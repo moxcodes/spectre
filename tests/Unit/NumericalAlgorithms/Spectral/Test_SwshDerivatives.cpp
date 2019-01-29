@@ -264,6 +264,34 @@ void test_compute_swsh_derivatives() noexcept {
             .data(),
         swsh_approx);
   }
+  {
+    INFO("Check the multiple argument function interface");
+    SpinWeighted<ComplexDataVector,
+                 Spin1 + Tags::derivative_spin_weight<DerivativeKind1>>
+        function_output_1{number_of_radial_points *
+                          number_of_swsh_collocation_points(l_max)};
+    SpinWeighted<ComplexDataVector,
+                 Spin2 + Tags::derivative_spin_weight<DerivativeKind2>>
+        function_output_2{number_of_radial_points *
+                          number_of_swsh_collocation_points(l_max)};
+    swsh_derivatives<tmpl::list<DerivativeKind1, DerivativeKind2>,
+                     Representation>(
+        l_max, number_of_radial_points, make_not_null(&function_output_1),
+        make_not_null(&function_output_2), get(db::get<TestTag<0, Spin1>>(box)),
+        get(db::get<TestTag<1, Spin2>>(box)));
+    CHECK_ITERABLE_CUSTOM_APPROX(expected_derivative_1_collocation_spin_1,
+                                 function_output_1.data(), swsh_approx);
+    CHECK_ITERABLE_CUSTOM_APPROX(expected_derivative_2_collocation_spin_2,
+                                 function_output_2.data(), swsh_approx);
+  }
+  {
+    INFO("Check the single argument function interface");
+    auto function_return = swsh_derivative<DerivativeKind1, Representation>(
+        l_max, number_of_radial_points, get(db::get<TestTag<0, Spin1>>(box)));
+    CHECK_ITERABLE_CUSTOM_APPROX(function_return.data(),
+                                 expected_derivative_1_collocation_spin_1,
+                                 swsh_approx);
+  }
 }
 
 SPECTRE_TEST_CASE("Unit.NumericalAlgorithms.Spectral.SwshDerivatives",
