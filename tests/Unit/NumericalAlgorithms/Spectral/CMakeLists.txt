@@ -14,6 +14,7 @@ set(LIBRARY_SOURCES
   Test_Spectral.cpp
   Test_SwshCoefficients.cpp
   Test_SwshCollocation.cpp
+  Test_SwshDerivatives.cpp
   Test_SwshTags.cpp
   Test_SwshTestHelpers.cpp
   Test_SwshTransformJob.cpp

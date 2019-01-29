@@ -65,7 +65,8 @@ void test_complex_diagonal_modal_operator_math() noexcept {
   const auto unary_ops = std::make_tuple(
       std::make_tuple(funcl::Conj<>{}, std::make_tuple(generic)),
       std::make_tuple(funcl::Imag<>{}, std::make_tuple(generic)),
-      std::make_tuple(funcl::Real<>{}, std::make_tuple(generic)));
+      std::make_tuple(funcl::Real<>{}, std::make_tuple(generic)),
+      std::make_tuple(funcl::Sqrt<>{}, std::make_tuple(generic)));
 
   TestHelpers::VectorImpl::test_functions_with_vector_arguments<
       TestHelpers::VectorImpl::TestKind::Normal, ComplexDiagonalModalOperator>(

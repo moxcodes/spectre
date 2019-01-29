@@ -54,7 +54,7 @@ using TestDerivativeTagList =
                Tags::Derivative<ExpectedTestTag<-1>, Tags::EthEthbar>,
                Tags::Derivative<TestTag<2>, Tags::EthbarEthbar>>;
 
-/// [make_swsh_transform_job_list]
+/// [make_transform_job_list]
 using ExpectedInverseJobs = tmpl::list<
     TransformJob<
         -1, ComplexRepresentation::RealsThenImags,
@@ -69,10 +69,10 @@ static_assert(
         make_swsh_transform_job_list<ComplexRepresentation::RealsThenImags,
                                      TestDerivativeTagList>,
         ExpectedInverseJobs>,
-    "failed testing make_swsh_transform_job_list");
-/// [make_swsh_transform_job_list]
+    "failed testing make_transform_job_list");
+/// [make_transform_job_list]
 
-/// [make_swsh_transform_from_derivative_tags]
+/// [make_transform_from_derivative_tags]
 using ExpectedJobs =
     tmpl::list<TransformJob<-1, ComplexRepresentation::Interleaved,
                             tmpl::list<TestTag<-1>, ExpectedTestTag<-1>>>,
@@ -84,8 +84,8 @@ static_assert(
         make_swsh_transform_job_list_from_derivative_tags<
             ComplexRepresentation::Interleaved, TestDerivativeTagList>,
         ExpectedJobs>,
-    "failed testing make_swsh_transform_job_list_from_derivative_tags");
-/// [make_swsh_transform_from_derivative_tags]
+    "failed testing make_transform_job_list_from_derivative_tags");
+/// [make_transform_from_derivative_tags]
 
 static_assert(
     cpp17::is_same_v<

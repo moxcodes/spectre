@@ -108,7 +108,7 @@ struct UnaryMapTrait<ComplexDiagonalModalOperator, Operator> {
   static_assert(
       tmpl::list_contains_v<
           tmpl::list<
-              blaze::Conj,
+              blaze::Conj, blaze::Sqrt,
               // these traits are required for operators acting with doubles
               blaze::AddScalar<ComplexDiagonalModalOperator::ElementType>,
               blaze::SubScalarRhs<ComplexDiagonalModalOperator::ElementType>,
@@ -160,7 +160,7 @@ struct MapTrait<ComplexDiagonalModalOperator, Operator> {
   static_assert(
       tmpl::list_contains_v<
           tmpl::list<
-              blaze::Conj,
+              blaze::Conj, blaze::Sqrt,
               // these traits are required for operators acting with doubles
               blaze::AddScalar<ComplexDiagonalModalOperator::ElementType>,
               blaze::SubScalarRhs<ComplexDiagonalModalOperator::ElementType>,
