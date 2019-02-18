@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <iosfwd>
 #include <limits>
@@ -195,6 +196,12 @@ const Matrix& differentiation_matrix(size_t num_points) noexcept;
  * \see differentiation_matrix(size_t)
  */
 const Matrix& differentiation_matrix(const Mesh<1>& mesh) noexcept;
+
+// TODO:dox
+template <Basis BasisType, Quadrature QuadratureType>
+const Matrix& integration_matrix(size_t num_points) noexcept;
+
+const Matrix& integration_matrix(const Mesh<1>& mesh) noexcept;
 
 /*!
  * \brief %Matrix used to interpolate to the \p target_points.

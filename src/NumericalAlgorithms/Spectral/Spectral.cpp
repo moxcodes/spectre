@@ -145,6 +145,22 @@ struct DifferentiationMatrixGenerator {
 };
 
 template <Basis BasisType, Quadrature QuadratureType>
+struct IntegrationMatrixGenerator {
+  Matrix operator()(const size_t num_points) const noexcept {
+    // improvement note: it might be the case that the accuracy on this
+    // technique could be improved if an analytically determined integration
+    // matrix could be generated instead.
+    Matrix derivative_matrix =
+        differentiation_matrix<BasisType, QuadratureType>(num_points);
+    for(size_t i = 0; i < num_points; ++i) {
+      derivative_matrix(0, i) = 0.0;
+    }
+    derivative_matrix(0, 0) = 1.0;
+    return inv(derivative_matrix);
+  }
+};
+
+template <Basis BasisType, Quadrature QuadratureType>
 struct SpectralToGridPointsMatrixGenerator {
   Matrix operator()(const size_t num_points) const noexcept {
     // To obtain the Vandermonde matrix we need to compute the basis function
@@ -259,12 +275,15 @@ const DataVector& quadrature_weights(const size_t num_points) noexcept {
 
 PRECOMPUTED_SPECTRAL_QUANTITY(differentiation_matrix, Matrix,
                               DifferentiationMatrixGenerator)
+PRECOMPUTED_SPECTRAL_QUANTITY(integration_matrix, Matrix,
+                              IntegrationMatrixGenerator)
 PRECOMPUTED_SPECTRAL_QUANTITY(spectral_to_grid_points_matrix, Matrix,
                               SpectralToGridPointsMatrixGenerator)
 PRECOMPUTED_SPECTRAL_QUANTITY(grid_points_to_spectral_matrix, Matrix,
                               GridPointsToSpectralMatrixGenerator)
 PRECOMPUTED_SPECTRAL_QUANTITY(linear_filter_matrix, Matrix,
                               LinearFilterMatrixGenerator)
+
 
 #undef PRECOMPUTED_SPECTRAL_QUANTITY
 /// \endcond
@@ -369,6 +388,7 @@ decltype(auto) get_spectral_quantity_for_mesh(F&& f,
 SPECTRAL_QUANTITY_FOR_MESH(collocation_points, DataVector)
 SPECTRAL_QUANTITY_FOR_MESH(quadrature_weights, DataVector)
 SPECTRAL_QUANTITY_FOR_MESH(differentiation_matrix, Matrix)
+SPECTRAL_QUANTITY_FOR_MESH(integration_matrix, Matrix)
 SPECTRAL_QUANTITY_FOR_MESH(spectral_to_grid_points_matrix, Matrix)
 SPECTRAL_QUANTITY_FOR_MESH(grid_points_to_spectral_matrix, Matrix)
 SPECTRAL_QUANTITY_FOR_MESH(linear_filter_matrix, Matrix)
@@ -402,6 +422,8 @@ Matrix interpolation_matrix(const Mesh<1>& mesh,
   template const Matrix&                                                      \
       Spectral::differentiation_matrix<BASIS(data), QUAD(data)>(              \
           size_t) noexcept;                                                   \
+  template const Matrix&                                                      \
+      Spectral::integration_matrix<BASIS(data), QUAD(data)>(size_t) noexcept; \
   template const Matrix&                                                      \
       Spectral::grid_points_to_spectral_matrix<BASIS(data), QUAD(data)>(      \
           size_t) noexcept;                                                   \
