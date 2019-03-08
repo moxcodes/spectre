@@ -26,7 +26,13 @@ number_of_swsh_coefficients(const size_t l_max) noexcept {
  * \brief Compute the relative sign change necessary to convert between the
  * libsharp basis for spin weight `from_spin_weight` to the basis for spin
  * weight `to_spin_weight`, for the real component coefficients if `real` is
- * true, otherwise for the imaginary component coefficients.
+ * true, otherwise for the imaginary component coefficients. The sign change for
+ * a given coefficient is equivalent to the product of
+ * `sharp_swsh_sign(from_spin, m, real) * sharp_swsh_sign(to_spin, m,
+ * real)`. Due to the form of the signs, it does not end up depending on m (the
+ * m's in the power of \f$-1\f$'s cancel).
+ * For full details of the libsharp sign conventions, see the documentation for
+ * TransformJob.
  *
  * \details The sign change is obtained by the
  * difference between the libsharp convention and the convention which uses:
@@ -71,8 +77,24 @@ constexpr SPECTRE_ALWAYS_INLINE double sharp_swsh_sign_change(
  * \f]
  *
  * See \cite Goldberg1966uu.
- * The sign change is computed the real component coefficients if `real` is
- * true, otherwise for the imaginary component coefficients.
+ * The sign change is computed for the real component coefficients if `real` is
+ * true, otherwise for the imaginary component coefficients. For full details on
+ * the sign convention used in libsharp, see the documentation for TransformJob.
+ * This function outputs the \f$\mathrm{sign}(m, s, \mathrm{real})\f$ necessary
+ * to produce the conversion between Goldberg moments and libsharp moments:
+ *
+ * \f{align*}{
+ * {}_s Y_{\ell m}^{\mathrm{real}, \mathrm{sharp}}  =& \mathrm{sign}(m, s,
+ * \mathrm{real=true}) {}_s Y_{\ell m}^{\mathrm{Goldberg}}\\
+ * {}_s Y_{\ell m}^{\mathrm{imag}, \mathrm{sharp}}  =&
+ * \mathrm{sign}(m, s, \mathrm{real=false}) {}_s Y_{\ell
+ * m}^{\mathrm{Goldberg}}.
+ * \f}
+ *
+ * Note that in this equation, the "real" and "imag" superscripts refer to the
+ * set of basis functions used for the decomposition of the real and imaginary
+ * part of the spin-weighted collocation points, not real or imaginary parts of
+ * the basis functions themselves.
  */
 constexpr SPECTRE_ALWAYS_INLINE double sharp_swsh_sign(
     const int spin_weight, const int m, const bool real) noexcept {

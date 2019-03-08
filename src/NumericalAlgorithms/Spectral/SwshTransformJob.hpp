@@ -60,7 +60,8 @@ namespace Swsh {
  * in [Wikipedia]
  * (https://en.wikipedia.org/wiki/Spin-weighted_spherical_harmonics)).
  * - libsharp deals only with the transformation of real values, so
- *   transformation of complex values must be done in multiple components.
+ *   transformation of complex values must be done for real and imaginary parts
+ *   separately.
  * - due to only transforming real components, it stores only the positive
  *   \f$m\f$ modes (as the rest would be redundant). Therefore, the negative
  *   \f$m\f$ modes must be inferred from conjugation and further sign changes.
@@ -74,7 +75,7 @@ namespace Swsh {
  * complex spin-weighted \f${}_s f\f$ can be represented mathematically as:
  *
  * \f{align*}{
- * {}_s f(\theta, \phi) = \sum_{\ell = 0}^{l_\mathrm{max}} \Bigg\{&
+ * {}_s f(\theta, \phi) = \sum_{\ell = 0}^{\ell_\mathrm{max}} \Bigg\{&
  * \left(\sum_{m = 0}^{\ell} a^\mathrm{sharp, real}_{l m} {}_s Y_{\ell
  * m}^\mathrm{sharp, real}\right) + \left(\sum_{m=1}^{\ell}
  * \left(a^\mathrm{sharp, real}_{l m}{}\right)^*
@@ -90,35 +91,58 @@ namespace Swsh {
  * \f{align*}{
  * {}_s Y_{\ell m}^\mathrm{sharp, real} &=
  * \begin{cases}
- * (-1)^{s + 1} {}_s Y_{\ell m}, & \mathrm{for}\; s < 0, m >=0 \\
- * {}_s Y_{\ell m}, & \mathrm{for}\; s = 0, m >=0 \\
- * - {}_s Y_{\ell m}, & \mathrm{for}\; s > 0, m >=0 \\
+ * (-1)^{s + 1} {}_s Y_{\ell m}, & \mathrm{for}\; s < 0, m \ge 0 \\
+ * {}_s Y_{\ell m}, & \mathrm{for}\; s = 0, m \ge 0 \\
+ * - {}_s Y_{\ell m}, & \mathrm{for}\; s > 0, m \ge 0 \\
  * (-1)^{s + m + 1} {}_s Y_{\ell m}, & \mathrm{for}\; s < 0, m < 0 \\
  * (-1)^{m} {}_s Y_{\ell m}, & \mathrm{for}\; s = 0, m < 0 \\
  * (-1)^{m + 1} {}_s Y_{\ell m}, & \mathrm{for}\; s > 0, m < 0
  * \end{cases} \\
+ * &\equiv {}_s S_{\ell m}^{\mathrm{real}} {}_s Y_{\ell m}\\
  * {}_s Y_{\ell m}^\mathrm{sharp, imag} &=
  * \begin{cases}
- * (-1)^{s + 1} {}_s Y_{\ell m}, & \mathrm{for}\; s < 0, m >=0 \\
- * -{}_s Y_{\ell m}, & \mathrm{for}\; s = 0, m >=0 \\
- * {}_s Y_{\ell m}, & \mathrm{for}\; s > 0, m >=0 \\
+ * (-1)^{s + 1} {}_s Y_{\ell m}, & \mathrm{for}\; s < 0, m \ge 0 \\
+ * -{}_s Y_{\ell m}, & \mathrm{for}\; s = 0, m \ge 0 \\
+ * {}_s Y_{\ell m}, & \mathrm{for}\; s > 0, m \ge 0 \\
  * (-1)^{s + m} {}_s Y_{\ell m}, & \mathrm{for}\; s < 0, m < 0 \\
  * (-1)^{m} {}_s Y_{\ell m}, & \mathrm{for}\; s = 0, m < 0 \\
  * (-1)^{m + 1} {}_s Y_{\ell m}, & \mathrm{for}\; s > 0, m < 0
- * \end{cases},
+ * \end{cases} \\
+ * &\equiv {}_s S_{\ell m}^{\mathrm{real}} {}_s Y_{\ell m},
  * \f}
  *
- * where the unadorned \f${}_s Y_{lm}\f$ on the right-hand-sides follow the
+ * where the unadorned \f${}_s Y_{\ell m}\f$ on the right-hand-sides follow the
  * (older) convention of \cite Goldberg1966uu. Note the phase in these
  * expressions is not completely standardized, so should be checked carefully
  * whenever coefficient data is directly manipulated.
  *
- * The resulting coefficients are stored in a triangular,
+ * For reference, we can compute the relation between Goldberg spin-weighted
+ * moments \f${}_s f_{\ell m}\f$, defined as
+ *
+ * \f[ {}_s f(\theta, \phi) = \sum_{\ell = 0}^{\ell_\mathrm{max}} \sum_{m =
+ * -\ell}^{\ell} {}_s f_{\ell m} {}_s Y_{\ell m}
+ * \f]
+ *
+ * so,
+ * \f[
+ * {}_s f_{\ell m} =
+ * \begin{cases}
+ * a_{\ell m}^{\mathrm{sharp}, \mathrm{real}}  {}_s S_{\ell m}^{\mathrm{real}} +
+ * a_{\ell m}^{\mathrm{sharp}, \mathrm{imag}}  {}_s S_{\ell m}^{\mathrm{imag}} &
+ * \mathrm{for} \; m \ge 0 \\
+ * \left(a_{\ell -m}^{\mathrm{sharp}, \mathrm{real}}\right)^* {}_s S_{\ell
+ * m}^{\mathrm{real}} + \left(a_{\ell -m}^{\mathrm{sharp},
+ * \mathrm{imag}}\right)^* {}_s S_{\ell m}^{\mathrm{imag}} &
+ * \mathrm{for} \; m < 0 \\
+ * \end{cases} \f]
+ *
+ *
+ * The resulting coefficients \f$a_{\ell m}\f$ are stored in a triangular,
  * \f$\ell\f$-varies-fastest configuration. So, for instance, the first
  * \f$\ell_\mathrm{max}\f$ entries contain the coefficients for \f$m=0\f$ and
  * all \f$\ell\f$s, and the next \f$\ell_\mathrm{max} - 1\f$ entries contain the
- * coefficients for \f$m=1\f$ and \f$1 \le \ell \le l_\mathrm{max} \f$, and so
- * on.
+ * coefficients for \f$m=1\f$ and \f$1 \le \ell \le \ell_\mathrm{max} \f$, and
+ * so on.
  */
 template <int Spin, ComplexRepresentation Representation, typename TagList>
 class TransformJob {
@@ -375,7 +399,9 @@ struct make_swsh_transform_job_list_impl<MinSpin, Representation, TagList,
 ///
 /// \details Up to five `TransformJob` will be returned, corresponding to
 /// the possible spin values. Any number of transformations are aggregated into
-/// that set of `TransformJob`s.
+/// that set of `TransformJob`s. The number of transforms is up to five because
+/// the libsharp utility only has capability to perform spin-weighted spherical
+/// harmonic transforms for integer spin-weights from -2 to 2.
 ///
 /// \snippet Test_SwshTransformJob.cpp make_swsh_transform_job_list
 template <ComplexRepresentation Representation, typename TagList>

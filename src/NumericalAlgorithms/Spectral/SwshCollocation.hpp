@@ -16,7 +16,8 @@ namespace Swsh {
 
 /// \ingroup SwshGroup
 /// \brief Convenience function for determining the number of spin-weighted
-/// spherical harmonic collocation values that are stored for a given `l_max`.
+/// spherical harmonic collocation values that are stored for a given `l_max`
+/// for a libsharp-compatible set of collocation points.
 constexpr SPECTRE_ALWAYS_INLINE size_t
 number_of_swsh_collocation_points(const size_t l_max) noexcept {
   return (l_max + 1) * (2 * l_max + 1);

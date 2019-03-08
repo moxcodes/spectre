@@ -107,17 +107,18 @@ void test_transform_and_inverse_transform() noexcept {
 
   // create the variables for the transformations
   // The four data structures will be used as:
-  // - expected coefficients: randomly generated
-  // - test collocation: computed from analytic expressions using the
-  //                     randomly generated coefficients
-  // - test coefficients: computed from test collocation points from forward
-  //                      transform
+  // - `generated_modes`: randomly generated
+  // - `test_collocation`: computed from analytic expressions using the
+  //                       randomly generated coefficients in `generated_modes`
+  // - `transformed_modes`: computed from test_collocation points from forward
+  //                        transform
   // next, we test the equivalence of the coefficients in test and expected
   // for the inverse transform test, we use:
-  // - expected collocation: copied from test collocation
-  // - test collocation: computed from an inverse transform of the test
-  //                     coefficients
-  // Finally, we test the equivalence of the expected and test collocation
+  // - `expected_collocation`: copied from `test_collocation`
+  // - `test_collocation`: computed from an inverse transform of the
+  //                       `transformed_modes`, overwriting the previous data
+  // Finally, we test the equivalence of the `expected_collocation` and
+  // `test_collocation`
   Variables<tmpl::list<ExpectedTestTag<S>, TestTag<S>>> collocation_data{
       number_of_radial_points * number_of_swsh_collocation_points(l_max), 0.0};
   Variables<tmpl::list<Tags::SwshTransform<ExpectedTestTag<S>>,
