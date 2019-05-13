@@ -148,15 +148,15 @@ void test_limiting_two_neighbors() noexcept {
       ](const ModalVector& upper_coeffs, const ModalVector& initial_coeffs,
         const ModalVector& lower_coeffs,
         const ModalVector& expected_coeffs) noexcept {
-    to_nodal_coefficients(&get(nodal_scalar_data_to_limit), initial_coeffs,
-                          mesh);
+    to_nodal_coefficients(make_not_null(&get(nodal_scalar_data_to_limit)),
+                          initial_coeffs, mesh);
     get(get<::Tags::Modal<ScalarTag<0>>>(
         package_data_upper.modal_volume_data)) = upper_coeffs;
     get(get<::Tags::Modal<ScalarTag<0>>>(
         package_data_lower.modal_volume_data)) = lower_coeffs;
     for (size_t i = 0; i < dim; ++i) {
-      to_nodal_coefficients(&nodal_vector_data_to_limit.get(i), initial_coeffs,
-                            mesh);
+      to_nodal_coefficients(make_not_null(&nodal_vector_data_to_limit.get(i)),
+                            initial_coeffs, mesh);
       get<::Tags::Modal<VectorTag<dim, 0>>>(
           package_data_upper.modal_volume_data)
           .get(i) = upper_coeffs;
@@ -166,7 +166,7 @@ void test_limiting_two_neighbors() noexcept {
     }
     krivodonova(&nodal_scalar_data_to_limit, &nodal_vector_data_to_limit,
                 element, mesh, neighbor_data);
-    to_nodal_coefficients(&expected, expected_coeffs, mesh);
+    to_nodal_coefficients(make_not_null(&expected), expected_coeffs, mesh);
     CHECK_ITERABLE_APPROX(get(nodal_scalar_data_to_limit), expected);
     for (size_t i = 0; i < dim; ++i) {
       CHECK_ITERABLE_APPROX(nodal_vector_data_to_limit.get(i), expected);
@@ -282,24 +282,24 @@ void test_limiting_different_values_different_tensors() noexcept {
   tnsr::I<DataVector, dim> nodal_vector_expected(num_pts, 0.0);
 
   // Limit top coeff from upper neighbor
-  to_nodal_coefficients(&get(nodal_scalar_data_to_limit), {3.0, -2.0, 2.0, 1.0},
-                        mesh);
+  to_nodal_coefficients(make_not_null(&get(nodal_scalar_data_to_limit)),
+                        ModalVector{3.0, -2.0, 2.0, 1.0}, mesh);
   get(get<::Tags::Modal<ScalarTag<0>>>(package_data_up_xi.modal_volume_data)) =
       ModalVector{7.0, 3.0, 2.5, 0.0};
   get(get<::Tags::Modal<ScalarTag<0>>>(package_data_lo_xi.modal_volume_data)) =
       ModalVector{1.0, -5.0, 1.0e-18, 0.0};
-  to_nodal_coefficients(&get(nodal_scalar_expected),
-                        {3.0, -2.0, 2.0, 0.5 * 0.99}, mesh);
+  to_nodal_coefficients(make_not_null(&get(nodal_scalar_expected)),
+                        ModalVector{3.0, -2.0, 2.0, 0.5 * 0.99}, mesh);
 
   // Limit top upper neighbor, limit second lower neighbor
-  to_nodal_coefficients(&nodal_vector_data_to_limit.get(0),
-                        {3.0, 2.0, 2.0, 1.0}, mesh);
+  to_nodal_coefficients(make_not_null(&nodal_vector_data_to_limit.get(0)),
+                        ModalVector{3.0, 2.0, 2.0, 1.0}, mesh);
   get<::Tags::Modal<VectorTag<dim, 0>>>(package_data_up_xi.modal_volume_data)
       .get(0) = ModalVector{7.0, 5.0, 2.5, 0.0};
   get<::Tags::Modal<VectorTag<dim, 0>>>(package_data_lo_xi.modal_volume_data)
       .get(0) = ModalVector{-2.1, 1.1, 1.0e-18, 0.0};
-  to_nodal_coefficients(&nodal_vector_expected.get(0),
-                        {3.0, 2.0, 0.9 * 0.99, 0.5 * 0.99}, mesh);
+  to_nodal_coefficients(make_not_null(&nodal_vector_expected.get(0)),
+                        ModalVector{3.0, 2.0, 0.9 * 0.99, 0.5 * 0.99}, mesh);
 
   krivodonova(&nodal_scalar_data_to_limit, &nodal_vector_data_to_limit, element,
               mesh, neighbor_data);
@@ -339,11 +339,12 @@ void test_package_data() noexcept {
 
   const ModalVector neighbor_modes{1.0, 2.0, 3.0, 4.0, 5.0, 6.0};
   Scalar<DataVector> tensor0(mesh.number_of_grid_points());
-  to_nodal_coefficients(&get(tensor0), neighbor_modes, mesh);
+  to_nodal_coefficients(make_not_null(&get(tensor0)), neighbor_modes, mesh);
 
   tnsr::I<DataVector, dim> tensor1(mesh.number_of_grid_points());
   for (size_t d = 0; d < dim; ++d) {
-    to_nodal_coefficients(&tensor1.get(d), (d + 2.0) * neighbor_modes, mesh);
+    to_nodal_coefficients(make_not_null(&tensor1.get(d)),
+                          ModalVector{(d + 2.0) * neighbor_modes}, mesh);
   }
   Limiter::PackagedData packaged_data{};
 
@@ -847,8 +848,9 @@ void test_limiting_different_values_different_tensors() noexcept {
   tnsr::I<DataVector, dim> nodal_vector_expected(num_pts, 0.0);
 
   // Limit (1,0) because +(0,0)
-  to_nodal_coefficients(&get(nodal_scalar_data_to_limit),
-                        {1.0, 3.0, 2.0, 3.0, 1.0, 2.0, 3.0, 2.0, 1.0}, mesh);
+  to_nodal_coefficients(
+      make_not_null(&get(nodal_scalar_data_to_limit)),
+      ModalVector{1.0, 3.0, 2.0, 3.0, 1.0, 2.0, 3.0, 2.0, 1.0}, mesh);
   get(get<::Tags::Modal<ScalarTag<0>>>(package_data_up_xi.modal_volume_data)) =
       ModalVector{1.5, 4.0, 7.0, 7.0, 3.0, 4.1, 4.0, 4.1, 0.0};
   get(get<::Tags::Modal<ScalarTag<0>>>(package_data_lo_xi.modal_volume_data)) =
@@ -857,14 +859,16 @@ void test_limiting_different_values_different_tensors() noexcept {
       ModalVector{5.0, 3.3, 7.0, 3.1, 3.0, 4.1, 4.0, 4.1, 0.0};
   get(get<::Tags::Modal<ScalarTag<0>>>(package_data_lo_eta.modal_volume_data)) =
       ModalVector{-5.0, -2.1, -5.0, -2.1, -5.0, 5.3, -5.0, 1.0e-18, 0.0};
-  to_nodal_coefficients(&get(nodal_scalar_expected),
-                        {1.0, 0.5 * 0.99, 1.0 * 0.99, 3.0, 0.3 * 0.99,
-                         2.0 * 0.99, 0.1 * 0.99, 0.99, 0.0},
-                        mesh);
+  to_nodal_coefficients(
+      make_not_null(&get(nodal_scalar_expected)),
+      ModalVector{1.0, 0.5 * 0.99, 1.0 * 0.99, 3.0, 0.3 * 0.99, 2.0 * 0.99,
+                  0.1 * 0.99, 0.99, 0.0},
+      mesh);
 
   // Zero (1,2) because +(0,2)
-  to_nodal_coefficients(&nodal_vector_data_to_limit.get(0),
-                        {0.0, 3.0, 2.0, 3.0, -2.0, 2.0, 3.0, 2.0, 1.0}, mesh);
+  to_nodal_coefficients(
+      make_not_null(&nodal_vector_data_to_limit.get(0)),
+      ModalVector{0.0, 3.0, 2.0, 3.0, -2.0, 2.0, 3.0, 2.0, 1.0}, mesh);
   get<::Tags::Modal<VectorTag<dim, 0>>>(package_data_up_xi.modal_volume_data)
       .get(0) = ModalVector{0.0, 7.0, 7.0, 7.0, 3.0, 4.1, 2.9, 4.1, 0.0};
   get<::Tags::Modal<VectorTag<dim, 0>>>(package_data_lo_xi.modal_volume_data)
@@ -875,12 +879,14 @@ void test_limiting_different_values_different_tensors() noexcept {
   get<::Tags::Modal<VectorTag<dim, 0>>>(package_data_lo_eta.modal_volume_data)
       .get(0) =
       ModalVector{0.0, -2.1, -5.0, -2.1, -5.0, 5.3, -5.0, 1.0e-18, 0.0};
-  to_nodal_coefficients(&nodal_vector_expected.get(0),
-                        {0.0, 3.0, 2.0, 3.0, -2.0, 2.0, 3.0, 0.0, 0.0}, mesh);
+  to_nodal_coefficients(
+      make_not_null(&nodal_vector_expected.get(0)),
+      ModalVector{0.0, 3.0, 2.0, 3.0, -2.0, 2.0, 3.0, 0.0, 0.0}, mesh);
 
   // Limit (2,1) because +(1,1)
-  to_nodal_coefficients(&nodal_vector_data_to_limit.get(1),
-                        {0.0, 3.0, 2.0, 3.0, -2.0, 2.0, 3.0, 2.0, 1.0}, mesh);
+  to_nodal_coefficients(
+      make_not_null(&nodal_vector_data_to_limit.get(1)),
+      ModalVector{0.0, 3.0, 2.0, 3.0, -2.0, 2.0, 3.0, 2.0, 1.0}, mesh);
   get<::Tags::Modal<VectorTag<dim, 0>>>(package_data_up_xi.modal_volume_data)
       .get(1) = ModalVector{0.0, 7.0, 5.0, 7.0, 3.0, 4.1, 7.0, 4.1, 0.0};
   get<::Tags::Modal<VectorTag<dim, 0>>>(package_data_lo_xi.modal_volume_data)
@@ -891,9 +897,9 @@ void test_limiting_different_values_different_tensors() noexcept {
   get<::Tags::Modal<VectorTag<dim, 0>>>(package_data_lo_eta.modal_volume_data)
       .get(1) =
       ModalVector{0.0, -2.1, -5.0, -2.1, -4.0, 5.3, -5.0, 1.0e-18, 0.0};
-  to_nodal_coefficients(&nodal_vector_expected.get(1),
-                        {0.0, 3.0, 2.0, 3.0, -2.0, 2.0, 3.0, 0.99 * 2.0, 0.0},
-                        mesh);
+  to_nodal_coefficients(
+      make_not_null(&nodal_vector_expected.get(1)),
+      ModalVector{0.0, 3.0, 2.0, 3.0, -2.0, 2.0, 3.0, 0.99 * 2.0, 0.0}, mesh);
 
   krivodonova(&nodal_scalar_data_to_limit, &nodal_vector_data_to_limit, element,
               mesh, neighbor_data);
@@ -956,8 +962,8 @@ void run() noexcept {
         const ModalVector& initial_coeffs, const ModalVector& lo_xi_coeffs,
         const ModalVector& lo_eta_coeffs,
         const ModalVector& expected_coeffs) noexcept {
-    to_nodal_coefficients(&get(nodal_scalar_data_to_limit), initial_coeffs,
-                          mesh);
+    to_nodal_coefficients(make_not_null(&get(nodal_scalar_data_to_limit)),
+                          initial_coeffs, mesh);
     get(get<::Tags::Modal<ScalarTag<0>>>(
         package_data_up_xi.modal_volume_data)) = up_xi_coeffs;
     get(get<::Tags::Modal<ScalarTag<0>>>(
@@ -967,7 +973,7 @@ void run() noexcept {
     get(get<::Tags::Modal<ScalarTag<0>>>(
         package_data_lo_eta.modal_volume_data)) = lo_eta_coeffs;
     krivodonova(&nodal_scalar_data_to_limit, element, mesh, neighbor_data);
-    to_nodal_coefficients(&expected, expected_coeffs, mesh);
+    to_nodal_coefficients(make_not_null(&expected), expected_coeffs, mesh);
     CHECK_ITERABLE_APPROX(get(nodal_scalar_data_to_limit), expected);
   };
 
@@ -1007,11 +1013,12 @@ void test_package_data() noexcept {
       0.0,  1.0,  2.0,  3.0,  4.0,  5.0,  6.0,  7.0,  8.0,  9.0,  10.0, 11.0,
       12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0};
   Scalar<DataVector> tensor0(mesh.number_of_grid_points());
-  to_nodal_coefficients(&get(tensor0), neighbor_modes, mesh);
+  to_nodal_coefficients(make_not_null(&get(tensor0)), neighbor_modes, mesh);
 
   tnsr::I<DataVector, dim> tensor1(mesh.number_of_grid_points());
   for (size_t d = 0; d < dim; ++d) {
-    to_nodal_coefficients(&tensor1.get(d), (d + 2.0) * neighbor_modes, mesh);
+    to_nodal_coefficients(make_not_null(&tensor1.get(d)),
+                          ModalVector{(d + 2.0) * neighbor_modes}, mesh);
   }
   Limiter::PackagedData packaged_data{};
 
@@ -2586,11 +2593,12 @@ void test_limiting_different_values_different_tensors() noexcept {
   tnsr::I<DataVector, dim> nodal_vector_expected(num_pts, 0.0);
 
   // Limit (2,2,1) because +(1,2,1)
-  to_nodal_coefficients(&get(nodal_scalar_data_to_limit),
-                        {0.0,  1.0,  2.0,  3.0,  4.0,  5.0,  6.0,  7.0,  -2.0,
-                         9.0,  10.0, 11.0, 12.0, 13.0, -2.0, 15.0, -2.0, 2.0,
-                         18.0, 19.0, -2.0, 21.0, -2.0, 2.0,  -2.0, 2.0,  1.0},
-                        mesh);
+  to_nodal_coefficients(
+      make_not_null(&get(nodal_scalar_data_to_limit)),
+      ModalVector{0.0,  1.0,  2.0,  3.0,  4.0,  5.0,  6.0,  7.0,  -2.0,
+                  9.0,  10.0, 11.0, 12.0, 13.0, -2.0, 15.0, -2.0, 2.0,
+                  18.0, 19.0, -2.0, 21.0, -2.0, 2.0,  -2.0, 2.0,  1.0},
+      mesh);
   get(get<::Tags::Modal<ScalarTag<0>>>(package_data_up_xi.modal_volume_data)) =
       ModalVector{0.0,  1.0,   2.0,  3.0,  4.0,  5.0, 6.0,  3.0,  3.0,
                   9.0,  10.0,  11.0, 12.0, 13.0, 2.0, 15.0, -1.1, 4.1,
@@ -2618,18 +2626,19 @@ void test_limiting_different_values_different_tensors() noexcept {
                   9.0,  10.0, 28.0, 12.0, 13.0, -5.0,    31.0, -5.0,    1.0e-18,
                   18.0, 19.0, -5.0, 21.0, -5.0, 1.0e-18, -5.0, 1.0e-18, 0.0};
   to_nodal_coefficients(
-      &get(nodal_scalar_expected),
-      {0.0,  1.0,  2.0,  3.0,  4.0,  5.0,  6.0,  7.0,  -2.0,
-       9.0,  10.0, 11.0, 12.0, 13.0, -2.0, 15.0, -2.0, 0.9 * 0.99,
-       18.0, 19.0, -2.0, 21.0, -2.0, 2.0,  -2.0, 2.0,  0.5 * 0.99},
+      make_not_null(&get(nodal_scalar_expected)),
+      ModalVector{0.0,  1.0,  2.0,  3.0,  4.0,  5.0,  6.0,  7.0,  -2.0,
+                  9.0,  10.0, 11.0, 12.0, 13.0, -2.0, 15.0, -2.0, 0.9 * 0.99,
+                  18.0, 19.0, -2.0, 21.0, -2.0, 2.0,  -2.0, 2.0,  0.5 * 0.99},
       mesh);
 
   // Limit (2,1,2) because +(1,1,2)
-  to_nodal_coefficients(&nodal_vector_data_to_limit.get(0),
-                        {0.0,  1.0,  2.0,  3.0,  4.0,  5.0,  6.0,  7.0,  -2.0,
-                         9.0,  10.0, 11.0, 12.0, 13.0, -2.0, 15.0, -2.0, 2.0,
-                         18.0, 19.0, -2.0, 21.0, -2.0, 2.0,  -2.0, 2.0,  1.0},
-                        mesh);
+  to_nodal_coefficients(
+      make_not_null(&nodal_vector_data_to_limit.get(0)),
+      ModalVector{0.0,  1.0,  2.0,  3.0,  4.0,  5.0,  6.0,  7.0,  -2.0,
+                  9.0,  10.0, 11.0, 12.0, 13.0, -2.0, 15.0, -2.0, 2.0,
+                  18.0, 19.0, -2.0, 21.0, -2.0, 2.0,  -2.0, 2.0,  1.0},
+      mesh);
   get<::Tags::Modal<VectorTag<dim, 0>>>(package_data_up_xi.modal_volume_data)
       .get(0) =
       ModalVector{0.0,  1.0,   2.0,  3.0,  4.0,   5.0, 6.0,  3.0, 3.0,
@@ -2660,18 +2669,20 @@ void test_limiting_different_values_different_tensors() noexcept {
                   9.0,  10.0, 28.0, 12.0, 13.0, -5.0,    31.0, -5.0,    1.0e-18,
                   18.0, 19.0, -5.0, 21.0, -5.0, 1.0e-18, -5.0, 1.0e-18, 0.0};
   to_nodal_coefficients(
-      &nodal_vector_expected.get(0),
-      {0.0,  1.0,  2.0,  3.0,  4.0,  5.0,         6.0,  7.0,  -2.0,
-       9.0,  10.0, 11.0, 12.0, 13.0, -2.0,        15.0, -2.0, 2.0,
-       18.0, 19.0, -2.0, 21.0, -2.0, 0.85 * 0.99, -2.0, 2.0,  0.5 * 0.99},
+      make_not_null(&nodal_vector_expected.get(0)),
+      ModalVector{0.0,  1.0,  2.0,         3.0,  4.0,  5.0,       6.0,
+                  7.0,  -2.0, 9.0,         10.0, 11.0, 12.0,      13.0,
+                  -2.0, 15.0, -2.0,        2.0,  18.0, 19.0,      -2.0,
+                  21.0, -2.0, 0.85 * 0.99, -2.0, 2.0,  0.5 * 0.99},
       mesh);
 
   // Limit (1,2,2) because +(0,2,2)
-  to_nodal_coefficients(&nodal_vector_data_to_limit.get(1),
-                        {0.0,  1.0,  2.0,  3.0,  4.0,  5.0,  6.0,  7.0,  -2.0,
-                         9.0,  10.0, 11.0, 12.0, 13.0, -2.0, 15.0, -2.0, 2.0,
-                         18.0, 19.0, -2.0, 21.0, -2.0, 2.0,  -2.0, 2.0,  1.0},
-                        mesh);
+  to_nodal_coefficients(
+      make_not_null(&nodal_vector_data_to_limit.get(1)),
+      ModalVector{0.0,  1.0,  2.0,  3.0,  4.0,  5.0,  6.0,  7.0,  -2.0,
+                  9.0,  10.0, 11.0, 12.0, 13.0, -2.0, 15.0, -2.0, 2.0,
+                  18.0, 19.0, -2.0, 21.0, -2.0, 2.0,  -2.0, 2.0,  1.0},
+      mesh);
   get<::Tags::Modal<VectorTag<dim, 0>>>(package_data_up_xi.modal_volume_data)
       .get(1) =
       ModalVector{0.0,  1.0,   2.0,  3.0,  4.0,  5.0, 6.0,   3.0, 3.0,
@@ -2702,18 +2713,20 @@ void test_limiting_different_values_different_tensors() noexcept {
                   9.0,  10.0, 28.0, 12.0, 13.0, -5.0,    31.0, -5.0,    1.0e-18,
                   18.0, 19.0, -5.0, 21.0, -5.0, 1.0e-18, -5.0, 1.0e-18, 0.0};
   to_nodal_coefficients(
-      &nodal_vector_expected.get(1),
-      {0.0,  1.0,  2.0,  3.0,  4.0,  5.0,  6.0,  7.0,         -2.0,
-       9.0,  10.0, 11.0, 12.0, 13.0, -2.0, 15.0, -2.0,        2.0,
-       18.0, 19.0, -2.0, 21.0, -2.0, 2.0,  -2.0, 1.36 * 0.99, 0.5 * 0.99},
+      make_not_null(&nodal_vector_expected.get(1)),
+      ModalVector{0.0,  1.0,  2.0,  3.0,  4.0,         5.0,       6.0,
+                  7.0,  -2.0, 9.0,  10.0, 11.0,        12.0,      13.0,
+                  -2.0, 15.0, -2.0, 2.0,  18.0,        19.0,      -2.0,
+                  21.0, -2.0, 2.0,  -2.0, 1.36 * 0.99, 0.5 * 0.99},
       mesh);
 
   // Limit (2,1,0) because -(2,0,0)
-  to_nodal_coefficients(&nodal_vector_data_to_limit.get(2),
-                        {0.0,  1.0,  2.0,  3.0,  4.0,  5.0,  6.0,  7.0,  -2.0,
-                         9.0,  10.0, 11.0, 12.0, 13.0, -2.0, 15.0, -2.0, 2.0,
-                         18.0, 19.0, -2.0, 21.0, -2.0, 2.0,  -2.0, 2.0,  1.0},
-                        mesh);
+  to_nodal_coefficients(
+      make_not_null(&nodal_vector_data_to_limit.get(2)),
+      ModalVector{0.0,  1.0,  2.0,  3.0,  4.0,  5.0,  6.0,  7.0,  -2.0,
+                  9.0,  10.0, 11.0, 12.0, 13.0, -2.0, 15.0, -2.0, 2.0,
+                  18.0, 19.0, -2.0, 21.0, -2.0, 2.0,  -2.0, 2.0,  1.0},
+      mesh);
   get<::Tags::Modal<VectorTag<dim, 0>>>(package_data_up_xi.modal_volume_data)
       .get(2) =
       ModalVector{0.0,   10.0,  2.0,  3.0,   8.0,  5.0, 60.0,  3.0, 3.0,
@@ -2745,12 +2758,12 @@ void test_limiting_different_values_different_tensors() noexcept {
       -90.0, -100.0, 28.0,  -120.0, 14.0,  -5.0,    31.0,  -5.0,    1.0e-18,
       18.0,  19.0,   -5.0,  21.0,   -5.0,  1.0e-18, -5.0,  1.0e-18, 0.0};
   to_nodal_coefficients(
-      &nodal_vector_expected.get(2),
-      {0.0,  1.0,         2.0,         3.0,  4.0,         0.5 * 0.99,
-       6.0,  7.0,         -2.0,        9.0,  10.0,        11.0,
-       12.0, 13.0,        -0.5 * 0.99, 15.0, -1.0 * 0.99, 2.0,
-       18.0, 19.0,        -0.99,       21.0, -1.0 * 0.99, 2.0,
-       -2.0, 0.97 * 0.99, 0.5 * 0.99},
+      make_not_null(&nodal_vector_expected.get(2)),
+      ModalVector{0.0,  1.0,         2.0,         3.0,  4.0,         0.5 * 0.99,
+                  6.0,  7.0,         -2.0,        9.0,  10.0,        11.0,
+                  12.0, 13.0,        -0.5 * 0.99, 15.0, -1.0 * 0.99, 2.0,
+                  18.0, 19.0,        -0.99,       21.0, -1.0 * 0.99, 2.0,
+                  -2.0, 0.97 * 0.99, 0.5 * 0.99},
       mesh);
 
   krivodonova(&nodal_scalar_data_to_limit, &nodal_vector_data_to_limit, element,
@@ -2825,8 +2838,8 @@ void run() noexcept {
         const ModalVector& lo_xi_coeffs, const ModalVector& lo_eta_coeffs,
         const ModalVector& lo_zeta_coeffs,
         const ModalVector& expected_coeffs) noexcept {
-    to_nodal_coefficients(&get(nodal_scalar_data_to_limit), initial_coeffs,
-                          mesh);
+    to_nodal_coefficients(make_not_null(&get(nodal_scalar_data_to_limit)),
+                          initial_coeffs, mesh);
     get(get<::Tags::Modal<ScalarTag<0>>>(
         package_data_up_xi.modal_volume_data)) = up_xi_coeffs;
     get(get<::Tags::Modal<ScalarTag<0>>>(
@@ -2841,8 +2854,8 @@ void run() noexcept {
         package_data_lo_zeta.modal_volume_data)) = lo_zeta_coeffs;
 
     for (size_t i = 0; i < dim; ++i) {
-      to_nodal_coefficients(&nodal_vector_data_to_limit.get(i), initial_coeffs,
-                            mesh);
+      to_nodal_coefficients(make_not_null(&nodal_vector_data_to_limit.get(i)),
+                            initial_coeffs, mesh);
       get<::Tags::Modal<VectorTag<dim, 0>>>(
           package_data_up_xi.modal_volume_data)
           .get(i) = up_xi_coeffs;
@@ -2865,7 +2878,7 @@ void run() noexcept {
 
     krivodonova(&nodal_scalar_data_to_limit, &nodal_vector_data_to_limit,
                 element, mesh, neighbor_data);
-    to_nodal_coefficients(&expected, expected_coeffs, mesh);
+    to_nodal_coefficients(make_not_null(&expected), expected_coeffs, mesh);
     CHECK_ITERABLE_APPROX(get(nodal_scalar_data_to_limit), expected);
     for (size_t i = 0; i < dim; ++i) {
       CHECK_ITERABLE_APPROX(nodal_vector_data_to_limit.get(i), expected);
