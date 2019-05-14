@@ -6,6 +6,7 @@ set(LIBRARY Cce)
 set(LIBRARY_SOURCES
   Equations.cpp
   LinearOperators.cpp
+  PrecomputeCceDependencies.cpp
   )
 
 add_spectre_library(${LIBRARY} ${LIBRARY_SOURCES})
