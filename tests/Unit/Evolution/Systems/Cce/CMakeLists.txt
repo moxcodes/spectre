@@ -7,6 +7,7 @@ set(LIBRARY_SOURCES
   Test_Equations.cpp
   CceComputationTestHelpers.cpp
   Test_ComputePreSwshDerivatives.cpp
+  Test_ComputeSwshDerivatives.cpp
   Test_InitializeCce.cpp
   Test_LinearOperators.cpp
   Test_PrecomputeCceDependencies.cpp

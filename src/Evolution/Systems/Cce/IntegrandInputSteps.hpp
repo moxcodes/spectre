@@ -273,10 +273,11 @@ using all_swsh_derivative_tags = tmpl::remove_duplicates<
  * `TransformJob`). Providing a `Variables` of this form is necessary for the
  * use of the aggregated computation `mutate_all_swsh_derivatives_for_tag`.
  */
-using all_transform_buffer_tags = tmpl::flatten<tmpl::transform<
-    all_swsh_derivative_tags,
-    tmpl::bind<Spectral::Swsh::coefficient_buffer_tags_for_derivative_tag,
-               tmpl::_1>>>;
+using all_transform_buffer_tags =
+    tmpl::remove_duplicates<tmpl::flatten<tmpl::transform<
+        all_swsh_derivative_tags,
+        tmpl::bind<Spectral::Swsh::coefficient_buffer_tags_for_derivative_tag,
+                   tmpl::_1>>>>;
 
 namespace detail {
 template <typename BondiTag>

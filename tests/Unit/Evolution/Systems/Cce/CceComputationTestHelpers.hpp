@@ -118,9 +118,8 @@ struct CalculateSeparatedTag<Spectral::Swsh::Tags::Derivative<Tag, DerivKind>> {
             Spectral::Swsh::Tags::Derivative<Tag, DerivKind>>>(
         *angular_collocation)) =
         Spectral::Swsh::swsh_derivative<DerivKind>(
-            make_not_null(
-                &get(get<AngularCollocationsFor<Tag>>(*angular_collocation))),
-            l_max);
+            l_max, 1,
+            get(get<AngularCollocationsFor<Tag>>(*angular_collocation)));
     // The spin-weighted derivatives are evaluated at constant r, so the radial
     // coefficients are unaltered.
     get(get<RadialPolyCoefficientsFor<
