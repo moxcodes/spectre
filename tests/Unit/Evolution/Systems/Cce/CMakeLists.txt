@@ -5,6 +5,7 @@ set(LIBRARY "Test_Cce")
 
 set(LIBRARY_SOURCES
   Test_Equations.cpp
+  Test_LinearOperators.cpp
   )
 
 add_test_library(
