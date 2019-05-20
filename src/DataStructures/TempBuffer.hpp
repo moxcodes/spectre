@@ -4,10 +4,12 @@
 #pragma once
 
 #include <cstddef>
+#include <type_traits>
 
 #include "DataStructures/Variables.hpp"
 #include "Utilities/TMPL.hpp"
 #include "Utilities/TaggedTuple.hpp"
+#include "Utilities/TypeTraits.hpp"
 
 /*!
  * \ingroup DataStructuresGroup
