@@ -34,6 +34,11 @@ struct BondiH : db::SimpleTag {
   static std::string name() noexcept { return "H"; }
 };
 
+struct SpecH : db::SimpleTag {
+  using type = Scalar<SpinWeighted<ComplexDataVector, 2>>;
+  static std::string name() noexcept { return "SpecH"; }
+};
+
 /// Bondi parameter \f$J\f$
 struct BondiJ : db::SimpleTag {
   using type = Scalar<SpinWeighted<ComplexDataVector, 2>>;
@@ -100,6 +105,24 @@ struct Dr : db::PrefixTag, db::SimpleTag {
   static std::string name() noexcept { return "Dr(" + Tag::name() + ")"; }
 };
 
+
+struct GaugeA : db::SimpleTag {
+  using type = Scalar<ComplexDataVector, 2>;
+  static std::string name() noexcept { return "GaugeA"; }
+};
+
+struct GaugeB : db::SimpleTag {
+  using type = Scalar<ComplexDataVector, 0>;
+  static std::string name() noexcept { return "GaugeB"; }
+};
+
+// For expressing the Cauchy angular coordinates for the worldtube data in terms
+// of the evolution angular coordinates.
+struct CauchyAngularCoords : db::SimpleTag {
+  using type = tnsr::i<DataVector, 2>;
+  static std::string name() noexcept { return "CauchyAngularCoords";}
+};
+
 // prefix tags associated with the integrands which are used as input to solvers
 // for the CCE equations
 
@@ -122,6 +145,15 @@ struct BoundaryValue : db::PrefixTag, db::SimpleTag {
   using tag = Tag;
   static std::string name() noexcept {
     return "BoundaryValue(" + Tag::name() + ")";
+  }
+};
+
+template <typename Tag>
+struct EvolutionGaugeBoundaryValue : db::PrefixTag, db::SimpleTag {
+  using type = Scalar<SpinWeighted<ComplexDataVector, Tag::type::type::spin>>;
+  using tag = Tag;
+  static std::string name() noexcept {
+    return "EvolutionGaugeBoundaryValue(" + Tag::name() + ")";
   }
 };
 

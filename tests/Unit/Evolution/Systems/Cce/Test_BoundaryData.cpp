@@ -10,8 +10,7 @@
 
 namespace Cce {
 
-SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.BoundaryData",
-                  "[Unit][Evolution]") {
+void pypp_test_worltube_computation_steps() noexcept {
   pypp::SetupLocalPythonEnvironment local_python_env{"Evolution/Systems/Cce/"};
 
   pypp::check_with_random_values<1>(
@@ -48,24 +47,14 @@ SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.BoundaryData",
                                      "calculate_inverse_dlambda_null_metric"},
                                     {{{0.01, 10.0}}}, DataVector{1});
 
+}
 
-  // pypp::check_with_random_values<1>(&(
-  //     PyppForwardingStruct<
-  //         1, decltype(
-  //             &calculate_cartesian_to_angular_coordinates_and_derivatives)>{
-  //         calculate_cartesian_to_angular_coordinates_and_derivatives},
-  //     "BoundaryData", , {{{0.01, 10.0}}},
-  //     DataVector{20}));
+SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.BoundaryData",
+                  "[Unit][Evolution]") {
+  // TODO test the spherical harmonic transform steps  at the start and any
+  // functions not testable with pypp
 
-  // pypp::check_with_random_values<1>(&(
-  //     PyppForwardingStruct<
-  //         2, decltype(
-  //  &calculate_cartesian_to_angular_coordinates_and_derivatives)>{
-  //         calculate_cartesian_to_angular_coordinates_and_derivatives},
-  //     "BoundaryData", "compute_cartesian_to_angular_inverse_jacobian",
-  //     {{{0.01, 10.0}}}, DataVector{20}));
-
-  CceBoundaryDataManager<LinearInterpolator, 5>{"./CceR0535.h5", 16};
+  pypp_test_worldtube_computation_steps();
 }
 
 }  // namespace Cce
