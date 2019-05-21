@@ -5,10 +5,12 @@ set(LIBRARY Cce)
 
 set(LIBRARY_SOURCES
   BoundaryData.cpp
+  CceEvolve.cpp
   Equations.cpp
   LinearOperators.cpp
   LinearSolve.cpp
   PrecomputeCceDependencies.cpp
+  ReadBoundaryDataH5.cpp
   )
 
 add_spectre_library(${LIBRARY} ${LIBRARY_SOURCES})
