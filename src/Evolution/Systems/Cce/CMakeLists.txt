@@ -10,6 +10,7 @@ set(LIBRARY_SOURCES
   LinearOperators.cpp
   LinearSolve.cpp
   PrecomputeCceDependencies.cpp
+  SerialEvolveHelpers.cpp
   )
 
 add_spectre_library(${LIBRARY} ${LIBRARY_SOURCES})

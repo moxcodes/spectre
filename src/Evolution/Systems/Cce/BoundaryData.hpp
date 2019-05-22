@@ -372,7 +372,8 @@ void create_bondi_boundary_data_from_cauchy(
     buffer_for_derivatives.data() =
         std::complex<double>(1.0, 0.0) * null_l.get(a);
     Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
-        make_not_null(&eth_buffer), l_max);
+        make_not_null(&eth_buffer), make_not_null(&buffer_for_derivatives),
+        l_max);
     angular_d_null_l.get(1, a) = -real(eth_buffer.data());
     angular_d_null_l.get(2, a) = -imag(eth_buffer.data());
     angular_d_null_l.get(0, a) = 0.0;

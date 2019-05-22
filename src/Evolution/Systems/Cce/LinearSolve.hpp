@@ -313,12 +313,14 @@ struct RadialIntegrateBondi<BoundaryPrefix, Tags::BondiH> {
       }
       operator_matrix(0, 0) = 1.0;
       operator_matrix(number_of_radial_points, number_of_radial_points) = 1.0;
+
       // put the data currently in integrand into a real DataVector of twice the
       // length
       linear_solve_buffer[offset * 2 * number_of_radial_points] =
           real(get(boundary).data()[offset]);
       linear_solve_buffer[(offset * 2 + 1) * number_of_radial_points] =
           imag(get(boundary).data()[offset]);
+
       std::vector<int> ipiv(2 * number_of_radial_points);
       int twice_size = 2 * number_of_radial_points;
       int info = 0;

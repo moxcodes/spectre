@@ -55,4 +55,21 @@ struct CalculateScriPlusValue<Tags::News> {
          2.0 * square(eth_beta_at_scri));
   }
 };
+
+template <>
+struct CalculateScriPlusValue<Tags::Du<Tags::InertialRetardedTime>> {
+
+  using argument_tags = tmpl::list<Tags::Exp2Beta>;
+  using return_tags = tmpl::list<Tags::Du<Tags::InertialRetardedTime>>;
+
+  static void apply(
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*>
+          du_inertial_time,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& exp2beta) noexcept {
+    ComplexDataVector buffer = get(exp2beta).data();
+    get(*du_intertial_time).data() = ComplexDataVector{
+        buffer.data() + buffer.size() - get(*du_intertial_time).size(),
+        get(*du_intertial_time).size()};
+}
+};
 }  // namespace Cce

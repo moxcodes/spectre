@@ -36,22 +36,42 @@ struct InitializeJ {
                                    Tags::BoundaryValue<Tags::BondiR>>;
 
   using return_tags = tmpl::list<Tags::BondiJ>;
-  using argument_tags = tmpl::append<boundary_tags>;
+  using argument_tags = tmpl::append<boundary_tags, tmpl::list<Tags::LMax>>;
 
   static void apply(
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> j,
       const Scalar<SpinWeighted<ComplexDataVector, 2>>& boundary_j,
       const Scalar<SpinWeighted<ComplexDataVector, 2>>& boundary_dr_j,
-      const Scalar<SpinWeighted<ComplexDataVector, 0>>& r) noexcept {
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& r,
+      const size_t l_max) noexcept {
     const size_t number_of_radial_points =
         get(*j).size() / get(boundary_j).size();
+    printf("size tests %zu, %zu\n", get(boundary_j).size(),
+           Spectral::Swsh::number_of_swsh_collocation_points(l_max));
     const auto& one_minus_y_collocation =
         1.0 - Spectral::collocation_points<Spectral::Basis::Legendre,
                                            Spectral::Quadrature::GaussLobatto>(
                   number_of_radial_points);
+    // TEST debug trying making volume
+    auto one_minus_y = ComplexDataVector{get(*j).size()};
+    // iterate through the angular 'chunks' and set them to their 1-y value
+    for (size_t i = 0; i < number_of_radial_points; ++i) {
+      ComplexDataVector angular_view{
+          one_minus_y.data() + get(boundary_j).size() * i,
+          get(boundary_j).size()};
+      angular_view = one_minus_y_collocation[i];
+    }
+
+    // const auto& one_minus_y_collocation =
+    // 1.0 - Spectral::collocation_points<Spectral::Basis::Legendre,
+    // Spectral::Quadrature::GaussLobatto>(
+    // number_of_radial_points);
     for (size_t i = 0; i < number_of_radial_points; i++) {
       ComplexDataVector angular_view_j{
           get(*j).data().data() + get(boundary_j).size() * i,
+          get(boundary_j).size()};
+      ComplexDataVector angular_view_one_minus_y{
+          one_minus_y.data() + get(boundary_j).size() * i,
           get(boundary_j).size()};
       const auto one_minus_y_coefficient =
           0.25 * (3.0 * get(boundary_j).data() +
@@ -64,5 +84,5 @@ struct InitializeJ {
           pow<3>(one_minus_y_collocation[i]) * one_minus_y_cubed_coefficient;
     }
   }
-};
+};  // namespace Cce
 }  // namespace Cce

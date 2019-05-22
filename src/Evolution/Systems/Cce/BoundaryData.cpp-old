@@ -3,26 +3,36 @@
 
 #include "Evolution/Systems/Cce/BoundaryData.hpp"
 #include "ApparentHorizons/SpherepackIterator.hpp"
-#include "DataStructures/TempBuffer.hpp"
 #include "NumericalAlgorithms/LinearOperators/Transpose.hpp"
 
 namespace Cce {
 
-void trigonometric_functions_on_swsh_collocation(
+void calculate_trigonometric_functions_on_swsh_collocation(
     const gsl::not_null<Scalar<DataVector>*> cos_phi,
     const gsl::not_null<Scalar<DataVector>*> cos_theta,
     const gsl::not_null<Scalar<DataVector>*> sin_phi,
     const gsl::not_null<Scalar<DataVector>*> sin_theta,
     const size_t l_max) noexcept {
-  check_and_resize(make_not_null(&get(*cos_phi)),
-                   Spectral::Swsh::number_of_swsh_collocation_points(l_max));
-  check_and_resize(make_not_null(&get(*cos_theta)),
-                   Spectral::Swsh::number_of_swsh_collocation_points(l_max));
-  check_and_resize(make_not_null(&get(*sin_phi)),
-                   Spectral::Swsh::number_of_swsh_collocation_points(l_max));
-  check_and_resize(make_not_null(&get(*sin_theta)),
-                   Spectral::Swsh::number_of_swsh_collocation_points(l_max));
-
+  if (UNLIKELY(get(*cos_phi).size() !=
+               Spectral::Swsh::number_of_swsh_collocation_points(l_max))) {
+    *cos_phi = Scalar<DataVector>{
+        Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
+  }
+  if (UNLIKELY(get(*cos_theta).size() !=
+               Spectral::Swsh::number_of_swsh_collocation_points(l_max))) {
+    *cos_theta = Scalar<DataVector>{
+        Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
+  }
+  if (UNLIKELY(get(*sin_phi).size() !=
+               Spectral::Swsh::number_of_swsh_collocation_points(l_max))) {
+    *sin_phi = Scalar<DataVector>{
+        Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
+  }
+  if (UNLIKELY(get(*sin_theta).size() !=
+               Spectral::Swsh::number_of_swsh_collocation_points(l_max))) {
+    *sin_theta = Scalar<DataVector>{
+        Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
+  }
   const auto& collocation = Spectral::Swsh::precomputed_collocation<
       Spectral::Swsh::ComplexRepresentation::Interleaved>(l_max);
   for (const auto& collocation_point : collocation) {
@@ -33,7 +43,7 @@ void trigonometric_functions_on_swsh_collocation(
   }
 }
 
-void cartesian_to_angular_coordinates_and_derivatives(
+void calculate_cartesian_to_angular_coordinates_and_derivatives(
     const gsl::not_null<tnsr::I<DataVector, 3>*> cartesian_coords,
     const gsl::not_null<tnsr::iJ<DataVector, 3>*> cartesian_to_angular_jacobian,
     const gsl::not_null<tnsr::iJ<DataVector, 3>*>
@@ -41,11 +51,21 @@ void cartesian_to_angular_coordinates_and_derivatives(
     const Scalar<DataVector>& cos_phi, const Scalar<DataVector>& cos_theta,
     const Scalar<DataVector>& sin_phi, const Scalar<DataVector>& sin_theta,
     const double extraction_radius) noexcept {
-  check_and_resize(cartesian_coords, get(cos_phi).size());
-  check_and_resize(cartesian_to_angular_jacobian, get(cos_phi).size());
-  check_and_resize(inverse_cartesian_to_angular_jacobian, get(cos_phi).size());
+  if (UNLIKELY((get<0>(*cartesian_coords).size() != get(cos_phi).size()))) {
+    *cartesian_coords = tnsr::I<DataVector, 3>{get(cos_phi).size()};
+  }
+  if (UNLIKELY((get<0, 0>(*cartesian_to_angular_jacobian).size() !=
+                get(cos_phi).size()))) {
+    *cartesian_to_angular_jacobian =
+        tnsr::iJ<DataVector, 3>{get(cos_phi).size()};
+  }
+  if (UNLIKELY((get<0, 0>(*inverse_cartesian_to_angular_jacobian).size() !=
+                get(cos_phi).size()))) {
+    *inverse_cartesian_to_angular_jacobian =
+        tnsr::iJ<DataVector, 3>{get(cos_phi).size()};
+  }
 
-  // note: factor of r scaled out
+  // note scaled without factor of r
   get<0>(*cartesian_coords) = get(sin_theta) * get(cos_phi);
   get<1>(*cartesian_coords) = get(sin_theta) * get(sin_phi);
   get<2>(*cartesian_coords) = get(cos_theta);
@@ -87,23 +107,30 @@ void cartesian_to_angular_coordinates_and_derivatives(
   get<2, 2>(*inverse_cartesian_to_angular_jacobian) = 0.0;
 }
 
-void cartesian_spatial_metric_and_derivatives(
+void calculate_cartesian_spatial_metric_and_derivatives(
     const gsl::not_null<tnsr::ii<DataVector, 3>*> cartesian_spatial_metric,
     const gsl::not_null<tnsr::II<DataVector, 3>*> inverse_spatial_metric,
     const gsl::not_null<tnsr::ijj<DataVector, 3>*> d_cartesian_spatial_metric,
     const gsl::not_null<tnsr::ii<DataVector, 3>*> dt_cartesian_spatial_metric,
-    const tnsr::ii<DataVector, 3>& spatial_metric_coefficients,
-    const tnsr::ii<DataVector, 3>& dr_spatial_metric_coefficients,
-    const tnsr::ii<DataVector, 3>& dt_spatial_metric_coefficients,
+    const tnsr::ii</*ModalVector*/ DataVector, 3>& spatial_metric_coefficients,
+    const tnsr::ii</*ModalVector*/ DataVector, 3>&
+        dr_spatial_metric_coefficients,
+    const tnsr::ii</*ModalVector*/ DataVector, 3>&
+        dt_spatial_metric_coefficients,
     const tnsr::iJ<DataVector, 3>& inverse_cartesian_to_angular_jacobian,
     const tnsr::I<DataVector, 3>& cartesian_coords,
     const YlmSpherepack& spherical_harmonics, const bool radial_renormalize,
     const size_t l_max) noexcept {
   size_t size = get<0, 0>(inverse_cartesian_to_angular_jacobian).size();
-  check_and_resize(cartesian_spatial_metric, size);
-  check_and_resize(d_cartesian_spatial_metric, size);
-  check_and_resize(dt_cartesian_spatial_metric, size);
-
+  if (UNLIKELY((get<0, 0>(*cartesian_spatial_metric).size() != size))) {
+    *cartesian_spatial_metric = tnsr::ii<DataVector, 3>{size};
+  }
+  if (UNLIKELY((get<0, 0, 0>(*d_cartesian_spatial_metric).size() != size))) {
+    *d_cartesian_spatial_metric = tnsr::ijj<DataVector, 3>{size};
+  }
+  if (UNLIKELY((get<0, 0>(*dt_cartesian_spatial_metric).size() != size))) {
+    *dt_cartesian_spatial_metric = tnsr::ii<DataVector, 3>{size};
+  }
   // It is assumed at this point that the coefficients are provided in the ylm
   // spherepack format, as prepared by the utility in `ReadBoundaryDataH5.hpp`.
 
@@ -128,19 +155,31 @@ void cartesian_spatial_metric_and_derivatives(
   auto interpolation_info =
       spherical_harmonics.set_up_interpolation_info(target_points);
 
-  // Allocations
-  SpinWeighted<ComplexDataVector, 0> derivative_buffer{size};
-  SpinWeighted<ComplexDataVector, 1> eth_of_component{size};
   for (size_t i = 0; i < 3; ++i) {
     for (size_t j = i; j < 3; ++j) {
-      // SpEC worldtube data is stored from Spherepack, so it is most consistent
-      // to use Spherepack (rather than libsharp) to extract that data.
+      // Note: assumes same grid (gauss-legendre)
+      // spherical_harmonics.spec_to_phys(
+      // make_not_null(transpose_buffer.data()),
+      // spatial_metric_coefficients.get(i, j).data());
+      // cartesian_spatial_metric->get(i, j) =
+      // transpose(transpose_buffer, spherical_harmonics.theta_points().size(),
+      // spherical_harmonics.phi_points().size());
+
       spherical_harmonics.interpolate_from_coefs(
           make_not_null(&interp_result), spatial_metric_coefficients.get(i, j),
           interpolation_info);
       for (size_t v = 0; v < interp_result.size(); ++v) {
         cartesian_spatial_metric->get(i, j)[v] = interp_result[v];
       }
+      // std::copy(interp_result.begin(), interp_result.end(),
+      // cartesian_spatial_metric->get(i, j).begin());
+
+      // spherical_harmonics.spec_to_phys(
+      // make_not_null(transpose_buffer.data()),
+      // dt_spatial_metric_coefficients.get(i, j).data());
+      // dt_cartesian_spatial_metric->get(i, j) =
+      // transpose(transpose_buffer, spherical_harmonics.theta_points().size(),
+      // spherical_harmonics.phi_points().size());
 
       spherical_harmonics.interpolate_from_coefs(
           make_not_null(&interp_result),
@@ -148,29 +187,98 @@ void cartesian_spatial_metric_and_derivatives(
       std::copy(interp_result.begin(), interp_result.end(),
                 dt_cartesian_spatial_metric->get(i, j).begin());
 
+      // spherical_harmonics.spec_to_phys(
+      // make_not_null(transpose_buffer.data()),
+      // dr_spatial_metric_coefficients.get(i, j).data());
+      // dr_cartesian_spatial_metric.get(i, j) =
+      // transpose(transpose_buffer, spherical_harmonics.theta_points().size(),
+      // spherical_harmonics.phi_points().size());
+
       spherical_harmonics.interpolate_from_coefs(
           make_not_null(&interp_result),
           dr_spatial_metric_coefficients.get(i, j), interpolation_info);
       std::copy(interp_result.begin(), interp_result.end(),
                 dr_cartesian_spatial_metric.get(i, j).begin());
 
-      derivative_buffer =
-          std::complex<double>(1.0, 0.0) * cartesian_spatial_metric->get(i, j);
-      Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
-          make_not_null(&eth_of_component), make_not_null(&derivative_buffer),
-          l_max);
-      angular_d_cartesian_spatial_metric.get(1, i, j) =
-          -real(eth_of_component.data());
-      angular_d_cartesian_spatial_metric.get(2, i, j) =
-          -imag(eth_of_component.data());
+      // angular_d_cartesian_spatial_metric.get(1, i, j) = transpose(
+      // angular_d_cartesian_spatial_metric_gauss_legendre.get(1, i, j),
+      // spherical_harmonics.theta_points().size(),
+      // spherical_harmonics.phi_points().size());
+
+      // angular_d_cartesian_spatial_metric.get(2, i, j) = transpose(
+      // angular_d_cartesian_spatial_metric_gauss_legendre.get(2, i, j),
+      // spherical_harmonics.theta_points().size(),
+      // spherical_harmonics.phi_points().size());
+
+      /// Trial
+      ComplexDataVector eth_of_component =
+          Spectral::Swsh::swsh_derivative<0, Spectral::Swsh::Tags::Eth>(
+              std::complex<double>(1.0, 0.0) *
+                  cartesian_spatial_metric->get(i, j),
+              l_max);
+      angular_d_cartesian_spatial_metric.get(1, i, j) = -real(eth_of_component);
+      angular_d_cartesian_spatial_metric.get(2, i, j) = -imag(eth_of_component);
+
+      // spherical_harmonics.gradient_from_coefs(
+      // make_array(
+      // angular_d_cartesian_spatial_metric_gauss_legendre.get(1, i, j)
+      // .data(),
+      // angular_d_cartesian_spatial_metric_gauss_legendre.get(2, i, j)
+      // .data()),
+      // spatial_metric_coefficients.get(i, j).data());
+      // spherical_harmonics.interpolate(
+      // make_not_null(&interp_result),
+      // angular_d_cartesian_spatial_metric_gauss_legendre.get(1, i, j).data(),
+      // interpolation_info);
+      // std::copy(interp_result.begin(), interp_result.end(),
+      // angular_d_cartesian_spatial_metric.get(1, i, j).begin());
+
+      // spherical_harmonics.interpolate(
+      // make_not_null(&interp_result),
+      // angular_d_cartesian_spatial_metric_gauss_legendre.get(2, i, j).data(),
+      // interpolation_info);
+      // std::copy(interp_result.begin(), interp_result.end(),
+      // angular_d_cartesian_spatial_metric.get(2, i, j).begin());
     }
   }
+
+  // printf("checking angular derivative vs sharp version");
+  // for (size_t i = 0; i < 3; ++i) {
+  // for (size_t j = i; j < 3; ++j) {
+  // ComplexDataVector eth_of_component =
+  // Spectral::Swsh::swsh_derivative<0, Spectral::Swsh::Tags::Eth>(
+  // std::complex<double>(1.0, 0.0) *
+  // cartesian_spatial_metric->get(i, j),
+  // l_max);
+  // for (size_t v = 0; v < eth_of_component.size(); ++v) {
+  // if (abs(angular_d_cartesian_spatial_metric.get(1, i, j)[v] +
+  // real(eth_of_component)[v]) > 1.0e-10) {
+  // printf(
+  // "-- Error too high in dtheta spatial metric component %zu, %zu "
+  // "-- "
+  // ": %e\n",
+  // i, j,
+  // angular_d_cartesian_spatial_metric.get(1, i, j)[v] +
+  // real(eth_of_component)[v]);
+  // }
+  // }
+  // for (size_t v = 0; v < eth_of_component.size(); ++v) {
+  // if (abs(angular_d_cartesian_spatial_metric.get(2, i, j)[v] +
+  // imag(eth_of_component)[v]) > 1.0e-10) {
+  // printf(
+  // "-- Error too high in dphi spatial metric component %zu, %zu -- "
+  // ": %e\n",
+  // i, j,
+  // angular_d_cartesian_spatial_metric.get(2, i, j)[v] +
+  // imag(eth_of_component)[v]);
+  // }
+  // }
+  // }
+  // }
 
   *inverse_spatial_metric =
       determinant_and_inverse(*cartesian_spatial_metric).second;
 
-  // Some SpEC worldtube data has an incorrectly normalized radial derivative,
-  // which must be fixed
   DataVector correction_factor{size, 0.0};
   if (radial_renormalize) {
     for (size_t i = 0; i < 3; ++i) {
@@ -213,22 +321,28 @@ void cartesian_spatial_metric_and_derivatives(
   }
 }
 
-void cartesian_shift_and_derivatives(
+void calculate_cartesian_shift_and_derivatives(
     gsl::not_null<tnsr::I<DataVector, 3>*> cartesian_shift,
     gsl::not_null<tnsr::iJ<DataVector, 3>*> d_cartesian_shift,
     gsl::not_null<tnsr::I<DataVector, 3>*> dt_cartesian_shift,
     const tnsr::II<DataVector, 3>& inverse_spatial_metric,
-    const tnsr::I<DataVector, 3>& shift_coefficients,
-    const tnsr::I<DataVector, 3>& dr_shift_coefficients,
-    const tnsr::I<DataVector, 3>& dt_shift_coefficients,
+    const tnsr::I</*ModalVector*/ DataVector, 3>& shift_coefficients,
+    const tnsr::I</*ModalVector*/ DataVector, 3>& dr_shift_coefficients,
+    const tnsr::I</*ModalVector*/ DataVector, 3>& dt_shift_coefficients,
     const tnsr::iJ<DataVector, 3>& inverse_cartesian_to_angular_jacobian,
     const tnsr::I<DataVector, 3>& cartesian_coords,
     const YlmSpherepack& spherical_harmonics, const bool radial_renormalize,
     const size_t l_max) noexcept {
   size_t size = get<0, 0>(inverse_cartesian_to_angular_jacobian).size();
-  check_and_resize(cartesian_shift, size);
-  check_and_resize(d_cartesian_shift, size);
-  check_and_resize(dt_cartesian_shift, size);
+  if (UNLIKELY(get<0>(*cartesian_shift).size() != size)) {
+    *cartesian_shift = tnsr::I<DataVector, 3>{size};
+  }
+  if (UNLIKELY((get<0, 0>(*d_cartesian_shift).size() != size))) {
+    *d_cartesian_shift = tnsr::iJ<DataVector, 3>{size};
+  }
+  if (UNLIKELY(get<0>(*dt_cartesian_shift).size() != size)) {
+    *dt_cartesian_shift = tnsr::I<DataVector, 3>{size};
+  }
 
   // Allocations
   tnsr::iJ<DataVector, 3> angular_d_cartesian_shift_gauss_legendre{
@@ -253,9 +367,25 @@ void cartesian_shift_and_derivatives(
   auto interpolation_info =
       spherical_harmonics.set_up_interpolation_info(target_points);
 
-  SpinWeighted<ComplexDataVector, 0> derivative_buffer{size};
-  SpinWeighted<ComplexDataVector, 1> eth_of_component{size};
   for (size_t i = 0; i < 3; ++i) {
+    // spherical_harmonics.spec_to_phys(make_not_null(transpose_buffer.data()),
+    // shift_coefficients.get(i).data());
+    // cartesian_shift->get(i) =
+    // transpose(transpose_buffer, spherical_harmonics.theta_points().size(),
+    // spherical_harmonics.phi_points().size());
+
+    // spherical_harmonics.spec_to_phys(make_not_null(transpose_buffer.data()),
+    // dt_shift_coefficients.get(i).data());
+    // dt_cartesian_shift->get(i) =
+    // transpose(transpose_buffer, spherical_harmonics.theta_points().size(),
+    // spherical_harmonics.phi_points().size());
+
+    // spherical_harmonics.spec_to_phys(make_not_null(transpose_buffer.data()),
+    // dr_shift_coefficients.get(i).data());
+    // dr_cartesian_shift.get(i) =
+    // transpose(transpose_buffer, spherical_harmonics.theta_points().size(),
+    // spherical_harmonics.phi_points().size());
+
     spherical_harmonics.interpolate_from_coefs(make_not_null(&interp_result),
                                                shift_coefficients.get(i),
                                                interpolation_info);
@@ -274,17 +404,42 @@ void cartesian_shift_and_derivatives(
     std::copy(interp_result.begin(), interp_result.end(),
               dt_cartesian_shift->get(i).begin());
 
-    derivative_buffer =
-        std::complex<double>(1.0, 0.0) * cartesian_shift->get(i);
-    Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
-        make_not_null(&eth_of_component), make_not_null(&derivative_buffer),
-        l_max);
-    angular_d_cartesian_shift.get(1, i) = -real(eth_of_component.data());
-    angular_d_cartesian_shift.get(2, i) = -imag(eth_of_component.data());
+    ComplexDataVector eth_of_component =
+        Spectral::Swsh::swsh_derivative<0, Spectral::Swsh::Tags::Eth>(
+            std::complex<double>(1.0, 0.0) * cartesian_shift->get(i), l_max);
+    angular_d_cartesian_shift.get(1, i) = -real(eth_of_component);
+    angular_d_cartesian_shift.get(2, i) = -imag(eth_of_component);
+
+    // spherical_harmonics.gradient_from_coefs(
+    // make_array(angular_d_cartesian_shift_gauss_legendre.get(1, i).data(),
+    // angular_d_cartesian_shift_gauss_legendre.get(2, i).data()),
+    // shift_coefficients.get(i).data());
+
+    // spherical_harmonics.interpolate(
+    // make_not_null(&interp_result),
+    // angular_d_cartesian_shift_gauss_legendre.get(1, i).data(),
+    // interpolation_info);
+    // std::copy(interp_result.begin(), interp_result.end(),
+    // angular_d_cartesian_shift.get(1, i).begin());
+
+    // spherical_harmonics.interpolate(
+    // make_not_null(&interp_result),
+    // angular_d_cartesian_shift_gauss_legendre.get(2, i).data(),
+    // interpolation_info);
+    // std::copy(interp_result.begin(), interp_result.end(),
+    // angular_d_cartesian_shift.get(2, i).begin());
+
+    // angular_d_cartesian_shift.get(1, i) =
+    // transpose(angular_d_cartesian_shift_gauss_legendre.get(1, i),
+    // spherical_harmonics.theta_points().size(),
+    // spherical_harmonics.phi_points().size());
+
+    // angular_d_cartesian_shift.get(2, i) =
+    // transpose(angular_d_cartesian_shift_gauss_legendre.get(2, i),
+    // spherical_harmonics.theta_points().size(),
+    // spherical_harmonics.phi_points().size());
   }
 
-  // Apply possible correction factor to improperly normalized SpEC worldtube
-  // data
   DataVector correction_factor{size, 0.0};
   if (radial_renormalize) {
     for (size_t i = 0; i < 3; ++i) {
@@ -313,22 +468,28 @@ void cartesian_shift_and_derivatives(
   }
 }
 
-void cartesian_lapse_and_derivatives(
+void calculate_cartesian_lapse_and_derivatives(
     const gsl::not_null<Scalar<DataVector>*> cartesian_lapse,
     const gsl::not_null<tnsr::i<DataVector, 3>*> d_cartesian_lapse,
     const gsl::not_null<Scalar<DataVector>*> dt_cartesian_lapse,
     const tnsr::II<DataVector, 3>& inverse_spatial_metric,
-    const Scalar<DataVector>& lapse_coefficients,
-    const Scalar<DataVector>& dr_lapse_coefficients,
-    const Scalar<DataVector>& dt_lapse_coefficients,
+    const Scalar</*ModalVector*/ DataVector>& lapse_coefficients,
+    const Scalar</*ModalVector*/ DataVector>& dr_lapse_coefficients,
+    const Scalar</*ModalVector*/ DataVector>& dt_lapse_coefficients,
     const tnsr::iJ<DataVector, 3>& inverse_cartesian_to_angular_jacobian,
     const tnsr::I<DataVector, 3>& cartesian_coords,
     const YlmSpherepack& spherical_harmonics, const bool radial_renormalize,
     const size_t l_max) noexcept {
   size_t size = get<0, 0>(inverse_cartesian_to_angular_jacobian).size();
-  check_and_resize(cartesian_lapse, size);
-  check_and_resize(d_cartesian_lapse, size);
-  check_and_resize(dt_cartesian_lapse, size);
+  if (UNLIKELY(get(*cartesian_lapse).size() != size)) {
+    *cartesian_lapse = Scalar<DataVector>{size};
+  }
+  if (UNLIKELY((get<0>(*d_cartesian_lapse).size() != size))) {
+    *d_cartesian_lapse = tnsr::i<DataVector, 3>{size};
+  }
+  if (UNLIKELY(get(*dt_cartesian_lapse).size() != size)) {
+    *dt_cartesian_lapse = Scalar<DataVector>{size};
+  }
 
   // Allocations
   tnsr::i<DataVector, 3> angular_d_cartesian_lapse_gauss_legendre{
@@ -353,8 +514,24 @@ void cartesian_lapse_and_derivatives(
   auto interpolation_info =
       spherical_harmonics.set_up_interpolation_info(target_points);
 
-  SpinWeighted<ComplexDataVector, 0> derivative_buffer{size};
-  SpinWeighted<ComplexDataVector, 1> eth_of_component{size};
+  // spherical_harmonics.spec_to_phys(make_not_null(transpose_buffer.data()),
+  // lapse_coefficients.get().data());
+  // cartesian_lapse->get() =
+  // transpose(transpose_buffer, spherical_harmonics.theta_points().size(),
+  // spherical_harmonics.phi_points().size());
+
+  // spherical_harmonics.spec_to_phys(make_not_null(transpose_buffer.data()),
+  // dt_lapse_coefficients.get().data());
+  // dt_cartesian_lapse->get() =
+  // transpose(transpose_buffer, spherical_harmonics.theta_points().size(),
+  // spherical_harmonics.phi_points().size());
+
+  // spherical_harmonics.spec_to_phys(make_not_null(transpose_buffer.data()),
+  // dr_lapse_coefficients.get().data());
+  // dr_cartesian_lapse.get() =
+  // transpose(transpose_buffer, spherical_harmonics.theta_points().size(),
+  // spherical_harmonics.phi_points().size());
+
   spherical_harmonics.interpolate_from_coefs(make_not_null(&interp_result),
                                              get(lapse_coefficients),
                                              interpolation_info);
@@ -373,15 +550,41 @@ void cartesian_lapse_and_derivatives(
   std::copy(interp_result.begin(), interp_result.end(),
             get(*dt_cartesian_lapse).begin());
 
-  derivative_buffer = std::complex<double>(1.0, 0.0) * get(*cartesian_lapse);
-  Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
-      make_not_null(&eth_of_component), make_not_null(&derivative_buffer),
-      l_max);
-  angular_d_cartesian_lapse.get(1) = -real(eth_of_component.data());
-  angular_d_cartesian_lapse.get(2) = -imag(eth_of_component.data());
+  // angular_d_cartesian_lapse.get(1) =
+  // transpose(angular_d_cartesian_lapse_gauss_legendre.get(1),
+  // spherical_harmonics.theta_points().size(),
+  // spherical_harmonics.phi_points().size());
 
-  // Apply possible correction factor to improperly normalized SpEC worldtube
-  // data
+  // angular_d_cartesian_lapse.get(2) =
+  // transpose(angular_d_cartesian_lapse_gauss_legendre.get(2),
+  // spherical_harmonics.theta_points().size(),
+  // spherical_harmonics.phi_points().size());
+
+  ComplexDataVector eth_of_component =
+      Spectral::Swsh::swsh_derivative<0, Spectral::Swsh::Tags::Eth>(
+          std::complex<double>(1.0, 0.0) * get(*cartesian_lapse), l_max);
+  angular_d_cartesian_lapse.get(1) = -real(eth_of_component);
+  angular_d_cartesian_lapse.get(2) = -imag(eth_of_component);
+
+  // spherical_harmonics.gradient_from_coefs(
+  // make_array(get<1>(angular_d_cartesian_lapse_gauss_legendre).data(),
+  // get<2>(angular_d_cartesian_lapse_gauss_legendre).data()),
+  // get(lapse_coefficients).data());
+
+  // spherical_harmonics.interpolate(
+  // make_not_null(&interp_result),
+  // get<1>(angular_d_cartesian_lapse_gauss_legendre).data(),
+  // interpolation_info);
+  // std::copy(interp_result.begin(), interp_result.end(),
+  // get<1>(angular_d_cartesian_lapse).begin());
+
+  // spherical_harmonics.interpolate(
+  // make_not_null(&interp_result),
+  // get<2>(angular_d_cartesian_lapse_gauss_legendre).data(),
+  // interpolation_info);
+  // std::copy(interp_result.begin(), interp_result.end(),
+  // get<2>(angular_d_cartesian_lapse).begin());
+
   DataVector correction_factor{size, 0.0};
   if (radial_renormalize) {
     for (size_t i = 0; i < 3; ++i) {
@@ -408,7 +611,7 @@ void cartesian_lapse_and_derivatives(
   }
 }
 
-void generalized_harmonic_quantities(
+void calculate_generalized_harmonic_quantities(
     const gsl::not_null<tnsr::iaa<DataVector, 3>*> phi,
     const gsl::not_null<tnsr::aa<DataVector, 3>*> dt_psi,
     const gsl::not_null<tnsr::aa<DataVector, 3>*> psi,
@@ -422,11 +625,13 @@ void generalized_harmonic_quantities(
     const Scalar<DataVector>& cartesian_lapse,
     const tnsr::i<DataVector, 3>& d_cartesian_lapse,
     const Scalar<DataVector>& dt_cartesian_lapse) noexcept {
-  check_and_resize(dt_psi, get(dt_cartesian_lapse).size());
+  // this doesn't have a pass by pointer version, so we may as well just assign
+  // from the result.
+  // TODO bound check and set for dt_psi
 
-  GeneralizedHarmonic::phi(
-      phi, cartesian_lapse, d_cartesian_lapse, cartesian_shift,
-      d_cartesian_shift, cartesian_spatial_metric, d_cartesian_spatial_metric);
+  *phi = GeneralizedHarmonic::phi(
+      cartesian_lapse, d_cartesian_lapse, cartesian_shift, d_cartesian_shift,
+      cartesian_spatial_metric, d_cartesian_spatial_metric);
 
   get<0, 0>(*dt_psi) = -2.0 * get(cartesian_lapse) * get(dt_cartesian_lapse);
   for (size_t i = 0; i < 3; ++i) {
@@ -455,22 +660,25 @@ void generalized_harmonic_quantities(
     }
   }
 
-  gr::spacetime_metric(psi, cartesian_lapse, cartesian_shift,
-                       cartesian_spatial_metric);
+  *psi = gr::spacetime_metric(cartesian_lapse, cartesian_shift,
+                              cartesian_spatial_metric);
 
   *inverse_spatial_metric =
       determinant_and_inverse(cartesian_spatial_metric).second;
 }
 
-void null_metric_and_derivative(
+void calculate_null_metric_and_derivative(
     const gsl::not_null<tnsr::aa<DataVector, 3>*> du_null_metric,
     const gsl::not_null<tnsr::aa<DataVector, 3>*> null_metric,
     const tnsr::iJ<DataVector, 3>& cartesian_to_angular_jacobian,
     const tnsr::aa<DataVector, 3>& dt_psi,
     const tnsr::aa<DataVector, 3>& psi) noexcept {
-  size_t size = get<0, 0>(psi).size();
-  check_and_resize(null_metric, size);
-  check_and_resize(du_null_metric, size);
+  if (UNLIKELY((get<0, 0>(*null_metric).size() != get<0, 0>(psi).size()))) {
+    *null_metric = tnsr::aa<DataVector, 3>{get<0, 0>(psi).size()};
+  }
+  if (UNLIKELY((get<0, 0>(*du_null_metric).size() != get<0, 0>(psi).size()))) {
+    *du_null_metric = tnsr::aa<DataVector, 3>{get<0, 0>(psi).size()};
+  }
 
   get<0, 0>(*null_metric) = get<0, 0>(psi);
   get<0, 0>(*du_null_metric) = get<0, 0>(dt_psi);
@@ -544,20 +752,73 @@ void null_metric_and_derivative(
   }
 }
 
-void worldtube_normal_and_derivatives(
+void calculate_inverse_null_metric(
+    const gsl::not_null<tnsr::AA<DataVector, 3>*> inverse_null_metric,
+    const tnsr::aa<DataVector, 3>& null_metric) noexcept {
+  if (UNLIKELY((get<0, 0>(*inverse_null_metric).size() !=
+                get<0, 0>(null_metric).size()))) {
+    *inverse_null_metric =
+        tnsr::AA<DataVector, 3>{get<0, 0>(null_metric).size()};
+  }
+  // The angular part is invertible on its own, so we just do that manually
+  // Allocation
+
+  *inverse_null_metric = determinant_and_inverse(null_metric).second;
+  // auto angular_determinant = DataVector{get<0, 0>(null_metric).size()};
+  // angular_determinant = get<2, 2>(null_metric) * get<3, 3>(null_metric) -
+  // get<2, 3>(null_metric) * get<3, 2>(null_metric);
+
+  // get<2, 2>(*inverse_null_metric) =
+  // get<3, 3>(null_metric) / angular_determinant;
+  // get<3, 3>(*inverse_null_metric) =
+  // get<2, 2>(null_metric) / angular_determinant;
+  // get<2, 3>(*inverse_null_metric) =
+  // -get<2, 3>(null_metric) / angular_determinant;
+
+  // get<0, 1>(*inverse_null_metric) = -1.0;
+
+  // get<0, 0>(*inverse_null_metric) = 0.0;
+  // get<0, 2>(*inverse_null_metric) = 0.0;
+  // get<0, 3>(*inverse_null_metric) = 0.0;
+
+  // get<1, 2>(*inverse_null_metric) =
+  // get<2, 2>(*inverse_null_metric) * get<2, 0>(null_metric) +
+  // get<2, 3>(*inverse_null_metric) * get<3, 0>(null_metric);
+  // get<1, 3>(*inverse_null_metric) =
+  // get<2, 3>(*inverse_null_metric) * get<2, 0>(null_metric) +
+  // get<3, 3>(*inverse_null_metric) * get<3, 0>(null_metric);
+
+  // get<1, 1>(*inverse_null_metric) =
+  // -get<0, 0>(null_metric) +
+  // get<1, 2>(*inverse_null_metric) * get<2, 0>(null_metric) +
+  // get<1, 3>(*inverse_null_metric) * get<3, 0>(null_metric);
+  // for (size_t a = 0; a < 4; ++a) {
+  // for (size_t b = 0; b < a; ++b) {
+  // inverse_null_metric->get(a, b) = inverse_null_metric->get(b, a);
+  // }
+  // }
+}
+
+void calculate_worldtube_normal_and_derivatives(
     const gsl::not_null<tnsr::iJ<DataVector, 3>*> angular_d_worldtube_normal,
     const gsl::not_null<tnsr::I<DataVector, 3>*> worldtube_normal,
     const gsl::not_null<tnsr::I<DataVector, 3>*> dt_worldtube_normal,
-    const tnsr::iJ<DataVector, 3>& /*cartesian_to_angular_jacobian*/,
+    const tnsr::iJ<DataVector, 3>& cartesian_to_angular_jacobian,
     const Scalar<DataVector>& cos_phi, const Scalar<DataVector>& cos_theta,
-    const tnsr::iaa<DataVector, 3>& /*phi*/, const tnsr::aa<DataVector, 3>& psi,
+    const tnsr::iaa<DataVector, 3>& phi, const tnsr::aa<DataVector, 3>& psi,
     const tnsr::aa<DataVector, 3>& dt_psi, const Scalar<DataVector>& sin_phi,
     const Scalar<DataVector>& sin_theta,
     const tnsr::II<DataVector, 3> inverse_spatial_metric) noexcept {
   size_t size = get<0, 0>(psi).size();
-  check_and_resize(angular_d_worldtube_normal, size);
-  check_and_resize(worldtube_normal, size);
-  check_and_resize(dt_worldtube_normal, size);
+  if (UNLIKELY((get<0, 0>(*angular_d_worldtube_normal).size() != size))) {
+    *angular_d_worldtube_normal = tnsr::iJ<DataVector, 3>{get(cos_phi).size()};
+  }
+  if (UNLIKELY(get<0>(*worldtube_normal).size() != size)) {
+    *worldtube_normal = tnsr::I<DataVector, 3>{get(cos_phi).size()};
+  }
+  if (UNLIKELY(get<0>(*dt_worldtube_normal).size() != size)) {
+    *dt_worldtube_normal = tnsr::I<DataVector, 3>{get(cos_phi).size()};
+  }
 
   // Allocation
   tnsr::i<DataVector, 3> sigma{size};
@@ -591,7 +852,59 @@ void worldtube_normal_and_derivatives(
     }
   }
 
+  // Allocation
+  // tnsr::iJ<DataVector, 3> angular_d_sigma{get<0, 0>(psi).size()};
+  // get<0, 0>(angular_d_sigma) = 0.0;
+  // get<0, 1>(angular_d_sigma) = 0.0;
+  // get<0, 2>(angular_d_sigma) = 0.0;
+
+  // get<1, 0>(angular_d_sigma) =
+  //     2.0 * get(cos_phi) * get(cos_theta) * get(sin_theta) / norm_of_sigma;
+  // get<1, 1>(angular_d_sigma) =
+  //     2.0 * get(sin_phi) * get(cos_theta) * get(sin_theta) / norm_of_sigma;
+  // get<1, 2>(angular_d_sigma) =
+  //     (square(get(cos_theta)) - square(get(sin_theta))) / norm_of_sigma;
+
+  // // note : scaled as 1/sin(theta)
+  // get<2, 0>(angular_d_sigma) = -get(sin_phi) * get(sin_theta) /
+  // norm_of_sigma; get<2, 1>(angular_d_sigma) = get(cos_phi) * get(sin_theta) /
+  // norm_of_sigma; get<2, 2>(angular_d_sigma) = 0.0;
+
+  // for (size_t i = 0; i < 3; ++i) {
+  //   angular_d_worldtube_normal->get(0, i) = 0.0;
+  // }
+
+  // for (size_t A = 0; A < 2; ++A) {
+  //   for (size_t i = 0; i < 3; ++i) {
+  //     // first term
+  //     angular_d_worldtube_normal->get(A + 1, i) =
+  //         angular_d_sigma.get(A + 1, 0) *
+  //         (inverse_spatial_metric.get(i, 0) -
+  //          worldtube_normal->get(i) * worldtube_normal->get(0));
+  //     for (size_t n = 1; n < 3; ++n) {
+  //       angular_d_worldtube_normal->get(A + 1, i) +=
+  //           angular_d_sigma.get(A + 1, n) *
+  //           (inverse_spatial_metric.get(i, n) -
+  //            worldtube_normal->get(i) * worldtube_normal->get(n));
+  //     }
+  //     // second term
+  //     // TODO: consider optimizations from e.g. symmetries and the
+  //     for (size_t j = 0; j < 3; ++j) {
+  //       for (size_t m = 0; m < 3; ++m) {
+  //         for (size_t n = 0; n < 3; ++n) {
+  //           angular_d_worldtube_normal->get(A + 1, i) +=
+  //               cartesian_to_angular_jacobian.get(A + 1, j) *
+  //               phi.get(j, m + 1, n + 1) * worldtube_normal->get(m) *
+  //               (0.5 * worldtube_normal->get(i) * worldtube_normal->get(n) -
+  //                inverse_spatial_metric.get(i, n));
+  //         }
+  //       }
+  //     }
+  //   }
+  // }
+
   for (size_t i = 0; i < 3; ++i) {
+    // TODO: optimize
     dt_worldtube_normal->get(i) = 0.0;
     for (size_t m = 0; m < 3; ++m) {
       for (size_t n = 0; n < 3; ++n) {
@@ -604,30 +917,35 @@ void worldtube_normal_and_derivatives(
   }
 }
 
-void null_vector_l_and_derivatives(
+void calculate_null_vector_l_and_derivatives(
     const gsl::not_null<tnsr::iA<DataVector, 3>*> angular_d_null_l,
     const gsl::not_null<tnsr::A<DataVector, 3>*> du_null_l,
     const gsl::not_null<tnsr::A<DataVector, 3>*> null_l,
-    const tnsr::iJ<DataVector, 3>& /*angular_d_worldtube_normal*/,
+    const tnsr::iJ<DataVector, 3>& angular_d_worldtube_normal,
     const tnsr::I<DataVector, 3>& dt_worldtube_normal,
-    const tnsr::iJ<DataVector, 3>& /*cartesian_to_angular_jacobian*/,
-    const tnsr::i<DataVector, 3>& /*d_lapse*/,
-    const tnsr::iaa<DataVector, 3>& /*phi*/,
-    const tnsr::iJ<DataVector, 3>& /*d_shift*/,
-    const Scalar<DataVector>& dt_lapse, const tnsr::aa<DataVector, 3>& dt_psi,
+    const tnsr::iJ<DataVector, 3>& cartesian_to_angular_jacobian,
+    const tnsr::i<DataVector, 3>& d_lapse, const tnsr::iaa<DataVector, 3>& phi,
+    const tnsr::iJ<DataVector, 3>& d_shift, const Scalar<DataVector>& dt_lapse,
+    const tnsr::aa<DataVector, 3>& dt_psi,
     const tnsr::I<DataVector, 3>& dt_shift, const Scalar<DataVector>& lapse,
     const tnsr::aa<DataVector, 3>& psi, const tnsr::I<DataVector, 3>& shift,
     const tnsr::I<DataVector, 3>& worldtube_normal) noexcept {
-  size_t size = get(lapse).size();
-  check_and_resize(angular_d_null_l, size);
-  check_and_resize(du_null_l, size);
-  check_and_resize(null_l, size);
+  if (UNLIKELY((get<0, 0>(*angular_d_null_l).size() != get(lapse).size()))) {
+    *angular_d_null_l = tnsr::iA<DataVector, 3>{get(lapse).size()};
+  }
+  if (UNLIKELY((get<0>(*du_null_l).size() != get(lapse).size()))) {
+    *du_null_l = tnsr::A<DataVector, 3>{get(lapse).size()};
+  }
+  if (UNLIKELY((get<0>(*null_l).size() != get(lapse).size()))) {
+    *null_l = tnsr::A<DataVector, 3>{get(lapse).size()};
+  }
 
   // Allocation
   DataVector denominator = get(lapse);
   for (size_t i = 0; i < 3; ++i) {
     // off-diagonal
     for (size_t j = i + 1; j < 3; ++j) {
+      // TODO: use symmetry, currently breaks the pypp test
       denominator -=
           psi.get(i + 1, j + 1) * (shift.get(i) * worldtube_normal.get(j) +
                                    shift.get(j) * worldtube_normal.get(i));
@@ -642,7 +960,109 @@ void null_vector_l_and_derivatives(
         (worldtube_normal.get(i) - shift.get(i) / get(lapse)) / denominator;
   }
 
-  // allocation
+  // TODO REMOVE
+  // // Allocation
+  // TODO: remove
+  // tnsr::i<DataVector, 2> angular_deriv_of_denominator{get(lapse).size()};
+
+  // // angular directions denoted with capitals
+  // for (size_t A = 0; A < 2; ++A) {
+  //   angular_deriv_of_denominator.get(A) =
+  //       -cartesian_to_angular_jacobian.get(A + 1, 0) * get<0>(d_lapse);
+  //   for (size_t i = 1; i < 3; ++i) {
+  //     angular_deriv_of_denominator.get(A) -=
+  //         cartesian_to_angular_jacobian.get(A + 1, i) * d_lapse.get(i);
+  //   }
+  //   // vary i < j (off-diagonal symmetric part), independent of k
+  //   for (size_t i = 0; i < 3; ++i) {
+  //     for (size_t j = i + 1; j < 3; ++j) {
+  //       // symmetry
+  //       angular_deriv_of_denominator.get(A) +=
+  //           (angular_d_worldtube_normal.get(A + 1, j) * shift.get(i) +
+  //            angular_d_worldtube_normal.get(A + 1, i) * shift.get(j)) *
+  //           psi.get(i + 1, j + 1);
+  //     }
+  //     angular_deriv_of_denominator.get(A) +=
+  //         angular_d_worldtube_normal.get(A + 1, i) * psi.get(i + 1, i + 1) *
+  //         shift.get(i);
+  //   }
+  //   // remaining k-dependent parts
+  //   for (size_t k = 0; k < 3; ++k) {
+  //     for (size_t i = 0; i < 3; ++i) {
+  //       for (size_t j = i + 1; j < 3; ++j) {
+  //         // symmetry
+  //         angular_deriv_of_denominator.get(A) +=
+  //             cartesian_to_angular_jacobian.get(A + 1, k) *
+  //             (worldtube_normal.get(j) * shift.get(i) +
+  //              worldtube_normal.get(i) * shift.get(j)) *
+  //             phi.get(k, i + 1, j + 1);
+  //         angular_deriv_of_denominator.get(A) +=
+  //             cartesian_to_angular_jacobian.get(A + 1, k) *
+  //             (worldtube_normal.get(j) * d_shift.get(k, i) +
+  //              worldtube_normal.get(i) * d_shift.get(k, j)) *
+  //             psi.get(i + 1, j + 1);
+  //       }
+  //       // diagonal k-dependent part
+  //       angular_deriv_of_denominator.get(A) +=
+  //           worldtube_normal.get(i) *
+  //           cartesian_to_angular_jacobian.get(A + 1, k) *
+  //           (shift.get(i) * phi.get(k, i + 1, i + 1) +
+  //            d_shift.get(k, i) * psi.get(i + 1, i + 1));
+  //     }
+  //   }
+  //   angular_deriv_of_denominator.get(A) /= square(denominator);
+  // }
+
+  // // note: angular_deriv_of_denominator contains the sign change from
+  // // differentiating the inverse
+
+  // // the time component of the angular_d_null_l
+  // for (size_t A = 0; A < 2; ++A) {
+  //   angular_d_null_l->get(A + 1, 0) = angular_deriv_of_denominator.get(A);
+  //   for (size_t i = 0; i < 3; ++i) {
+  //     angular_d_null_l->get(A + 1, 0) -=
+  //         d_lapse.get(i) * cartesian_to_angular_jacobian.get(A + 1, i) /
+  //         (get(lapse) * denominator);
+  //   }
+  //   angular_d_null_l->get(A + 1, 0) /= get(lapse);
+  // }
+
+  // // spatial components (m) of the angular_d_null_l
+  // for (size_t A = 0; A < 2; ++A) {
+  //   for (size_t m = 0; m < 3; ++m) {
+  //     angular_d_null_l->get(A + 1, m + 1) =
+  //         angular_deriv_of_denominator.get(A) *
+  //             (worldtube_normal.get(m) - shift.get(m) / get(lapse)) +
+  //         angular_d_worldtube_normal.get(A + 1, m) / denominator;
+  //   }
+  // }
+
+  // tnsr::iA<DataVector, 3> angular_d_spacetime_normal{get(lapse).size(), 0.0};
+  // for (size_t A = 0; A < 2; ++A) {
+  //   for (size_t i = 0; i < 3; ++i) {
+  //     angular_d_spacetime_normal.get(A + 1, 0) +=
+  //         cartesian_to_angular_jacobian.get(A + 1, i) *
+  //         (-d_lapse.get(i) / square(get(lapse)));
+  //     for (size_t j = 0; j < 3; ++j) {
+  //       angular_d_spacetime_normal.get(A + 1, i + 1) +=
+  //           cartesian_to_angular_jacobian.get(A + 1, j) *
+  //           (-d_shift.get(j, i) / get(lapse) +
+  //            shift.get(i) * d_lapse.get(j) / square(get(lapse)));
+  //     }
+  //   }
+  // }
+
+  // for (size_t A = 0; A < 2; ++A) {
+  //   for (size_t m = 0; m < 3; ++m) {
+  //     angular_d_null_l->get(A + 1, m + 1) +=
+  //         angular_d_spacetime_normal.get(A + 1, m + 1) / denominator;
+  //   }
+  // }
+  // for (size_t a = 0; a < 4; ++a) {
+  //   angular_d_null_l->get(0, a) = 0.0;
+  // }
+
+  // Allocation
   DataVector du_denominator{get(lapse).size()};
 
   du_denominator = -get(dt_lapse);
@@ -681,7 +1101,7 @@ void null_vector_l_and_derivatives(
   }
 }
 
-void dlambda_null_metric_and_inverse(
+void calculate_dlambda_null_metric_and_inverse(
     const gsl::not_null<tnsr::aa<DataVector, 3>*> dlambda_null_metric,
     const gsl::not_null<tnsr::AA<DataVector, 3>*> dlambda_inverse_null_metric,
     const tnsr::iA<DataVector, 3> angular_d_null_l,
@@ -692,10 +1112,15 @@ void dlambda_null_metric_and_inverse(
     const tnsr::A<DataVector, 3>& null_l,
     const tnsr::aa<DataVector, 3>& psi) noexcept {
   // first, the (down-index) null metric
-  size_t size = get<0, 0>(psi).size();
-  check_and_resize(dlambda_null_metric, size);
-  check_and_resize(dlambda_inverse_null_metric, size);
-
+  if (UNLIKELY(
+          (get<0, 0>(*dlambda_null_metric).size() != get<0, 0>(psi).size()))) {
+    *dlambda_null_metric = tnsr::aa<DataVector, 3>(get<0, 0>(psi).size());
+  }
+  if (UNLIKELY((get<0, 0>(*dlambda_inverse_null_metric).size() !=
+                get<0, 0>(psi).size()))) {
+    *dlambda_inverse_null_metric =
+        tnsr::AA<DataVector, 3>(get<0, 0>(psi).size());
+  }
   get<0, 0>(*dlambda_null_metric) = get<0>(null_l) * get<0, 0>(dt_psi) +
                                     2.0 * get<0>(du_null_l) * get<0, 0>(psi);
   for (size_t i = 0; i < 3; ++i) {
@@ -750,7 +1175,15 @@ void dlambda_null_metric_and_inverse(
               null_l.get(0) * cartesian_to_angular_jacobian.get(A + 1, i) *
               cartesian_to_angular_jacobian.get(B + 1, j) *
               dt_psi.get(i + 1, j + 1);
+        }
+      }
+    }
+  }
 
+  for (size_t A = 0; A < 2; ++A) {
+    for (size_t B = A; B < 2; ++B) {
+      for (size_t i = 0; i < 3; ++i) {
+        for (size_t j = 0; j < 3; ++j) {
           for (size_t k = 0; k < 3; ++k) {
             dlambda_null_metric->get(A + 2, B + 2) +=
                 null_l.get(k + 1) *
@@ -778,6 +1211,45 @@ void dlambda_null_metric_and_inverse(
     }
   }
   ///
+
+  // for (size_t A = 0; A < 2; ++A) {
+  //   for (size_t B = A; B < 2; ++B) {
+  //     dlambda_null_metric->get(A + 2, B + 2) =
+  //         get<0, 1>(psi) * (angular_d_null_l.get(A + 1, 0) *
+  //                               cartesian_to_angular_jacobian.get(B + 1, 0) +
+  //                           angular_d_null_l.get(B + 1, 0) *
+  //                               cartesian_to_angular_jacobian.get(A + 1, 0));
+  //     for (size_t l = 1; l < 3; ++l) {
+  //       dlambda_null_metric->get(A + 2, B + 2) +=
+  //           psi.get(0, l + 1) *
+  //           (angular_d_null_l.get(A + 1, 0) *
+  //                cartesian_to_angular_jacobian.get(B + 1, l) +
+  //            angular_d_null_l.get(B + 1, 0) *
+  //                cartesian_to_angular_jacobian.get(A + 1, l));
+  //     }
+  //     for (size_t l = 0; l < 3; ++l) {
+  //       for (size_t k = 0; k < 3; ++k) {
+  //         dlambda_null_metric->get(A + 2, B + 2) +=
+  //             psi.get(k + 1, l + 1) *
+  //                 (angular_d_null_l.get(A + 1, k + 1) *
+  //                      cartesian_to_angular_jacobian.get(B + 1, l) +
+  //                  angular_d_null_l.get(B + 1, k + 1) *
+  //                      cartesian_to_angular_jacobian.get(A + 1, l)) +
+  //             get<0>(null_l) * cartesian_to_angular_jacobian.get(A + 1, l) *
+  //                 cartesian_to_angular_jacobian.get(B + 1, k) *
+  //                 dt_psi.get(l + 1, k + 1);
+
+  //         for (size_t i = 0; i < 3; ++i) {
+  //           dlambda_null_metric->get(A + 2, B + 2) +=
+  //               null_l.get(i + 1) *
+  //               cartesian_to_angular_jacobian.get(A + 1, l) *
+  //               cartesian_to_angular_jacobian.get(B + 1, k) *
+  //               phi.get(i, l + 1, k + 1);
+  //         }
+  //       }
+  //     }
+  //   }
+  // }
   for (size_t a = 0; a < 4; ++a) {
     for (size_t b = 0; b < a; ++b) {
       dlambda_null_metric->get(a, b) = dlambda_null_metric->get(b, a);
@@ -838,10 +1310,12 @@ void dlambda_null_metric_and_inverse(
   }
 }
 
-void bondi_r(const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> r,
-             const tnsr::aa<DataVector, 3>& null_metric) noexcept {
-  check_and_resize(r, get<0, 0>(null_metric).size());
-
+void calculate_r(
+    const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> r,
+    const tnsr::aa<DataVector, 3>& null_metric) noexcept {
+  if (UNLIKELY((get(*r).data().size() != get<0, 0>(null_metric).size()))) {
+    get(*r).data() = ComplexDataVector{get<0, 0>(null_metric).size()};
+  }
   // the inclusion of the std::complex<double> informs the Blaze expression
   // templates to turn the result into a ComplexDataVector
   get(*r).data() = std::complex<double>(1.0, 0) *
@@ -850,35 +1324,7 @@ void bondi_r(const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> r,
                        0.25);
 }
 
-void d_bondi_r(
-    const gsl::not_null<tnsr::a<DataVector, 3>*> d_r,
-    const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> r,
-    const tnsr::aa<DataVector, 3>& dlambda_null_metric,
-    const tnsr::aa<DataVector, 3>& du_null_metric,
-    const tnsr::AA<DataVector, 3>& inverse_null_metric, size_t l_max,
-    const YlmSpherepack /*spherical_harmonic*/) noexcept {
-  check_and_resize(d_r, get<0, 0>(inverse_null_metric).size());
-
-  // compute the time derivative part
-  get<0>(*d_r) =
-      0.25 * real(get(*r).data()) *
-      (get<2, 2>(inverse_null_metric) * get<2, 2>(du_null_metric) +
-       2.0 * get<2, 3>(inverse_null_metric) * get<2, 3>(du_null_metric) +
-       get<3, 3>(inverse_null_metric) * get<3, 3>(du_null_metric));
-  // compute the lambda derivative part
-  get<1>(*d_r) =
-      0.25 * real(get(*r).data()) *
-      (get<2, 2>(inverse_null_metric) * get<2, 2>(dlambda_null_metric) +
-       2.0 * get<2, 3>(inverse_null_metric) * get<2, 3>(dlambda_null_metric) +
-       get<3, 3>(inverse_null_metric) * get<3, 3>(dlambda_null_metric));
-
-  auto eth_of_r = Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
-      make_not_null(&get(*r)), l_max);
-  d_r->get(2) = -real(eth_of_r.data());
-  d_r->get(3) = -imag(eth_of_r.data());
-}
-
-void dyads(
+void calculate_dyads(
     const gsl::not_null<tnsr::i<ComplexDataVector, 2>*> down_dyad,
     const gsl::not_null<tnsr::i<ComplexDataVector, 2>*> up_dyad) noexcept {
   // implicit factors of sin_theta omitted
@@ -888,65 +1334,69 @@ void dyads(
   get<1>(*up_dyad) = std::complex<double>(0.0, -1.0);
 }
 
-void beta_worldtube_data(
+void calculate_beta_initial_data(
     const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> beta,
     const tnsr::a<DataVector, 3>& d_r) noexcept {
-  check_and_resize(beta, get<0>(d_r).size());
+  if (UNLIKELY(get(*beta).data().size() != get<0>(d_r).size())) {
+    get(*beta).data() = ComplexDataVector{get<1>(d_r).size()};
+  }
   get(*beta).data() = std::complex<double>(-0.5, 0.0) * log(get<1>(d_r));
 }
 
-void bondi_u_worldtube_data(
-    const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> bondi_u,
+void calculate_u_initial_data(
+    const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> u,
     const tnsr::i<ComplexDataVector, 2>& down_dyad,
     const tnsr::a<DataVector, 3>& d_r,
     const tnsr::AA<DataVector, 3>& inverse_null_metric) noexcept {
-  check_and_resize(bondi_u, get<0>(d_r).size());
-  get(*bondi_u).data() = -get<0>(down_dyad) * get<1, 2>(inverse_null_metric) -
-                         get<1>(down_dyad) * get<1, 3>(inverse_null_metric);
+  if (UNLIKELY(get(*u).data().size() != get<0>(d_r).size())) {
+    get(*u).data() = ComplexDataVector{get<0>(d_r).size()};
+  }
+
+  get(*u).data() = -get<0>(down_dyad) * get<1, 2>(inverse_null_metric) -
+                   get<1>(down_dyad) * get<1, 3>(inverse_null_metric);
 
   for (size_t A = 0; A < 2; ++A) {
     for (size_t B = 0; B < 2; ++B) {
-      get(*bondi_u).data() -= d_r.get(2 + A) * down_dyad.get(B) *
-                              inverse_null_metric.get(A + 2, B + 2) /
-                              get<1>(d_r);
+      get(*u).data() -= d_r.get(2 + A) * down_dyad.get(B) *
+                        inverse_null_metric.get(A + 2, B + 2) / get<1>(d_r);
     }
   }
 }
 
-void bondi_w_worldtube_data(
-    const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> bondi_w,
+void calculate_w_initial_data(
+    const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> w,
     const tnsr::a<DataVector, 3>& d_r,
     const tnsr::AA<DataVector, 3>& inverse_null_metric,
     const Scalar<SpinWeighted<ComplexDataVector, 0>>& r) noexcept {
-  check_and_resize(bondi_w, get(r).data().size());
-
-  get(*bondi_w).data() =
+  if (UNLIKELY(get(*w).data().size() != get(r).data().size())) {
+    get(*w).data() = ComplexDataVector{get(r).data().size()};
+  }
+  get(*w).data() =
       std::complex<double>(1.0, 0.0) *
       (-1.0 + get<1>(d_r) * get<1, 1>(inverse_null_metric) - 2.0 * get<0>(d_r));
 
   for (size_t A = 0; A < 2; ++A) {
-    get(*bondi_w).data() +=
-        2.0 * d_r.get(A + 2) * inverse_null_metric.get(1, A + 2);
+    get(*w).data() += 2.0 * d_r.get(A + 2) * inverse_null_metric.get(1, A + 2);
   }
 
   for (size_t A = 0; A < 2; ++A) {
     for (size_t B = 0; B < 2; ++B) {
-      get(*bondi_w).data() += d_r.get(A + 2) * d_r.get(B + 2) *
-                              inverse_null_metric.get(A + 2, B + 2) /
-                              get<1>(d_r);
+      get(*w).data() += d_r.get(A + 2) * d_r.get(B + 2) *
+                        inverse_null_metric.get(A + 2, B + 2) / get<1>(d_r);
     }
   }
-  get(*bondi_w).data() /= std::complex<double>(1.0, 0.0) * get(r).data();
+  get(*w).data() /= std::complex<double>(1.0, 0.0) * get(r).data();
 }
 
-void bondi_j_worldtube_data(
-    const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> bondi_j,
+void calculate_j_initial_data(
+    const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> j,
     const tnsr::aa<DataVector, 3>& null_metric,
     const Scalar<SpinWeighted<ComplexDataVector, 0>> r,
     const tnsr::i<ComplexDataVector, 2>& up_dyad) noexcept {
-  check_and_resize(bondi_j, get(r).data().size());
-
-  get(*bondi_j).data() =
+  if (UNLIKELY(get(*j).data().size() != get(r).data().size())) {
+    get(*j).data() = ComplexDataVector{get(r).data().size()};
+  }
+  get(*j).data() =
       0.5 *
       (square(get<0>(up_dyad)) * get<2, 2>(null_metric) +
        2.0 * get<0>(up_dyad) * get<1>(up_dyad) * get<2, 3>(null_metric) +
@@ -954,101 +1404,109 @@ void bondi_j_worldtube_data(
       square(get(r).data());
 }
 
-void dr_bondi_j(
+void calculate_dr_j(
     const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> dr_j,
     const tnsr::aa<DataVector, 3>& dlambda_null_metric,
     const tnsr::a<DataVector, 3>& d_r,
-    const Scalar<SpinWeighted<ComplexDataVector, 2>>& bondi_j,
+    const Scalar<SpinWeighted<ComplexDataVector, 2>>& j,
     const Scalar<SpinWeighted<ComplexDataVector, 0>>& r,
     const tnsr::i<ComplexDataVector, 2>& up_dyad) noexcept {
-  check_and_resize(dr_j, get(r).data().size());
-  get(*dr_j) = -2.0 * get(bondi_j) / get(r);
+  if (UNLIKELY(get(*dr_j).data().size() != get(r).data().size())) {
+    get(*dr_j).data() = ComplexDataVector{get(r).data().size()};
+  }
+  get(*dr_j) = -2.0 * get(j) / get(r);
   for (size_t A = 0; A < 2; ++A) {
     for (size_t B = 0; B < 2; ++B) {
       get(*dr_j).data() += 0.5 * up_dyad.get(A) * up_dyad.get(B) *
-                                 dlambda_null_metric.get(A + 2, B + 2) /
-                                 (square(get(r).data()) * get<1>(d_r));
+                           dlambda_null_metric.get(A + 2, B + 2) /
+                           (square(get(r).data()) * get<1>(d_r));
     }
   }
 }
 
-void d2lambda_bondi_r(
+void calculate_d2lambda_r(
     const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> d2lambda_r,
     const tnsr::a<DataVector, 3>& d_r,
     const Scalar<SpinWeighted<ComplexDataVector, 2>>& dr_j,
-    const Scalar<SpinWeighted<ComplexDataVector, 2>>& bondi_j,
+    const Scalar<SpinWeighted<ComplexDataVector, 2>>& j,
     const Scalar<SpinWeighted<ComplexDataVector, 0>>& r) noexcept {
-  check_and_resize(d2lambda_r, get(bondi_j).data().size());
-  get(*d2lambda_r) = -0.25 * get(r) *
-                     (get(dr_j) * conj(get(dr_j)) -
-                      0.25 *
-                          square(conj(get(bondi_j)) * get(dr_j) +
-                                 get(bondi_j) * conj(get(dr_j))) /
-                          (1.0 + get(bondi_j) * conj(get(bondi_j))));
+  if (UNLIKELY(get(*d2lambda_r).data().size() != get(j).data().size())) {
+    get(*d2lambda_r).data() = ComplexDataVector{get(j).data().size()};
+  }
+  get(*d2lambda_r) =
+      -0.25 * get(r) *
+      (get(dr_j) * conj(get(dr_j)) -
+       0.25 * square(conj(get(j)) * get(dr_j) + get(j) * conj(get(dr_j))) /
+           (1.0 + get(j) * conj(get(j))));
   get(*d2lambda_r).data() *= square(get<1>(d_r));
 }
 
-void bondi_q_worldtube_data(
-    const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> bondi_q,
-    const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> dr_bondi_u,
+void calculate_bondi_q_initial_data(
+    const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> q,
     const Scalar<SpinWeighted<ComplexDataVector, 0>>& d2lambda_r,
     const tnsr::AA<DataVector, 3>& dlambda_inverse_null_metric,
     const tnsr::a<DataVector, 3>& d_r,
     const tnsr::i<ComplexDataVector, 2> down_dyad,
     const tnsr::i<DataVector, 2> angular_d_dlambda_r,
     const tnsr::AA<DataVector, 3>& inverse_null_metric,
-    const Scalar<SpinWeighted<ComplexDataVector, 2>>& bondi_j,
+    const Scalar<SpinWeighted<ComplexDataVector, 2>>& j,
     const Scalar<SpinWeighted<ComplexDataVector, 0>>& r,
-    const Scalar<SpinWeighted<ComplexDataVector, 1>>& bondi_u) noexcept {
-  check_and_resize(bondi_q, get(bondi_j).data().size());
+    const Scalar<SpinWeighted<ComplexDataVector, 1>>& u) noexcept {
+  if (UNLIKELY(get(*q).data().size() != get(j).data().size())) {
+    get(*q).data() = ComplexDataVector{get(j).data().size()};
+  }
   // Allocation
-  Scalar<SpinWeighted<ComplexDataVector, 1>> dlambda_bondi_u;
+  Scalar<SpinWeighted<ComplexDataVector, 1>> dlambda_u;
 
-  get(dlambda_bondi_u).data() = ComplexDataVector{get(bondi_j).data().size()};
+  get(dlambda_u).data() = ComplexDataVector{get(j).data().size()};
 
-  get(dlambda_bondi_u).data() =
-      -get(bondi_u).data() * get(d2lambda_r).data() / get<1>(d_r);
+  get(dlambda_u).data() = -get(u).data() * get(d2lambda_r).data() / get<1>(d_r);
 
   for (size_t A = 0; A < 2; ++A) {
-    get(dlambda_bondi_u) -=
-        (dlambda_inverse_null_metric.get(1, A + 2) +
-         get(d2lambda_r).data() * inverse_null_metric.get(1, A + 2) /
-             get<1>(d_r)) *
-        down_dyad.get(A);
+    get(dlambda_u) -= (dlambda_inverse_null_metric.get(1, A + 2) +
+                       get(d2lambda_r).data() *
+                           inverse_null_metric.get(1, A + 2) / get<1>(d_r)) *
+                      down_dyad.get(A);
     for (size_t B = 0; B < 2; ++B) {
-      get(dlambda_bondi_u) -=
+      get(dlambda_u) -=
           (d_r.get(B + 2) * dlambda_inverse_null_metric.get(A + 2, B + 2) /
            get<1>(d_r)) *
           down_dyad.get(A);
-      get(dlambda_bondi_u) -= angular_d_dlambda_r.get(B) *
-                              inverse_null_metric.get(A + 2, B + 2) *
-                              down_dyad.get(A) / get<1>(d_r);
+      get(dlambda_u) -= angular_d_dlambda_r.get(B) *
+                        inverse_null_metric.get(A + 2, B + 2) *
+                        down_dyad.get(A) / get<1>(d_r);
     }
   }
-  get(*dr_bondi_u).data() = get(dlambda_bondi_u).data() / get<1>(d_r);
 
-  get(*bondi_q).data() =
+  get(*q).data() =
       square(get(r).data()) *
-      (get(bondi_j).data() * conj(get(dlambda_bondi_u).data()) +
-       sqrt(1.0 + get(bondi_j).data() * conj(get(bondi_j).data())) *
-           get(dlambda_bondi_u).data());
+      (get(j).data() * conj(get(dlambda_u).data()) +
+       sqrt(1.0 + get(j).data() * conj(get(j).data())) * get(dlambda_u).data());
+
+  ComplexDataVector dlambda_u_check{get(*q).data().size(), 0.0};
+  dlambda_u_check =
+      square(get<1>(d_r)) / square(get(r).data()) *
+      (sqrt(1.0 + get(j).data() * conj(get(j).data())) * get(*q).data() -
+       get(j).data() * conj(get(*q).data()));
 }
 
-void bondi_h_worldtube_data(
-    const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> bondi_h,
+void calculate_bondi_h_initial_data(
+    const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> h,
     const tnsr::a<DataVector, 3>& d_r,
-    const Scalar<SpinWeighted<ComplexDataVector, 2>>& bondi_j,
+    const Scalar<SpinWeighted<ComplexDataVector, 2>>& j,
     const tnsr::aa<DataVector, 3>& du_null_metric,
     const Scalar<SpinWeighted<ComplexDataVector, 0>>& r,
     const tnsr::i<ComplexDataVector, 2>& up_dyad) noexcept {
-  check_and_resize(bondi_h, get(bondi_j).data().size());
-
-  get(*bondi_h).data() =
-      -2.0 * get<0>(d_r) / get(r).data() * get(bondi_j).data();
+  if (UNLIKELY(get(*h).data().size() != get(j).data().size())) {
+    get(*h).data() = ComplexDataVector{get(j).data().size()};
+  }
+  // TEST FOR SPEC H
+  // get(*h).data() = 0.0;
+  get(*h).data() = -2.0 * get<0>(d_r) / get(r).data() * get(j).data();
   for (size_t A = 0; A < 2; ++A) {
     for (size_t B = 0; B < 2; ++B) {
-      get(*bondi_h).data() += (0.5 / square(get(r).data())) * up_dyad.get(A) *
-                              up_dyad.get(B) * du_null_metric.get(A + 2, B + 2);
+      get(*h).data() += (0.5 / square(get(r).data())) * up_dyad.get(A) *
+                        up_dyad.get(B) * du_null_metric.get(A + 2, B + 2);
     }
   }
 }

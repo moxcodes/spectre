@@ -128,11 +128,18 @@ struct News : db::SimpleTag {
   static std::string name() noexcept { return "News"; }
 };
 
+
+
 // For expressing the Cauchy angular coordinates for the worldtube data in terms
 // of the evolution angular coordinates.
 struct CauchyAngularCoords : db::SimpleTag {
   using type = tnsr::i<DataVector, 2>;
   static std::string name() noexcept { return "CauchyAngularCoords";}
+};
+
+struct InertialRetardedTime : db::SimpleTag {
+  using type = Scalar<SpinWeighted<ComplexDataVector, 0>>;
+  static std::string name() noexcept { return "InertialRetardedTime"; }
 };
 
 struct U0 : db::SimpleTag {

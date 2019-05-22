@@ -1,10 +1,6 @@
 // Distributed under the MIT License.
 // See LICENSE.txt for details.
 
-//// This file is only for my own practice, locally.
-//// If it appears in a PR, please tell me that I have
-//// made a version control error and that it should be removed.
-
 #pragma once
 
 #include "DataStructures/Variables.hpp"
@@ -64,7 +60,6 @@ struct ModeComparisonManager {
         closest_time = i;
       }
     }
-
     auto mode_difference_at_time = ComplexModalVector{square(l_max_ + 1), 0.0};
     for (int l = 0; l <= static_cast<int>(l_max_); ++l) {
       for (int m = -l; m <= l; ++m) {
@@ -90,4 +85,10 @@ struct ModeComparisonManager {
   ComplexModalVector modes_;
   h5::H5File<h5::AccessType::ReadOnly> mode_data_file_;
 };
+
+ComplexDataVector interpolate_to_bondi_r(ComplexDataVector to_interpolate,
+                                         ComplexDataVector boundary_r,
+                                         double target_r,
+                                         size_t l_max) noexcept;
+
 }  // namespace Cce

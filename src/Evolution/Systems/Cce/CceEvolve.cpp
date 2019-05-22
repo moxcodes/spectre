@@ -35,6 +35,34 @@ ComplexModalVector compute_mode_difference_at_scri(
   return mode_compare.mode_difference(time, modes);
 }
 
+template <typename BondiTag>
+ComplexModalVector compute_mode_difference_at_bondi_r_200(
+    double time, std::string prefix, const ComplexModalVector& modes,
+    size_t l_max) {
+  std::string filename;
+  if (cpp17::is_same_v<BondiTag, Tags::Beta>) {
+    filename = "betaR200modes.h5";
+  }
+  if (cpp17::is_same_v<BondiTag, Tags::U>) {
+    filename = "UR200modes.h5";
+  }
+  if (cpp17::is_same_v<BondiTag, Tags::Q>) {
+    filename = "QR200modes.h5";
+  }
+  if (cpp17::is_same_v<BondiTag, Tags::W>) {
+    filename = "WR200modes.h5";
+  }
+  if (cpp17::is_same_v<BondiTag, Tags::J>) {
+    filename = "JR200modes.h5";
+  }
+  if (cpp17::is_same_v<BondiTag, Tags::SpecH>) {
+    filename = "HR200modes.h5";
+  }
+
+  ModeComparisonManager mode_compare(prefix + filename, l_max);
+  return mode_compare.mode_difference(time, modes);
+}
+
 template <typename BondiTag, typename SwshVariablesTag,
           typename SwshBufferVariablesTag, typename PreSwshVariablesTag,
           typename DataBoxType>
@@ -95,20 +123,52 @@ void compare_and_record_scri_values(
                 Spectral::Swsh::number_of_swsh_collocation_points(l_max),
         Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
 
-    auto scri_goldberg_modes =
-        Spectral::Swsh::libsharp_to_goldberg_modes(
-            Spectral::Swsh::swsh_transform(make_not_null(&scri_slice), l_max),
-            l_max)
-            .data();
+    auto scri_goldberg_modes = Spectral::Swsh::libsharp_to_goldberg_modes(
+        Spectral::Swsh::swsh_transform(make_not_null(&scri_slice), l_max),
+        l_max);
     recorder->append_mode_data("/" + tag::name() + "_scri", time,
-                               scri_goldberg_modes, comparison_l_max);
+                               scri_goldberg_modes.data(), comparison_l_max);
 
     if (comparison_file_prefix != "") {
-      recorder->append_mode_data("/" + tag::name() + "_scri_difference", time,
-                                 compute_mode_difference_at_scri<tag>(
-                                     time, comparison_file_prefix,
-                                     scri_goldberg_modes, comparison_l_max),
-                                 comparison_l_max);
+      recorder->append_mode_data(
+          "/" + tag::name() + "_scri_difference", time,
+          compute_mode_difference_at_scri<tag>(time, comparison_file_prefix,
+                                               scri_goldberg_modes.data(),
+                                               comparison_l_max),
+          comparison_l_max);
+    }
+  });
+}
+
+template <typename TagList, typename DataBoxType>
+void compare_and_record_r200_values(
+    const gsl::not_null<DataBoxType*> box,
+    const gsl::not_null<ModeRecorder*> recorder,
+    const std::string comparison_file_prefix, const double time,
+    const size_t l_max, const size_t comparison_l_max,
+    const size_t /*number_of_radial_points*/) noexcept {
+  tmpl::for_each<TagList>([&comparison_file_prefix, &box, &l_max, &recorder,
+                           &time, &comparison_l_max](auto x) {
+    using tag = typename decltype(x)::type;
+    typename db::item_type<tag>::type r200_slice;
+    ComplexDataVector r200_slice_buffer = get(db::get<tag>(*box)).data();
+    r200_slice.data() = interpolate_to_bondi_r(
+        get(db::get<tag>(*box)).data(), get(db::get<Tags::R>(*box)).data(),
+        200.0, l_max);
+
+    auto r200_goldberg_modes = Spectral::Swsh::libsharp_to_goldberg_modes(
+        Spectral::Swsh::swsh_transform(make_not_null(&r200_slice), l_max),
+        l_max);
+    recorder->append_mode_data("/" + tag::name() + "_scri", time,
+                               r200_goldberg_modes.data(), comparison_l_max);
+
+    if (comparison_file_prefix != "") {
+      recorder->append_mode_data(
+          "/" + tag::name() + "_r200_difference", time,
+          compute_mode_difference_at_bondi_r_200<tag>(
+              time, comparison_file_prefix, r200_goldberg_modes.data(),
+              comparison_l_max),
+          comparison_l_max);
     }
   });
 }
@@ -132,8 +192,8 @@ void run_trial_cce(std::string input_filename,
   using boundary_variables_tag = ::Tags::Variables<all_boundary_tags>;
   using integration_independent_variables_tag =
       ::Tags::Variables<pre_computation_tags>;
-  using pre_swsh_derivatives_variables_tag =
-      ::Tags::Variables<all_pre_swsh_derivative_tags>;
+  using pre_swsh_derivatives_variables_tag = ::Tags::Variables<
+      tmpl::append<all_pre_swsh_derivative_tags, tmpl::list<Tags::SpecH>>>;
   using transform_buffer_variables_tag =
       ::Tags::Variables<all_transform_buffer_tags>;
   using swsh_derivatives_variables_tag =
@@ -220,6 +280,8 @@ void run_trial_cce(std::string input_filename,
     // do not quite align).
     // TODO: investigate if this is still necessary. If it is, there is still a
     // problem.
+    db::mutate_apply<ComputePreSwshDerivatives<Tags::Dy<Tags::J>>>(
+        make_not_null(&box));
     db::mutate<Tags::BoundaryValue<Tags::H>,
                Tags::BoundaryValue<Tags::DuRDividedByR>, Tags::Dy<Tags::J>>(
         make_not_null(&box),
@@ -267,6 +329,18 @@ void run_trial_cce(std::string input_filename,
     history.insert(time.time(), get(db::get<Tags::J>(box)).data(),
                    std::move(du_j));
 
+    db::mutate<Tags::SpecH>(
+        make_not_null(&box),
+        [](const gsl::not_null<db::item_type<Tags::SpecH>*> spec_h,
+           const db::item_type<Tags::H>& h,
+           const db::item_type<Tags::DuRDividedByR>& du_r_divided_by_r,
+           const db::item_type<Tags::OneMinusY>& one_minus_y,
+           const db::item_type<Tags::Dy<Tags::J>>& dy_j) {
+          get(*spec_h) =
+              get(h) - get(du_r_divided_by_r) * get(one_minus_y) * get(dy_j);
+        },
+        db::get<Tags::H>(box), db::get<Tags::DuRDividedByR>(box),
+        db::get<Tags::OneMinusY>(box), db::get<Tags::Dy<Tags::J>>(box));
     if (time.substep() == 0) {
       // perform a comparison of boundary values and scri+ values on each new
       // time advancement
@@ -289,6 +363,14 @@ void run_trial_cce(std::string input_filename,
             make_not_null(&box), make_not_null(&recorder),
             comparison_file_prefix, time.step_time().value(), l_max,
             comparison_l_max, number_of_radial_points);
+
+        // note: SpecH is available, but needs to be computed on its own for the
+        // comparison to be useful.
+        compare_and_record_r200_values<tmpl::list<
+            Tags::J, Tags::Beta, Tags::Q, Tags::U, Tags::W, Tags::SpecH>>(
+            make_not_null(&box), make_not_null(&recorder),
+            comparison_file_prefix, time.step_time().value(), l_max,
+            comparison_l_max, number_of_radial_points);
       }
     }
     db::mutate<Tags::J>(make_not_null(&box),
@@ -302,12 +384,12 @@ void run_trial_cce(std::string input_filename,
     // get the worldtube data for the next time step.
     db::mutate<boundary_variables_tag>(
         make_not_null(&box),
-        [&start_time, &data_manager, &data_still_available](
+        [&time, &data_manager, &data_still_available](
             const gsl::not_null<db::item_type<boundary_variables_tag>*>
                 boundary_variables) {
           data_still_available =
               data_manager.populate_hypersurface_boundary_data(
-                  boundary_variables, start_time);
+                  boundary_variables, time.time().value());
         });
   }
 }
