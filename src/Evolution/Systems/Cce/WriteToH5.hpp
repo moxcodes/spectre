@@ -19,7 +19,7 @@ struct ModeRecorder {
     // TODO: write the simulation l_max in a better place. The current hdf5
     // utilities don't offer much help so this is an acceptable stop-gap.
     file_legend_.push_back("times, sim lmax: " + std::to_string(info_l_max));
-    for(int i = 0; i <= l_max; ++i){
+    for (int i = 0; i <= static_cast<int>(l_max); ++i) {
       for(int j = -i; j <= i; ++j) {
         file_legend_.push_back("Real Y_" + std::to_string(i) + "," +
                               std::to_string(j));

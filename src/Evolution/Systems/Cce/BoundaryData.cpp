@@ -373,7 +373,7 @@ void cartesian_lapse_and_derivatives(
   std::copy(interp_result.begin(), interp_result.end(),
             get(*dt_cartesian_lapse).begin());
 
-  derivative_buffer = std::complex<double>(1.0, 0.0) * get(cartesian_lapse);
+  derivative_buffer = std::complex<double>(1.0, 0.0) * get(*cartesian_lapse);
   Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
       make_not_null(&eth_of_component), make_not_null(&derivative_buffer),
       l_max);
@@ -548,9 +548,9 @@ void worldtube_normal_and_derivatives(
     const gsl::not_null<tnsr::iJ<DataVector, 3>*> angular_d_worldtube_normal,
     const gsl::not_null<tnsr::I<DataVector, 3>*> worldtube_normal,
     const gsl::not_null<tnsr::I<DataVector, 3>*> dt_worldtube_normal,
-    const tnsr::iJ<DataVector, 3>& cartesian_to_angular_jacobian,
+    const tnsr::iJ<DataVector, 3>& /*cartesian_to_angular_jacobian*/,
     const Scalar<DataVector>& cos_phi, const Scalar<DataVector>& cos_theta,
-    const tnsr::iaa<DataVector, 3>& phi, const tnsr::aa<DataVector, 3>& psi,
+    const tnsr::iaa<DataVector, 3>& /*phi*/, const tnsr::aa<DataVector, 3>& psi,
     const tnsr::aa<DataVector, 3>& dt_psi, const Scalar<DataVector>& sin_phi,
     const Scalar<DataVector>& sin_theta,
     const tnsr::II<DataVector, 3> inverse_spatial_metric) noexcept {
@@ -608,12 +608,13 @@ void null_vector_l_and_derivatives(
     const gsl::not_null<tnsr::iA<DataVector, 3>*> angular_d_null_l,
     const gsl::not_null<tnsr::A<DataVector, 3>*> du_null_l,
     const gsl::not_null<tnsr::A<DataVector, 3>*> null_l,
-    const tnsr::iJ<DataVector, 3>& angular_d_worldtube_normal,
+    const tnsr::iJ<DataVector, 3>& /*angular_d_worldtube_normal*/,
     const tnsr::I<DataVector, 3>& dt_worldtube_normal,
-    const tnsr::iJ<DataVector, 3>& cartesian_to_angular_jacobian,
-    const tnsr::i<DataVector, 3>& d_lapse, const tnsr::iaa<DataVector, 3>& phi,
-    const tnsr::iJ<DataVector, 3>& d_shift, const Scalar<DataVector>& dt_lapse,
-    const tnsr::aa<DataVector, 3>& dt_psi,
+    const tnsr::iJ<DataVector, 3>& /*cartesian_to_angular_jacobian*/,
+    const tnsr::i<DataVector, 3>& /*d_lapse*/,
+    const tnsr::iaa<DataVector, 3>& /*phi*/,
+    const tnsr::iJ<DataVector, 3>& /*d_shift*/,
+    const Scalar<DataVector>& dt_lapse, const tnsr::aa<DataVector, 3>& dt_psi,
     const tnsr::I<DataVector, 3>& dt_shift, const Scalar<DataVector>& lapse,
     const tnsr::aa<DataVector, 3>& psi, const tnsr::I<DataVector, 3>& shift,
     const tnsr::I<DataVector, 3>& worldtube_normal) noexcept {
@@ -691,7 +692,7 @@ void dlambda_null_metric_and_inverse(
     const tnsr::A<DataVector, 3>& null_l,
     const tnsr::aa<DataVector, 3>& psi) noexcept {
   // first, the (down-index) null metric
-  size_t size = get(lapse).size();
+  size_t size = get<0, 0>(psi).size();
   check_and_resize(dlambda_null_metric, size);
   check_and_resize(dlambda_inverse_null_metric, size);
 
@@ -822,10 +823,9 @@ void dlambda_null_metric_and_inverse(
   }
 }
 
-void bondi_r(
-    const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> bondi_r,
-    const tnsr::aa<DataVector, 3>& null_metric) noexcept {
-  check_and_resize(bondi_r, get<0, 0>(null_metric).size());
+void bondi_r(const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> r,
+             const tnsr::aa<DataVector, 3>& null_metric) noexcept {
+  check_and_resize(r, get<0, 0>(null_metric).size());
 
   // the inclusion of the std::complex<double> informs the Blaze expression
   // templates to turn the result into a ComplexDataVector
@@ -835,31 +835,31 @@ void bondi_r(
                        0.25);
 }
 
-void d_bondi_r(const gsl::not_null<tnsr::a<DataVector, 3>*> d_bondi_r,
-               const Scalar<SpinWeighted<ComplexDataVector, 0>>& bondi_r,
-               const tnsr::aa<DataVector, 3>& dlambda_null_metric,
-               const tnsr::aa<DataVector, 3>& du_null_metric,
-               const tnsr::AA<DataVector, 3>& inverse_null_metric, size_t l_max,
-               const YlmSpherepack spherical_harmonic) noexcept {
-  check_and_resize(d_bondi_r, get<0, 0>(inverse_null_metric).size());
+void d_bondi_r(
+    const gsl::not_null<tnsr::a<DataVector, 3>*> d_r,
+    const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> r,
+    const tnsr::aa<DataVector, 3>& dlambda_null_metric,
+    const tnsr::aa<DataVector, 3>& du_null_metric,
+    const tnsr::AA<DataVector, 3>& inverse_null_metric, size_t l_max,
+    const YlmSpherepack /*spherical_harmonic*/) noexcept {
+  check_and_resize(d_r, get<0, 0>(inverse_null_metric).size());
   // compute the time derivative part
-  get<0>(*d_bondi_r) =
-      0.25 * real(get(bondi_r).data()) *
+  get<0>(*d_r) =
+      0.25 * real(get(*r).data()) *
       (get<2, 2>(inverse_null_metric) * get<2, 2>(du_null_metric) +
        2.0 * get<2, 3>(inverse_null_metric) * get<2, 3>(du_null_metric) +
        get<3, 3>(inverse_null_metric) * get<3, 3>(du_null_metric));
   // compute the lambda derivative part
   get<1>(*d_r) =
-      0.25 * real(get(r).data()) *
+      0.25 * real(get(*r).data()) *
       (get<2, 2>(inverse_null_metric) * get<2, 2>(dlambda_null_metric) +
        2.0 * get<2, 3>(inverse_null_metric) * get<2, 3>(dlambda_null_metric) +
        get<3, 3>(inverse_null_metric) * get<3, 3>(dlambda_null_metric));
 
-  ComplexDataVector eth_of_r =
-      Spectral::Swsh::swsh_derivative<0, Spectral::Swsh::Tags::Eth>(
-          get(r).data(), l_max);
-  d_r->get(2) = -real(eth_of_r);
-  d_r->get(3) = -imag(eth_of_r);
+  auto eth_of_r = Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
+      make_not_null(&get(*r)), l_max);
+  d_r->get(2) = -real(eth_of_r.data());
+  d_r->get(3) = -imag(eth_of_r.data());
 }
 
 void dyads(
@@ -874,15 +874,15 @@ void dyads(
 
 void beta_worldtube_data(
     const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> beta,
-    const tnsr::a<DataVector, 3>& d_bondi_r) noexcept {
-  check_and_resize(beta, get<0>(d_bondi_r).size());
-  get(*beta).data() = std::complex<double>(-0.5, 0.0) * log(get<1>(d_bondi_r));
+    const tnsr::a<DataVector, 3>& d_r) noexcept {
+  check_and_resize(beta, get<0>(d_r).size());
+  get(*beta).data() = std::complex<double>(-0.5, 0.0) * log(get<1>(d_r));
 }
 
 void bondi_u_worldtube_data(
     const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> bondi_u,
     const tnsr::i<ComplexDataVector, 2>& down_dyad,
-    const tnsr::a<DataVector, 3>& d_bondi_r,
+    const tnsr::a<DataVector, 3>& d_r,
     const tnsr::AA<DataVector, 3>& inverse_null_metric) noexcept {
   check_and_resize(bondi_u, get<0>(d_r).size());
   get(*bondi_u).data() = -get<0>(down_dyad) * get<1, 2>(inverse_null_metric) -
@@ -899,92 +899,90 @@ void bondi_u_worldtube_data(
 
 void bondi_w_worldtube_data(
     const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> bondi_w,
-    const tnsr::a<DataVector, 3>& d_bondi_r,
+    const tnsr::a<DataVector, 3>& d_r,
     const tnsr::AA<DataVector, 3>& inverse_null_metric,
-    const Scalar<SpinWeighted<ComplexDataVector, 0>>& bondi_r) noexcept {
+    const Scalar<SpinWeighted<ComplexDataVector, 0>>& r) noexcept {
   check_and_resize(bondi_w, get(r).data().size());
 
   get(*bondi_w).data() =
       std::complex<double>(1.0, 0.0) *
-      (-1.0 + get<1>(d_bondi_r) * get<1, 1>(inverse_null_metric) -
-       2.0 * get<0>(d_bondi_r));
+      (-1.0 + get<1>(d_r) * get<1, 1>(inverse_null_metric) - 2.0 * get<0>(d_r));
 
   for (size_t A = 0; A < 2; ++A) {
     get(*bondi_w).data() +=
-        2.0 * d_bondi_r.get(A + 2) * inverse_null_metric.get(1, A + 2);
+        2.0 * d_r.get(A + 2) * inverse_null_metric.get(1, A + 2);
   }
 
   for (size_t A = 0; A < 2; ++A) {
     for (size_t B = 0; B < 2; ++B) {
-      get(*bondi_w).data() += d_bondi_r.get(A + 2) * d_r.get(B + 2) *
+      get(*bondi_w).data() += d_r.get(A + 2) * d_r.get(B + 2) *
                               inverse_null_metric.get(A + 2, B + 2) /
-                              get<1>(d_bondi_r);
+                              get<1>(d_r);
     }
   }
-  get(*bondi_w).data() /= std::complex<double>(1.0, 0.0) * get(bondi_r).data();
+  get(*bondi_w).data() /= std::complex<double>(1.0, 0.0) * get(r).data();
 }
 
 void bondi_j_worldtube_data(
     const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> bondi_j,
     const tnsr::aa<DataVector, 3>& null_metric,
-    const Scalar<SpinWeighted<ComplexDataVector, 0>> bondi_r,
+    const Scalar<SpinWeighted<ComplexDataVector, 0>> r,
     const tnsr::i<ComplexDataVector, 2>& up_dyad) noexcept {
-  check_and_resize(bondi_j, get(bondi_r).data().size());
+  check_and_resize(bondi_j, get(r).data().size());
 
   get(*bondi_j).data() =
       0.5 *
       (square(get<0>(up_dyad)) * get<2, 2>(null_metric) +
        2.0 * get<0>(up_dyad) * get<1>(up_dyad) * get<2, 3>(null_metric) +
        square(get<1>(up_dyad)) * get<3, 3>(null_metric)) /
-      square(get(bondi_r).data());
+      square(get(r).data());
 }
 
 void dr_bondi_j(
-    const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> dr_bondi_j,
+    const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> dr_j,
     const tnsr::aa<DataVector, 3>& dlambda_null_metric,
-    const tnsr::a<DataVector, 3>& d_bondi_r,
+    const tnsr::a<DataVector, 3>& d_r,
     const Scalar<SpinWeighted<ComplexDataVector, 2>>& bondi_j,
-    const Scalar<SpinWeighted<ComplexDataVector, 0>>& bondi_r,
+    const Scalar<SpinWeighted<ComplexDataVector, 0>>& r,
     const tnsr::i<ComplexDataVector, 2>& up_dyad) noexcept {
-  check_and_resize(dr_bondi_j, get(bondi_r).data().size());
-  get(*dr_bondi_j) = -2.0 * get(bondi_j) / get(bondi_r);
+  check_and_resize(dr_j, get(r).data().size());
+  get(*dr_j) = -2.0 * get(bondi_j) / get(r);
   for (size_t A = 0; A < 2; ++A) {
     for (size_t B = 0; B < 2; ++B) {
-      get(*dr_bondi_j).data() +=
-          0.5 * up_dyad.get(A) * up_dyad.get(B) *
-          dlambda_null_metric.get(A + 2, B + 2) /
-          (square(get(bondi_r).data()) * get<1>(d_bondi_r));
+      get(*dr_j).data() += 0.5 * up_dyad.get(A) * up_dyad.get(B) *
+                                 dlambda_null_metric.get(A + 2, B + 2) /
+                                 (square(get(r).data()) * get<1>(d_r));
     }
   }
 }
 
 void d2lambda_bondi_r(
-    const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*>
-        d2lambda_bondi_r,
-    const tnsr::a<DataVector, 3>& d_bondi_r,
-    const Scalar<SpinWeighted<ComplexDataVector, 2>>& dr_bondi_j,
+    const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> d2lambda_r,
+    const tnsr::a<DataVector, 3>& d_r,
+    const Scalar<SpinWeighted<ComplexDataVector, 2>>& dr_j,
     const Scalar<SpinWeighted<ComplexDataVector, 2>>& bondi_j,
-    const Scalar<SpinWeighted<ComplexDataVector, 0>>& bondi_r) noexcept {
-  check_and_resize(d2lambda_bondi_r, get(bondi_j).data().size());
-  get(*d2lambda_bondi_r) = -0.25 * get(bondi_r) *
-                           (get(dr_bondi_j) * conj(get(dr_bondi_j)) -
-                            0.25 *
-                                square(conj(get(bondi_j)) * get(dr_bondi_j) +
-                                       get(bondi_j) * conj(get(dr_bondi_j))) /
-                                (1.0 + get(bondi_j) * conj(get(bondi_j))));
-  get(*d2lambda_bondi_r).data() *= square(get<1>(d_bondi_r));
+    const Scalar<SpinWeighted<ComplexDataVector, 0>>& r) noexcept {
+  check_and_resize(d2lambda_r, get(bondi_j).data().size());
+  get(*d2lambda_r) = -0.25 * get(r) *
+                     (get(dr_j) * conj(get(dr_j)) -
+                      0.25 *
+                          square(conj(get(bondi_j)) * get(dr_j) +
+                                 get(bondi_j) * conj(get(dr_j))) /
+                          (1.0 + get(bondi_j) * conj(get(bondi_j))));
+  get(*d2lambda_r).data() *= square(get<1>(d_r));
 }
 
 void bondi_q_worldtube_data(
     const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> bondi_q,
-    const Scalar<SpinWeighted<ComplexDataVector, 0>>& d2lambda_bondi_r,
+    const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> dr_bondi_u,
+    const Scalar<SpinWeighted<ComplexDataVector, 0>>& d2lambda_r,
     const tnsr::AA<DataVector, 3>& dlambda_inverse_null_metric,
-    const tnsr::a<DataVector, 3>& d_bondi_r,
+    const tnsr::a<DataVector, 3>& d_r,
     const tnsr::i<ComplexDataVector, 2> down_dyad,
-    const tnsr::i<DataVector, 2> angular_d_dlambda_bondi_r,
+    const tnsr::i<DataVector, 2> angular_d_dlambda_r,
     const tnsr::AA<DataVector, 3>& inverse_null_metric,
     const Scalar<SpinWeighted<ComplexDataVector, 2>>& bondi_j,
-    const Scalar<SpinWeighted<ComplexDataVector, 0>>& bondi_r,
+    const Scalar<SpinWeighted<ComplexDataVector, 0>>& r,
     const Scalar<SpinWeighted<ComplexDataVector, 1>>& bondi_u) noexcept {
   check_and_resize(bondi_q, get(bondi_j).data().size());
   // Allocation
@@ -993,27 +991,28 @@ void bondi_q_worldtube_data(
   get(dlambda_bondi_u).data() = ComplexDataVector{get(bondi_j).data().size()};
 
   get(dlambda_bondi_u).data() =
-      -get(bondi_u).data() * get(d2lambda_bondi_r).data() / get<1>(d_bondi_r);
+      -get(bondi_u).data() * get(d2lambda_r).data() / get<1>(d_r);
 
   for (size_t A = 0; A < 2; ++A) {
     get(dlambda_bondi_u) -=
         (dlambda_inverse_null_metric.get(1, A + 2) +
-         get(d2lambda_bondi_r).data() * inverse_null_metric.get(1, A + 2) /
-             get<1>(d_bondi_r)) *
+         get(d2lambda_r).data() * inverse_null_metric.get(1, A + 2) /
+             get<1>(d_r)) *
         down_dyad.get(A);
     for (size_t B = 0; B < 2; ++B) {
       get(dlambda_bondi_u) -=
-          (d_bondi_r.get(B + 2) *
-           dlambda_inverse_null_metric.get(A + 2, B + 2) / get<1>(d_bondi_r)) *
+          (d_r.get(B + 2) * dlambda_inverse_null_metric.get(A + 2, B + 2) /
+           get<1>(d_r)) *
           down_dyad.get(A);
-      get(dlambda_bondi_u) -= angular_d_dlambda_bondi_r.get(B) *
+      get(dlambda_bondi_u) -= angular_d_dlambda_r.get(B) *
                               inverse_null_metric.get(A + 2, B + 2) *
                               down_dyad.get(A) / get<1>(d_r);
     }
   }
+  get(*dr_bondi_u).data() = get(dlambda_bondi_u).data() / get<1>(d_r);
 
   get(*bondi_q).data() =
-      square(get(bondi_r).data()) *
+      square(get(r).data()) *
       (get(bondi_j).data() * conj(get(dlambda_bondi_u).data()) +
        sqrt(1.0 + get(bondi_j).data() * conj(get(bondi_j).data())) *
            get(dlambda_bondi_u).data());
@@ -1021,20 +1020,19 @@ void bondi_q_worldtube_data(
 
 void bondi_h_worldtube_data(
     const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> bondi_h,
-    const tnsr::a<DataVector, 3>& d_bondi_r,
+    const tnsr::a<DataVector, 3>& d_r,
     const Scalar<SpinWeighted<ComplexDataVector, 2>>& bondi_j,
     const tnsr::aa<DataVector, 3>& du_null_metric,
-    const Scalar<SpinWeighted<ComplexDataVector, 0>>& bondi_r,
+    const Scalar<SpinWeighted<ComplexDataVector, 0>>& r,
     const tnsr::i<ComplexDataVector, 2>& up_dyad) noexcept {
-  check_and_resize(bondi_h, get(j).data().size());
+  check_and_resize(bondi_h, get(bondi_j).data().size());
 
   get(*bondi_h).data() =
-      -2.0 * get<0>(d_bondi_r) / get(bondi_r).data() * get(bondi_j).data();
+      -2.0 * get<0>(d_r) / get(r).data() * get(bondi_j).data();
   for (size_t A = 0; A < 2; ++A) {
     for (size_t B = 0; B < 2; ++B) {
-      get(*bondi_h).data() += (0.5 / square(get(bondi_r).data())) *
-                              up_dyad.get(A) * up_dyad.get(B) *
-                              du_null_metric.get(A + 2, B + 2);
+      get(*bondi_h).data() += (0.5 / square(get(r).data())) * up_dyad.get(A) *
+                              up_dyad.get(B) * du_null_metric.get(A + 2, B + 2);
     }
   }
 }

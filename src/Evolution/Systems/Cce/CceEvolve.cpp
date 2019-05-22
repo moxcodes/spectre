@@ -2,6 +2,8 @@
 // See LICENSE.txt for details.
 
 #include "Evolution/Systems/Cce/CceEvolve.hpp"
+#include "NumericalAlgorithms/Spectral/SwshFiltering.hpp"
+#include "NumericalAlgorithms/Spectral/SwshTransformJob.hpp"
 
 namespace Cce {
 
@@ -33,36 +35,139 @@ ComplexModalVector compute_mode_difference_at_scri(
   return mode_compare.mode_difference(time, modes);
 }
 
+template <typename BondiTag, typename SwshVariablesTag,
+          typename SwshBufferVariablesTag, typename PreSwshVariablesTag,
+          typename DataBoxType>
+void perform_hypersurface_computation(
+    const gsl::not_null<DataBoxType*> box) noexcept {
+  mutate_all_pre_swsh_derivatives_for_tag<BondiTag>(box);
+
+  mutate_all_swsh_derivatives_for_tag<
+      BondiTag, SwshVariablesTag, SwshBufferVariablesTag, PreSwshVariablesTag>(
+      box);
+
+  tmpl::for_each<integrand_terms_to_compute_for_bondi_variable<BondiTag>>(
+      [&box](auto x) {
+        using bondi_integrand_tag = typename decltype(x)::type;
+        db::mutate_apply<ComputeBondiIntegrand<bondi_integrand_tag>>(box);
+      });
+
+  db::mutate_apply<RadialIntegrateBondi<Tags::BoundaryValue, BondiTag>>(box);
+}
+
+template <template <typename> class BoundaryPrefix, typename TagList,
+          typename DataBoxType>
+void record_boundary_values(const gsl::not_null<DataBoxType*> box,
+                            const gsl::not_null<ModeRecorder*> recorder,
+                            const double time, const size_t l_max,
+                            const size_t comparison_l_max) noexcept {
+  tmpl::for_each<TagList>([&box, &l_max, &recorder, &time,
+                           &comparison_l_max](auto x) {
+    using tag = typename decltype(x)::type;
+    typename db::item_type<BoundaryPrefix<tag>>::type transform_buffer =
+        get(db::get<BoundaryPrefix<tag>>(*box));
+    recorder->append_mode_data("/" + tag::name() + "_boundary", time,
+                               Spectral::Swsh::libsharp_to_goldberg_modes(
+                                   Spectral::Swsh::swsh_transform(
+                                       make_not_null(&transform_buffer), l_max),
+                                   l_max)
+                                   .data(),
+                               comparison_l_max);
+  });
+}
+
+template <typename TagList, typename DataBoxType>
+void compare_and_record_scri_values(
+    const gsl::not_null<DataBoxType*> box,
+    const gsl::not_null<ModeRecorder*> recorder,
+    const std::string comparison_file_prefix, const double time,
+    const size_t l_max, const size_t comparison_l_max,
+    const size_t number_of_radial_points) noexcept {
+  tmpl::for_each<TagList>([&comparison_file_prefix, &box, &l_max, &recorder,
+                           &time, &number_of_radial_points,
+                           &comparison_l_max](auto x) {
+    using tag = typename decltype(x)::type;
+    typename db::item_type<tag>::type scri_slice;
+    ComplexDataVector scri_slice_buffer = get(db::get<tag>(*box)).data();
+    scri_slice.data() = ComplexDataVector{
+        scri_slice_buffer.data() +
+            (number_of_radial_points - 1) *
+                Spectral::Swsh::number_of_swsh_collocation_points(l_max),
+        Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
+
+    auto scri_goldberg_modes =
+        Spectral::Swsh::libsharp_to_goldberg_modes(
+            Spectral::Swsh::swsh_transform(make_not_null(&scri_slice), l_max),
+            l_max)
+            .data();
+    recorder->append_mode_data("/" + tag::name() + "_scri", time,
+                               scri_goldberg_modes, comparison_l_max);
+
+    if (comparison_file_prefix != "") {
+      recorder->append_mode_data("/" + tag::name() + "_scri_difference", time,
+                                 compute_mode_difference_at_scri<tag>(
+                                     time, comparison_file_prefix,
+                                     scri_goldberg_modes, comparison_l_max),
+                                 comparison_l_max);
+    }
+  });
+}
+
 void run_trial_cce(std::string input_filename,
                    std::string comparison_file_prefix, size_t simulation_l_max,
                    size_t comparison_l_max, size_t number_of_radial_points,
                    std::string output_file_suffix,
                    size_t rational_timestep_numerator,
                    size_t rational_timestep_denominator,
-                   bool calculate_psi4_diagnostic,
-                   size_t l_filter_start, double start_time,
-                   double end_time) noexcept {
+                   bool /*calculate_psi4_diagnostic*/, size_t l_filter_start,
+                   double start_time, double end_time) noexcept {
   TimeSteppers::RungeKutta3 stepper{};
   TimeSteppers::History<ComplexDataVector, ComplexDataVector> history{};
 
-  auto data_manager = CceBoundaryDataManager<CubicInterpolator, 500>{
-      input_filename + ".h5", simulation_l_max};
-  // auto data_manager = CceBoundaryDataManager<BarycentricInterpolator<10>,
-  // 500>{ input_filename + ".h5", simulation_l_max};
+  // TODO: upgrade interpolator choice
+  auto data_manager = CceH5BoundaryDataManager<CubicInterpolator>{
+      input_filename + ".h5", simulation_l_max, 100};
 
-  Variables<tmpl::append<sw_derivative_tags_to_compute_for<Tags::Beta>,
-                         sw_derivative_tags_to_compute_for<Tags::Q>,
-                         sw_derivative_tags_to_compute_for<Tags::U>,
-                         sw_derivative_tags_to_compute_for<Tags::W>,
-                         sw_derivative_tags_to_compute_for<Tags::H>>>
-      test_creation{2};
+  // this is where we will add another for the gauge adjustment
+  using boundary_variables_tag = ::Tags::Variables<all_boundary_tags>;
+  using integration_independent_variables_tag =
+      ::Tags::Variables<pre_computation_tags>;
+  using pre_swsh_derivatives_variables_tag =
+      ::Tags::Variables<all_pre_swsh_derivative_tags>;
+  using transform_buffer_variables_tag =
+      ::Tags::Variables<all_transform_buffer_tags>;
+  using swsh_derivatives_variables_tag =
+      ::Tags::Variables<all_swsh_derivative_tags>;
+  using temporary_variables_tag =
+      ::Tags::Variables<all_temporary_equation_tags>;
+  using integrand_variables_tag = ::Tags::Variables<all_integrand_tags>;
 
   size_t l_max = data_manager.get_l_max();
+  size_t boundary_size =
+      Spectral::Swsh::number_of_swsh_collocation_points(l_max);
+  size_t volume_size = boundary_size * number_of_radial_points;
+  size_t transform_buffer_size =
+      2 * number_of_radial_points *
+      Spectral::Swsh::number_of_swsh_coefficients(l_max);
+
+  auto box = db::create<db::AddSimpleTags<
+      Tags::LMax, boundary_variables_tag, integration_independent_variables_tag,
+      pre_swsh_derivatives_variables_tag, transform_buffer_variables_tag,
+      swsh_derivatives_variables_tag, temporary_variables_tag,
+      integrand_variables_tag>>(
+      l_max, db::item_type<boundary_variables_tag>{boundary_size},
+      db::item_type<integration_independent_variables_tag>{volume_size},
+      db::item_type<pre_swsh_derivatives_variables_tag>{volume_size},
+      db::item_type<transform_buffer_variables_tag>{transform_buffer_size},
+      db::item_type<swsh_derivatives_variables_tag>{volume_size},
+      db::item_type<temporary_variables_tag>{volume_size},
+      db::item_type<integrand_variables_tag>{volume_size});
 
   ModeRecorder recorder{input_filename + output_file_suffix + ".h5",
                         comparison_l_max, simulation_l_max};
 
-  // TODO This is a bit inelegant
+  // TODO This is a bit inelegant, used entirely for comparing directly to SpEC
+  // data
   std::vector<double> times{};
   if (comparison_file_prefix != "") {
     h5::H5File<h5::AccessType::ReadOnly> beta_comparison_file{
@@ -75,155 +180,94 @@ void run_trial_cce(std::string input_filename,
       times[i] = times_mat(i, 0);
     }
   }
-  // create a variables for boundary data
-  Variables<all_boundary_tags> boundary_variables{
-      Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
-
-  // for the pre-computation buffers
-  Variables<pre_computation_boundary_coefficient_buffer_tags> boundary_buffers{
-      2 * Spectral::Swsh::number_of_swsh_coefficients(l_max)};
-  Variables<tmpl::list<::Tags::TempScalar<0>, ::Tags::TempScalar<1>,
-                       ::Tags::TempScalar<2>>>
-      radial_derivative_buffers{
-          number_of_radial_points *
-          Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
-
-  // For the intermediate computation buffers
-  Variables<tmpl::remove_duplicates<
-      tmpl::flatten<tmpl::remove_duplicates<tmpl::flatten<tmpl::transform<
-          all_sw_derivative_tags,
-          tmpl::bind<coefficient_buffer_tags_for_derivative_tag, tmpl::_1>>>>>>>
-      angular_coefficient_buffers{
-          2 * number_of_radial_points *
-          Spectral::Swsh::number_of_swsh_coefficients(l_max)};
-
-  // BondiAndSWCache Variables
-  Variables<all_bondi_and_sw_cache_tags> bondi_and_sw_cache{
-      number_of_radial_points *
-      Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
-  Variables<all_sw_derivative_tags> sw_derivatives{
-      number_of_radial_points *
-      Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
-  Variables<pre_computation_tags> secondary{
-      number_of_radial_points *
-      Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
-
-  Variables<all_integrand_tags> integrands{
-      number_of_radial_points *
-      Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
-  Variables<all_temporary_equation_tags> temporary{
-      number_of_radial_points *
-      Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
-
-  std::deque<Variables<tmpl::append<
-      ComputeNonInertial<Tags::BoundaryValue<Tags::Psi4>>::return_tags,
-      ComputeNonInertial<Tags::BoundaryValue<Tags::Psi4>>::argument_tags>>>
-      scri_plus_values;
-
-
-  // in order to use the time architecture, we need to make a slab
+  // end time of -1.0 is used to indicate that CCE should just run through all
+  // available data
   if (end_time == -1.0) {
     end_time =
         data_manager
             .get_time_buffer()[data_manager.get_time_buffer().size() - 1];
   }
+  // in order to use the time architecture, we need to make a slab
   Slab only_slab{start_time, end_time};
   TimeDelta time_step{
-      only_slab, Time::rational_t{
-                     static_cast<int>(rational_timestep_numerator),
-                     static_cast<int>(static_cast<int>(end_time - start_time) *
-                                      rational_timestep_denominator)}};
+      only_slab,
+      Time::rational_t{static_cast<int>(rational_timestep_numerator),
+                       static_cast<int>(end_time - start_time) *
+                           static_cast<int>(rational_timestep_denominator)}};
   TimeId time{true, 0, Time{only_slab, Time::rational_t{0, 1}}};
-  data_manager.populate_hypersurface_boundary_data(
-      make_not_null(&boundary_variables), start_time);
-
-  initialize_first_j_slice(
-      make_not_null(&radial_derivative_buffers),
-      make_not_null(&boundary_variables), make_not_null(&boundary_buffers),
-      make_not_null(&bondi_and_sw_cache), make_not_null(&secondary), l_max);
-
-  // In order to perform the time differentiation for the psi_4 diagnostic, we
-  // need to keep track of the time values
-  size_t max_time_list_size = 30;
-
-  size_t max_scri_deque_size = 15;
-
-  // we'll only update the time list if we get to a new, later time (so we
-  // avoid storing out-of-order substeps.
-  double latest_time = start_time - 1.0;
-
-  std::deque<double> time_list;
-
-  std::deque<ComplexDataVector> lambda_1_history;
+  bool data_still_available = false;
+  db::mutate<boundary_variables_tag>(
+      make_not_null(&box),
+      [&start_time, &data_manager, &data_still_available](
+          const gsl::not_null<db::item_type<boundary_variables_tag>*>
+              boundary_variables) {
+        data_still_available = data_manager.populate_hypersurface_boundary_data(
+            boundary_variables, start_time);
+      });
+  db::mutate_apply<InitializeJ<Tags::BoundaryValue>>(make_not_null(&box));
 
   size_t step_counter = 0;
 
-  while (data_manager.populate_hypersurface_boundary_data(
-             make_not_null(&boundary_variables), time.time().value()) and
-         time.time().value() < end_time) {
+  // main loop
+  while (data_still_available and time.time().value() < end_time) {
     step_counter++;
-    precompute_shared_cce_quantities(
-        make_not_null(&radial_derivative_buffers),
-        make_not_null(&boundary_variables), make_not_null(&boundary_buffers),
-        make_not_null(&bondi_and_sw_cache), make_not_null(&secondary), l_max);
+
+    mutate_all_precompute_cce_dependencies<Tags::BoundaryValue>(
+        make_not_null(&box));
 
     // Fix boundary condition for H to be like that of SpEC (there's a
     // coordinates on boundary vs coordinates in bulk problem so the definitions
     // do not quite align).
-    ComplexDataVector boundary_dy_j{
-        get(get<Tags::Dy<Tags::J>>(bondi_and_sw_cache)).data().data(),
-        Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
-    ComplexDataVector boundary_du_r_divided_by_r{
-        get(get<Tags::DuRDividedByR>(secondary)).data().data(),
-        Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
+    // TODO: investigate if this is still necessary. If it is, there is still a
+    // problem.
+    db::mutate<Tags::BoundaryValue<Tags::H>,
+               Tags::BoundaryValue<Tags::DuRDividedByR>, Tags::Dy<Tags::J>>(
+        make_not_null(&box),
+        [&l_max](
+            const gsl::not_null<db::item_type<Tags::BoundaryValue<Tags::H>>*>
+                boundary_h,
+            const gsl::not_null<
+                db::item_type<Tags::BoundaryValue<Tags::DuRDividedByR>>*>
+                du_r_divided_by_r,
+            const gsl::not_null<db::item_type<Tags::Dy<Tags::J>>*> dy_j,
+            const db::item_type<Tags::BoundaryValue<Tags::SpecH>>& spec_h) {
+          ComplexDataVector boundary_dy_j{
+              get(*dy_j).data().data(),
+              Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
+          ComplexDataVector boundary_du_r_divided_by_r{
+              get(*du_r_divided_by_r).data().data(),
+              Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
+          get(*boundary_h).data() =
+              get(spec_h).data() +
+              2.0 * boundary_du_r_divided_by_r * boundary_dy_j;
+        },
+        db::get<Tags::BoundaryValue<Tags::SpecH>>(box));
 
-    get(get<Tags::BoundaryValue<Tags::H>>(boundary_variables)).data() =
-        get(get<Tags::BoundaryValue<Tags::SpecH>>(boundary_variables)).data() +
-        2.0 * boundary_du_r_divided_by_r * boundary_dy_j;
+    tmpl::for_each<tmpl::list<Tags::Beta, Tags::Q, Tags::U, Tags::W, Tags::H>>(
+        [&box, &l_max, &l_filter_start](auto x) {
+          using bondi_tag = typename decltype(x)::type;
+          perform_hypersurface_computation<bondi_tag,
+                                           swsh_derivatives_variables_tag,
+                                           transform_buffer_variables_tag,
+                                           pre_swsh_derivatives_variables_tag>(
+              make_not_null(&box));
 
-    tmpl::for_each<tmpl::list<Tags::Beta, Tags::Q, Tags::U, Tags::W,
-                              Tags::H>>([&bondi_and_sw_cache, &sw_derivatives,
-                                         &secondary, &temporary, &integrands,
-                                         &boundary_variables, &history,
-                                         &angular_coefficient_buffers, &l_max,
-                                         &number_of_radial_points, &time,
-                                         &start_time,
-                                         &l_filter_start](auto x) {
-      using bondi_tag = typename decltype(x)::type;
+          db::mutate<bondi_tag>(
+              make_not_null(&box),
+              [&l_max,
+               &l_filter_start](const gsl::not_null<db::item_type<bondi_tag>*>
+                                    bondi_quantity) {
+                Spectral::Swsh::filter_swsh_volume_quantity(
+                    make_not_null(&get(*bondi_quantity)), l_max, l_filter_start,
+                    108.0, 8);
+              });
+        });
 
-      compute_cce_bondi_values_and_sw_cache_for_tag<bondi_tag>(
-          make_not_null(&bondi_and_sw_cache), sw_derivatives, secondary, l_max);
+    ComplexDataVector du_j = get(db::get<Tags::H>(box)).data();
+    history.insert(time.time(), get(db::get<Tags::J>(box)).data(),
+                   std::move(du_j));
 
-      compute_cce_sw_derivatives_for_tag<bondi_tag>(
-          make_not_null(&bondi_and_sw_cache), make_not_null(&sw_derivatives),
-          secondary, make_not_null(&angular_coefficient_buffers), l_max);
-
-      tmpl::for_each<integrand_terms_to_compute_for_bondi_variable<bondi_tag>>(
-          [&bondi_and_sw_cache, &sw_derivatives, &secondary, &temporary,
-           &integrands, &number_of_radial_points, &l_max](auto y) {
-            using bondi_integrand_tag = typename decltype(y)::type;
-
-            ComputeBondiIntegrandFromVariables<bondi_integrand_tag>{}.evaluate(
-                make_not_null(&integrands), make_not_null(&temporary),
-                bondi_and_sw_cache, sw_derivatives, secondary);
-          });
-      RadialIntegrateBondi<bondi_tag>{}(make_not_null(&bondi_and_sw_cache),
-                                        integrands, boundary_variables, l_max);
-      filter_bondi_value<bondi_tag>(make_not_null(&bondi_and_sw_cache),
-                                    number_of_radial_points, 4.0, l_max,
-                                    l_filter_start);
-    });
-
-    if (time.time() == Time{only_slab, Time::rational_t{0, 1}}) {
-      history.insert_initial(time.time(),
-                             get(get<Tags::J>(bondi_and_sw_cache)).data(),
-                             get(get<Tags::H>(bondi_and_sw_cache)).data());
-    } else {
-      ComplexDataVector deriv = get(get<Tags::H>(bondi_and_sw_cache)).data();
-      history.insert(time.time(), get(get<Tags::J>(bondi_and_sw_cache)).data(),
-                     std::move(deriv));
-    }
-    if (time.step_time().value() > latest_time && time.substep() == 0) {
+    if (time.substep() == 0) {
       // perform a comparison of boundary values and scri+ values on each new
       // time advancement
 
@@ -234,159 +278,37 @@ void run_trial_cce(std::string input_filename,
                          return abs(x - time.step_time().value()) < 1.0e-8;
                        }) != times.end() or
           (comparison_file_prefix == "" and step_counter % 12 == 0)) {
-        tmpl::for_each<tmpl::list<
-            Tags::Beta, Tags::Q, Tags::U, Tags::W, Tags::SpecH, Tags::J,
-            Tags::NullL<0>, Tags::NullL<1>, Tags::NullL<2>, Tags::NullL<3>,
-            Tags::R>>([&comparison_file_prefix, &boundary_variables,
-                       &bondi_and_sw_cache, &sw_derivatives, &integrands,
-                       &l_max, &recorder, &time, &number_of_radial_points,
-                       &comparison_l_max](auto x) {
-          using tag = typename decltype(x)::type;
-          recorder.append_mode_data(
-              "/" + tag::name() + "_boundary", time.step_time().value(),
-              Spectral::Swsh::libsharp_to_standard_modes<tag::type::type::spin>(
-                  Spectral::Swsh::swsh_transform<tag::type::type::spin>(
-                      get(get<Tags::BoundaryValue<tag>>(boundary_variables))
-                          .data(),
-                      l_max),
-                  l_max),
-              comparison_l_max);
-        });
-        tmpl::for_each<tmpl::list<Tags::J, Tags::Beta, Tags::Q, Tags::U,
-                                  Tags::W, Tags::H>>([&comparison_file_prefix,
-                                                      &boundary_variables,
-                                                      &bondi_and_sw_cache,
-                                                      &l_max, &recorder, &time,
-                                                      &number_of_radial_points,
-                                                      &comparison_l_max](
-                                                         auto x) {
-          using tag = typename decltype(x)::type;
-          ComplexDataVector scri_slice{
-              get(get<tag>(bondi_and_sw_cache)).data().data() +
-                  (number_of_radial_points - 1) *
-                      Spectral::Swsh::number_of_swsh_collocation_points(l_max),
-              Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
-          recorder.append_mode_data(
-              "/" + tag::name() + "_scri", time.step_time().value(),
-              Spectral::Swsh::libsharp_to_standard_modes<tag::type::type::spin>(
-                  Spectral::Swsh::swsh_transform<tag::type::type::spin>(
-                      scri_slice, l_max),
-                  l_max),
-              comparison_l_max);
-          if (comparison_file_prefix != "") {
-            recorder.append_mode_data(
-                "/" + tag::name() + "_scri_difference",
-                time.step_time().value(),
-                compute_mode_difference_at_scri<tag>(
-                    time.step_time().value(), comparison_file_prefix,
-                    Spectral::Swsh::libsharp_to_standard_modes<
-                        tag::type::type::spin>(
-                        Spectral::Swsh::swsh_transform<tag::type::type::spin>(
-                            scri_slice, l_max),
-                        l_max),
-                    comparison_l_max),
-                comparison_l_max);
-          }
-        });
+        record_boundary_values<Tags::BoundaryValue,
+                               tmpl::list<Tags::Beta, Tags::Q, Tags::U, Tags::W,
+                                          Tags::SpecH, Tags::J, Tags::R>>(
+            make_not_null(&box), make_not_null(&recorder),
+            time.step_time().value(), l_max, comparison_l_max);
+
+        compare_and_record_scri_values<tmpl::list<Tags::J, Tags::Beta, Tags::Q,
+                                                  Tags::U, Tags::W, Tags::H>>(
+            make_not_null(&box), make_not_null(&recorder),
+            comparison_file_prefix, time.step_time().value(), l_max,
+            comparison_l_max, number_of_radial_points);
       }
-
-      // perform the computation for the psi_4 diagnostic
-      latest_time = time.step_time().value();
-      scri_plus_values.emplace(
-          scri_plus_values.end(),
-          Spectral::Swsh::number_of_swsh_collocation_points(l_max));
-      auto& scri_plus_vars = scri_plus_values.back();
-
-      // prepare the boundary values in the new variables
-      tmpl::for_each<typename ComputeNonInertial<
-          Tags::BoundaryValue<Tags::Psi4>>::scri_newman_penrose_tags>(
-          [&scri_plus_vars, &boundary_variables, &bondi_and_sw_cache,
-           &sw_derivatives, &secondary, &l_max](auto x) {
-            using tag = typename decltype(x)::type;
-            ComputeNonInertialFromVariables<tag>::evaluate(
-                l_max, make_not_null(&scri_plus_vars), boundary_variables,
-                bondi_and_sw_cache, sw_derivatives, secondary);
-          });
-
-      tmpl::for_each<typename ComputeNonInertial<Tags::BoundaryValue<
-          Tags::Psi4>>::boundary_from_volume_bondi_and_sw_cache_tags>(
-          [&scri_plus_vars, &bondi_and_sw_cache, &l_max](auto x) {
-            using boundary_tag = typename decltype(x)::type;
-            using tag = typename boundary_tag::tag;
-            get(get<boundary_tag>(scri_plus_vars)).data() =
-                surface_value_at_scri(get(get<tag>(bondi_and_sw_cache)).data(),
-                                      l_max);
-          });
-      tmpl::for_each<typename ComputeNonInertial<Tags::BoundaryValue<
-          Tags::Psi4>>::boundary_from_volume_sw_derivative_tags>(
-          [&scri_plus_vars, &sw_derivatives, &l_max](auto x) {
-            using boundary_tag = typename decltype(x)::type;
-            using tag = typename boundary_tag::tag;
-            get(get<boundary_tag>(scri_plus_vars)).data() =
-                surface_value_at_scri(get(get<tag>(sw_derivatives)).data(),
-                                      l_max);
-          });
-      tmpl::for_each<typename ComputeNonInertial<Tags::BoundaryValue<
-          Tags::Psi4>>::boundary_from_volume_secondary_tags>(
-          [&scri_plus_vars, &secondary, &l_max](auto x) {
-            using boundary_tag = typename decltype(x)::type;
-            using tag = typename boundary_tag::tag;
-            get(get<boundary_tag>(scri_plus_vars)).data() =
-                surface_value_at_scri(get(get<tag>(secondary)).data(), l_max);
-          });
-
-      if (scri_plus_values.size() > max_scri_deque_size) {
-        scri_plus_values.pop_front();
-      }
-      time_list.push_back(time.step_time().value());
-      lambda_1_history.push_back(
-          get(get<Tags::BoundaryValue<Tags::Lambda1>>(scri_plus_vars)).data());
-
-      if (time_list.size() >= max_time_list_size) {
-        if (calculate_psi4_diagnostic) {
-          // the time list is full, so we can extract the psi value associated
-          // with the front of the scri_plus deque
-
-          auto& past_scri_vars = scri_plus_values.front();
-          double psi_4_time =
-              time_list[time_list.size() - scri_plus_values.size()];
-          compute_du_lambda_1(
-              make_not_null(&get(
-                  get<Tags::BoundaryValue<Tags::DuLambda1>>(past_scri_vars))),
-              psi_4_time, lambda_1_history, time_list);
-
-          ComputeNonInertialFromVariables<Tags::BoundaryValue<Tags::Psi4>>::
-              evaluate(l_max, make_not_null(&past_scri_vars),
-                       boundary_variables, bondi_and_sw_cache, sw_derivatives,
-                       secondary);
-
-          recorder.append_mode_data(
-              "/psi4", psi_4_time,
-              Spectral::Swsh::libsharp_to_standard_modes<-2>(
-                  Spectral::Swsh::swsh_transform<-2>(
-                      get(get<Tags::BoundaryValue<Tags::Psi4>>(past_scri_vars))
-                          .data(),
-                      l_max),
-                  l_max),
-              comparison_l_max);
-        }
-        time_list.pop_front();
-        lambda_1_history.pop_front();
-      }
-      //
     }
-    stepper.update_u(
-        make_not_null(&get(get<Tags::J>(bondi_and_sw_cache)).data()),
-        make_not_null(&history), time_step);
-
-    size_t i = (number_of_radial_points - 1) *
-               Spectral::Swsh::number_of_swsh_collocation_points(l_max);
-
+    db::mutate<Tags::J>(make_not_null(&box),
+                        [&stepper, &time_step, &history](
+                            const gsl::not_null<db::item_type<Tags::J>*> j) {
+                          stepper.update_u(make_not_null(&get(*j).data()),
+                                           make_not_null(&history), time_step);
+                        });
     time = stepper.next_time_id(time, time_step);
-    printf("text time: %f\n", time.time().value());
-    // filter_bondi_value<Tags::J>(make_not_null(&bondi_and_sw_cache),
-    // radial_filter_start, 4.0, l_max,
-    // l_filter_start);
+    printf("next time: %f\n", time.time().value());
+    // get the worldtube data for the next time step.
+    db::mutate<boundary_variables_tag>(
+        make_not_null(&box),
+        [&start_time, &data_manager, &data_still_available](
+            const gsl::not_null<db::item_type<boundary_variables_tag>*>
+                boundary_variables) {
+          data_still_available =
+              data_manager.populate_hypersurface_boundary_data(
+                  boundary_variables, start_time);
+        });
   }
 }
 }  // namespace Cce

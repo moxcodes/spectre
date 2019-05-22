@@ -5,47 +5,48 @@
 
 #include "DataStructures/Variables.hpp"
 #include "Evolution/Systems/Cce/BoundaryData.hpp"
+#include "Evolution/Systems/Cce/ComputePreSwshDerivatives.hpp"
+#include "Evolution/Systems/Cce/ComputeSwshDerivatives.hpp"
 #include "Evolution/Systems/Cce/Equations.hpp"
+#include "Evolution/Systems/Cce/GaugeTransformBoundaryData.hpp"
+#include "Evolution/Systems/Cce/InitializeCce.hpp"
+#include "Evolution/Systems/Cce/IntegrandInputSteps.hpp"
 #include "Evolution/Systems/Cce/LinearSolve.hpp"
-#include "Evolution/Systems/Cce/NonInertialPsi4.hpp"
-#include "Evolution/Systems/Cce/Precomputation.hpp"
+#include "Evolution/Systems/Cce/PrecomputeCceDependencies.hpp"
 #include "Evolution/Systems/Cce/ReadBoundaryDataH5.hpp"
-#include "NumericalAlgorithms/Spectral/Spectral.hpp"
 #include "Evolution/Systems/Cce/SerialEvolveHelpers.hpp"
 #include "Evolution/Systems/Cce/WriteToH5.hpp"
+#include "NumericalAlgorithms/Spectral/Spectral.hpp"
 #include "Time/History.hpp"
 #include "Time/TimeSteppers/RungeKutta3.hpp"
 
 namespace Cce{
 
-using boundary_variables_tags = tmpl::list<
-    Tags::BoundaryValue<Tags::Beta>, Tags::BoundaryValue<Tags::J>,
-    Tags::BoundaryValue<Tags::Dr<Tags::J>>, Tags::BoundaryValue<Tags::Q>,
-    Tags::BoundaryValue<Tags::U>, Tags::BoundaryValue<Tags::W>,
-    Tags::BoundaryValue<Tags::H>, Tags::BoundaryValue<Tags::SpecH>,
-    Tags::BoundaryValue<Tags::R>, Tags::BoundaryValue<Tags::NullL<0>>,
-    Tags::BoundaryValue<Tags::NullL<1>>, Tags::BoundaryValue<Tags::NullL<2>>,
-    Tags::BoundaryValue<Tags::NullL<3>>,
-    Tags::BoundaryValue<Tags::AngularDNullL<1, 0>>,
-    Tags::BoundaryValue<Tags::AngularDNullL<1, 1>>,
-    Tags::BoundaryValue<Tags::AngularDNullL<1, 2>>,
-    Tags::BoundaryValue<Tags::AngularDNullL<1, 3>>,
+using boundary_value_tags =
+    tmpl::list<Tags::BoundaryValue<Tags::Beta>, Tags::BoundaryValue<Tags::J>,
+               Tags::BoundaryValue<Tags::Dr<Tags::J>>,
+               Tags::BoundaryValue<Tags::Q>, Tags::BoundaryValue<Tags::U>,
+               Tags::BoundaryValue<Tags::Dr<Tags::U>>,
+               Tags::BoundaryValue<Tags::W>, Tags::BoundaryValue<Tags::H>,
+               Tags::BoundaryValue<Tags::SpecH>>;
 
-    Tags::BoundaryValue<Tags::AngularDNullL<2, 0>>,
-    Tags::BoundaryValue<Tags::AngularDNullL<2, 1>>,
-    Tags::BoundaryValue<Tags::AngularDNullL<2, 2>>,
-    Tags::BoundaryValue<Tags::AngularDNullL<2, 3>>,
+using gauge_transform_boundary_tags =
+    tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::R>,
+               Tags::EvolutionGaugeBoundaryValue<Tags::DuRDividedByR>,
+               Tags::EvolutionGaugeBoundaryValue<Tags::J>,
+               Tags::EvolutionGaugeBoundaryValue<Tags::Dr<Tags::J>>,
+               Tags::EvolutionGaugeBoundaryValue<Tags::Beta>,
+               Tags::EvolutionGaugeBoundaryValue<Tags::Q>,
+               Tags::EvolutionGaugeBoundaryValue<Tags::U>,
+               Tags::EvolutionGaugeBoundaryValue<Tags::W>,
+               Tags::EvolutionGaugeBoundaryValue<Tags::H>,
+               Tags::CauchyAngularCoords, Tags::Du<Tags::CauchyAngularCoords>,
+               Tags::GaugeA, Tags::GaugeB>;
 
-    Tags::BoundaryValue<Tags::DLambdaNullMetric<2, 2>>,
-    Tags::BoundaryValue<Tags::DLambdaNullMetric<2, 3>>,
-    Tags::BoundaryValue<Tags::DLambdaNullMetric<3, 3>>,
-
-    Tags::BoundaryValue<Tags::InverseAngularNullMetric<2, 2>>,
-    Tags::BoundaryValue<Tags::InverseAngularNullMetric<2, 3>>,
-    Tags::BoundaryValue<Tags::InverseAngularNullMetric<3, 3>>>;
+using scri_tags = tmpl::list<Tags::News>;
 
 using all_boundary_tags =
-    tmpl::append<boundary_variables_tags, pre_computation_boundary_tags>;
+    tmpl::append<boundary_value_tags, pre_computation_boundary_tags>;
 
 using all_integrand_tags = tmpl::flatten<
     tmpl::list<integrand_terms_to_compute_for_bondi_variable<Tags::Beta>,
@@ -54,29 +55,18 @@ using all_integrand_tags = tmpl::flatten<
                integrand_terms_to_compute_for_bondi_variable<Tags::W>,
                integrand_terms_to_compute_for_bondi_variable<Tags::H>>>;
 
-using all_temporary_equation_tags =
-    tmpl::remove_duplicates<tmpl::flatten<tmpl::list<
-        tags_needed_for_integrand_computation<Tags::Integrand<Tags::Beta>,
-                                              TagsCategory::Temporary>,
-        tags_needed_for_integrand_computation<Tags::PoleOfIntegrand<Tags::Q>,
-                                              TagsCategory::Temporary>,
-        tags_needed_for_integrand_computation<Tags::RegularIntegrand<Tags::Q>,
-                                              TagsCategory::Temporary>,
-        tags_needed_for_integrand_computation<Tags::Integrand<Tags::U>,
-                                              TagsCategory::Temporary>,
-        tags_needed_for_integrand_computation<Tags::PoleOfIntegrand<Tags::W>,
-                                              TagsCategory::Temporary>,
-        tags_needed_for_integrand_computation<Tags::RegularIntegrand<Tags::W>,
-                                              TagsCategory::Temporary>,
-        tags_needed_for_integrand_computation<Tags::PoleOfIntegrand<Tags::H>,
-                                              TagsCategory::Temporary>,
-        tags_needed_for_integrand_computation<Tags::RegularIntegrand<Tags::H>,
-                                              TagsCategory::Temporary>,
-        tags_needed_for_integrand_computation<Tags::LinearFactor<Tags::H>,
-                                              TagsCategory::Temporary>,
-        tags_needed_for_integrand_computation<
-            Tags::LinearFactorForConjugate<Tags::H>,
-            TagsCategory::Temporary>>>>;
+using all_temporary_equation_tags = tmpl::remove_duplicates<tmpl::append<
+    ComputeBondiIntegrand<Tags::Integrand<Tags::Beta>>::temporary_tags,
+    ComputeBondiIntegrand<Tags::PoleOfIntegrand<Tags::Q>>::temporary_tags,
+    ComputeBondiIntegrand<Tags::RegularIntegrand<Tags::Q>>::temporary_tags,
+    ComputeBondiIntegrand<Tags::Integrand<Tags::U>>::temporary_tags,
+    ComputeBondiIntegrand<Tags::PoleOfIntegrand<Tags::W>>::temporary_tags,
+    ComputeBondiIntegrand<Tags::RegularIntegrand<Tags::W>>::temporary_tags,
+    ComputeBondiIntegrand<Tags::PoleOfIntegrand<Tags::H>>::temporary_tags,
+    ComputeBondiIntegrand<Tags::RegularIntegrand<Tags::H>>::temporary_tags,
+    ComputeBondiIntegrand<Tags::LinearFactor<Tags::H>>::temporary_tags,
+    ComputeBondiIntegrand<
+        Tags::LinearFactorForConjugate<Tags::H>>::temporary_tags>>;
 
 template <typename BondiTag>
 ComplexModalVector compute_mode_difference_at_scri(

@@ -4,6 +4,7 @@
 #pragma once
 
 #include <boost/math/special_functions/binomial.hpp>
+#include <cmath>
 #include <complex>
 
 #include "DataStructures/DataBox/DataBoxTag.hpp"
@@ -22,30 +23,36 @@ namespace Swsh {
 
 class SpinWeightedSphericalHarmonic {
  public:
+  // TODO try to limit the casts
   SpinWeightedSphericalHarmonic(const int spin, const size_t l,
                                 const int m) noexcept
       : spin_{spin}, l_{l}, m_{m} {
     overall_prefactor_ = 1.0;
     if (abs(spin) > abs(m)) {
-      for (size_t i = 0; i < abs(m) - abs(spin)) {
-        overall_prefactor *=
-            (static_cast<double>(l + abs(m)) - static_cast<double>(i)) /
-            (static_cast<double>(l) - static_cast<double>(abs(spin) + i));
+      for (size_t i = 0; i < static_cast<size_t>(abs(m) - abs(spin)); ++i) {
+        overall_prefactor_ *=
+            (static_cast<double>(l + static_cast<size_t>(abs(m))) -
+             static_cast<double>(i)) /
+            (static_cast<double>(l) -
+             static_cast<double>(static_cast<size_t>(abs(spin)) + i));
       }
     } else if (abs(m) > abs(spin)) {
-      for (size_t i = 0; i < abs(m) - abs(spin)) {
-        overall_prefactor *=
-            (static_cast<double>(l) - static_cast<double>(abs(m) + i)) /
-            (static_cast<double>(l + abs(spin)) - static_cast<double>(i));
+      for (size_t i = 0; i < static_cast<size_t>(abs(m) - abs(spin)); ++i) {
+        overall_prefactor_ *=
+            (static_cast<double>(l) -
+             static_cast<double>(static_cast<size_t>(abs(m)) + i)) /
+            (static_cast<double>(l + static_cast<size_t>(abs(spin))) -
+             static_cast<double>(i));
       }
     }
     // if neither is greater (they are equal), then the prefactor is 1.0
     overall_prefactor_ = sqrt(overall_prefactor_);
     overall_prefactor_ *= (m % 2) == 0 ? 1.0 : -1.0;
 
-    if (l < abs(spin)) {
+    if (l < static_cast<size_t>(abs(spin))) {
       if (spin < 0) {
-        r_prefactors = std::vector<double>(l + abs(spin), 0.0);
+        r_prefactors_ =
+            std::vector<double>(l + static_cast<size_t>(abs(spin)), 0.0);
       }
     } else {
       for (int r = 0; r < (static_cast<int>(l) - spin); ++r) {
@@ -53,11 +60,12 @@ class SpinWeightedSphericalHarmonic {
             static_cast<int>(l) - static_cast<int>(r) + m >= 0) {
           r_prefactors_.push_back(
               boost::math::binomial_coefficient<double>(
-                  static_cast<size_t>(static_cast<int>(l) - spin), r) *
+                  static_cast<size_t>(static_cast<int>(l) - spin),
+                  static_cast<size_t>(r)) *
               boost::math::binomial_coefficient<double>(
                   static_cast<size_t>(static_cast<int>(l) + spin),
-                  static_cast<size_t>(spin - m + static_cast<int>(r)))) *
-              (((static_cast<int>(l) - r - spin) % 2) == 0 ? 1.0 : -1.0);
+                  static_cast<size_t>(spin - m + static_cast<int>(r))) *
+              (((static_cast<int>(l) - r - spin) % 2) == 0 ? 1.0 : -1.0));
         } else {
           r_prefactors_.push_back(0.0);
         }
@@ -73,20 +81,20 @@ class SpinWeightedSphericalHarmonic {
         theta_factor = pow(cos(theta / 2.0), 2 * r + spin_ - m_) *
                        pow(sin(theta / 2.0),
                            2 * static_cast<int>(l_) - (2 * r + spin_ - m_));
-      } else if (2 * static_cast<int>(l) < 2 * r + s - m) {
-        theta_factor = pow(cot(theta / 2.0),
+      } else if (2 * static_cast<int>(l_) < 2 * r + spin_ - m_) {
+        theta_factor = pow(1.0 / tan(theta / 2.0),
                            2 * r + spin_ - m_ - 2 * static_cast<int>(l_)) *
                        pow(cos(theta / 2.0), 2 * l_);
       } else {
         theta_factor = pow(cos(theta / 2.0), 2 * l_);
       }
 
-      accumulator += gsl::at(r_prefactors_, r) std::complex<double>(
-                         cos(static_cast<double>(m) * phi),
-                         sin(static_cast<double>(m) * phi)) *
+      accumulator += gsl::at(r_prefactors_, r) *
+                     std::complex<double>(cos(static_cast<double>(m_) * phi),
+                                          sin(static_cast<double>(m_) * phi)) *
                      theta_factor;
     }
-    accumulator *= ovarall_prefactor_;
+    accumulator *= overall_prefactor_;
     return accumulator;
   }
   std::complex<double> evaluate_from_pfaffian(const double theta,
@@ -104,6 +112,13 @@ class SpinWeightedSphericalHarmonic {
   std::vector<double> r_prefactors_;
 };
 
+// TODO these interpolation methods can be improved. Some ideas for making them
+// better:
+// - matrix multiplies for small l
+// - find some sort of Clenshaw-esque recurrence relation for spin-weighted
+// quantities
+// - at least cache trig functions of theta and phi.
+
 // @{
 template <int Spin>
 void swsh_interpolate_from_pfaffian(
@@ -112,7 +127,7 @@ void swsh_interpolate_from_pfaffian(
     const gsl::not_null<SpinWeighted<ComplexDataVector, Spin>*>
         source_collocation,
     const DataVector& target_theta, const DataVector& target_phi,
-    const l_max) noexcept {
+    const size_t l_max) noexcept {
   check_and_resize(target_collocation, target_theta.size());
   SpinWeighted<ComplexModalVector, Spin> goldberg_modes =
       libsharp_to_goldberg_modes(swsh_transform(source_collocation, l_max),
@@ -122,9 +137,9 @@ void swsh_interpolate_from_pfaffian(
       auto sYlm = SpinWeightedSphericalHarmonic(Spin, l, m);
       for (size_t i = 0; i < target_theta.size(); ++i) {
         target_collocation->data()[i] +=
-            goldberg_modes.data()[static_cast<int>(square(l) + l) + m] *
-            SpinWeightedSphericalHarmonic.evaluate_from_pfaffian(
-                target_theta[i], target_phi[i]);
+            goldberg_modes.data()[static_cast<size_t>(
+                static_cast<int>(square(l) + l) + m)] *
+            sYlm.evaluate_from_pfaffian(target_theta[i], target_phi[i]);
       }
     }
   }
@@ -138,7 +153,7 @@ SpinWeighted<ComplexDataVector, Spin> swsh_interpolate_from_pfaffian(
     const size_t l_max) noexcept {
   SpinWeighted<ComplexDataVector, Spin> result{target_theta.size()};
   swsh_interpolate_from_pfaffian(make_not_null(&result), source_collocation,
-                                 target_points, l_max);
+                                 target_theta, target_phi, l_max);
   return result;
 }
 // @}
@@ -152,7 +167,7 @@ void swsh_interpolate(
     const gsl::not_null<SpinWeighted<ComplexDataVector, Spin>*>
         source_collocation,
     const DataVector& target_theta, const DataVector& target_phi,
-    const l_max) noexcept {
+    const size_t l_max) noexcept {
   check_and_resize(target_collocation, target_theta.size());
   SpinWeighted<ComplexModalVector, Spin> goldberg_modes =
       libsharp_to_goldberg_modes(swsh_transform(source_collocation, l_max),
@@ -162,9 +177,9 @@ void swsh_interpolate(
       auto sYlm = SpinWeightedSphericalHarmonic(Spin, l, m);
       for (size_t i = 0; i < target_theta.size(); ++i) {
         target_collocation->data()[i] +=
-            goldberg_modes.data()[static_cast<int>(square(l) + l) + m] *
-            SpinWeightedSphericalHarmonic.evaluate(target_theta[i],
-                                                   target_phi[i]);
+            goldberg_modes.data()[static_cast<size_t>(
+                static_cast<int>(square(l) + l) + m)] *
+            sYlm.evaluate(target_theta[i], target_phi[i]);
       }
     }
   }
@@ -177,8 +192,8 @@ SpinWeighted<ComplexDataVector, Spin> swsh_interpolate(
     const DataVector& target_theta, const DataVector& target_phi,
     const size_t l_max) noexcept {
   SpinWeighted<ComplexDataVector, Spin> result{target_theta.size()};
-  swsh_interpolate(make_not_null(&result), source_collocation, target_points,
-                   l_max);
+  swsh_interpolate(make_not_null(&result), source_collocation, target_theta,
+                   target_phi, l_max);
   return result;
 }
 // @}

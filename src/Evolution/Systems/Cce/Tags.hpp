@@ -105,15 +105,27 @@ struct Dr : db::PrefixTag, db::SimpleTag {
   static std::string name() noexcept { return "Dr(" + Tag::name() + ")"; }
 };
 
+template <typename Tag>
+struct Du : db::PrefixTag, db::SimpleTag {
+  using type = Scalar<SpinWeighted<ComplexDataVector, Tag::type::type::spin>>;
+  using tag = Tag;
+  static std::string name() noexcept { return "Dr(" + Tag::name() + ")"; }
+};
+
 
 struct GaugeA : db::SimpleTag {
-  using type = Scalar<ComplexDataVector, 2>;
+  using type = Scalar<SpinWeighted<ComplexDataVector, 2>>;
   static std::string name() noexcept { return "GaugeA"; }
 };
 
 struct GaugeB : db::SimpleTag {
-  using type = Scalar<ComplexDataVector, 0>;
+  using type = Scalar<SpinWeighted<ComplexDataVector, 0>>;
   static std::string name() noexcept { return "GaugeB"; }
+};
+
+struct News : db::SimpleTag {
+  using type = Scalar<SpinWeighted<ComplexDataVector, 2>>;
+  static std::string name() noexcept { return "News"; }
 };
 
 // For expressing the Cauchy angular coordinates for the worldtube data in terms
@@ -121,6 +133,11 @@ struct GaugeB : db::SimpleTag {
 struct CauchyAngularCoords : db::SimpleTag {
   using type = tnsr::i<DataVector, 2>;
   static std::string name() noexcept { return "CauchyAngularCoords";}
+};
+
+struct U0 : db::SimpleTag {
+  using type = Scalar<SpinWeighted<ComplexDataVector, 1>>;
+  static std::string name() noexcept { return "U"; }
 };
 
 // prefix tags associated with the integrands which are used as input to solvers

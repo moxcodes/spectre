@@ -70,7 +70,9 @@ template <>
 struct TagsToComputeForImpl<Tags::BondiW> {
   using pre_swsh_derivative_tags =
       tmpl::list<Tags::Dy<Tags::BondiU>, Tags::Dy<Tags::Dy<Tags::BondiU>>,
-                 Tags::Dy<::Tags::Multiplies<Tags::BondiJ, Tags::BondiJbar>>>;
+                 Tags::Dy<::Tags::Multiplies<Tags::BondiJ, Tags::BondiJbar>>,
+                 Tags::Dy<Spectral::Swsh::Tags::Derivative<
+                     Tags::BondiJ, Spectral::Swsh::Tags::Ethbar>>>;
   using swsh_derivative_tags = tmpl::list<
       Spectral::Swsh::Tags::Derivative<Tags::Dy<Tags::BondiBeta>,
                                        Spectral::Swsh::Tags::Ethbar>,
@@ -83,7 +85,16 @@ struct TagsToComputeForImpl<Tags::BondiW> {
       Spectral::Swsh::Tags::Derivative<Tags::Dy<Tags::BondiU>,
                                        Spectral::Swsh::Tags::Ethbar>,
       Spectral::Swsh::Tags::Derivative<Tags::BondiU,
-                                       Spectral::Swsh::Tags::Ethbar>>;
+                                       Spectral::Swsh::Tags::Ethbar>,
+      Spectral::Swsh::Tags::Derivative<Tags::BondiBeta,
+                                       Spectral::Swsh::Tags::EthEth>,
+      Spectral::Swsh::Tags::Derivative<Tags::BondiBeta,
+                                       Spectral::Swsh::Tags::EthEthbar>,
+      Spectral::Swsh::Tags::Derivative<
+          Tags::Multiplies<Tags::BondiJ, Tags::BondiJbar>,
+          Spectral::Swsh::Tags::EthEthbar>,
+      Spectral::Swsh::Tags::Derivative<Tags::BondiJ,
+                                       Spectral::Swsh::Tags::EthbarEthbar>>;
   // Currently, the `eth_ethbar_j` term is the single instance of a swsh
   // derivative needing nested `Spectral::Swsh::Tags::Derivatives` steps to
   // compute. The reason is that if we do not do this in two steps, there are
@@ -93,20 +104,10 @@ struct TagsToComputeForImpl<Tags::BondiW> {
   // end of `swsh_derivative_tags` and the corresponding computational steps
   // from `ComputeSwshDerivatives.hpp` removed.
   using second_swsh_derivative_tags =
-      tmpl::list<Spectral::Swsh::Tags::Derivative<Tags::BondiBeta,
-                                                  Spectral::Swsh::Tags::EthEth>,
-                 Spectral::Swsh::Tags::Derivative<
-                     Tags::BondiBeta, Spectral::Swsh::Tags::EthEthbar>,
-                 Spectral::Swsh::Tags::Derivative<
-                     ::Tags::Multiplies<Tags::BondiJ, Tags::BondiJbar>,
-                     Spectral::Swsh::Tags::EthEthbar>,
-
-                 Spectral::Swsh::Tags::Derivative<
-                     Tags::BondiJ, Spectral::Swsh::Tags::EthbarEthbar>,
-                 Spectral::Swsh::Tags::Derivative<
-                     Spectral::Swsh::Tags::Derivative<
-                         Tags::BondiJ, Spectral::Swsh::Tags::Ethbar>,
-                     Spectral::Swsh::Tags::Eth>>;
+      tmpl::list<Spectral::Swsh::Tags::Derivative<
+          Spectral::Swsh::Tags::Derivative<Tags::BondiJ,
+                                           Spectral::Swsh::Tags::Ethbar>,
+          Spectral::Swsh::Tags::Eth>>;
 };
 
 template <>
@@ -320,7 +321,6 @@ using all_pre_swsh_derivative_tags =
         all_pre_swsh_derivative_tags_for_tag<Tags::BondiQ>,
         all_pre_swsh_derivative_tags_for_tag<Tags::BondiU>,
         all_pre_swsh_derivative_tags_for_tag<Tags::BondiW>,
-        pre_swsh_derivative_tags_to_compute_for<Tags::BondiH>, Tags::BondiH,
-        Tags::Dy<Tags::BondiBeta>, Tags::Dy<Tags::BondiU>>>>;
+        pre_swsh_derivative_tags_to_compute_for<Tags::BondiH>, Tags::BondiH>>>;
 
 }  // namespace Cce

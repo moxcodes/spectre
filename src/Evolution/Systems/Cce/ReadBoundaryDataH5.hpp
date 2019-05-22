@@ -13,6 +13,7 @@
 #include "ApparentHorizons/SpherepackIterator.hpp"
 #include "ApparentHorizons/YlmSpherepack.hpp"
 #include "DataStructures/DataBox/DataBoxTag.hpp"
+#include "DataStructures/Matrix.hpp"
 #include "Evolution/Systems/Cce/BoundaryData.hpp"
 #include "IO/H5/Dat.hpp"
 #include "IO/H5/File.hpp"
@@ -169,8 +170,6 @@ struct DataSet {
 };
 }  // namespace InputTags
 
-
-
 using cce_input_tags =
     tmpl::list<InputTags::SpatialMetric,
                InputTags::Dr<InputTags::SpatialMetric>,
@@ -192,8 +191,6 @@ class CceCauchyBoundaryDataManager {
         spherical_harmonic_{spherepack_l_max, spherepack_l_max},
         l_max_{cce_l_max},
         spherepack_l_max_{spherepack_l_max},
-        time_span_start_{0},
-        time_span_end_{0},
         target_buffer_pad_{target_buffer_pad} {}
   // This currently assumes that it will receive data in ascending time order
   template <typename TagList>
@@ -215,17 +212,17 @@ class CceCauchyBoundaryDataManager {
   // current buffer range.
   bool ready_to_provide_hypersurface_boundary_data(
       const double time, const bool no_more_steps) noexcept {
-    if(time < time_buffer_.front() or time > time_buffer_.back()) {
+    if (time < time_buffer_.front() or time > time_buffer_.back()) {
       return false;
     }
     size_t i = 0;
-    for(auto time_in_buffer : time_buffer_) {
-      if(time < time_in_buffer) {
+    for (auto time_in_buffer : time_buffer_) {
+      if (time < time_in_buffer) {
         break;
       }
       ++i;
     }
-    if (not no_more_steps and (time_buffer_.size() - i) < target_buffer_pad) {
+    if (not no_more_steps and (time_buffer_.size() - i) < target_buffer_pad_) {
       return false;
     }
     return true;
@@ -245,10 +242,10 @@ class CceCauchyBoundaryDataManager {
     auto interpolation_time_end = time_buffer_.begin();
     auto interpolation_coefficients_begin = time_buffer_.begin();
     size_t size_so_far = 0;
-    while(*interpolation_time_mid < time) {
-      if (size_so_far > 2 * target_buffer_pad) {
+    while (*interpolation_time_mid < time) {
+      if (size_so_far > 2 * target_buffer_pad_) {
         ++interpolation_time_begin;
-        ++iterpolation_coefficients_begin;
+        ++interpolation_coefficients_begin;
       }
       ++size_so_far;
       ++interpolation_time_mid;
@@ -256,10 +253,10 @@ class CceCauchyBoundaryDataManager {
     }
     size_t start_of_buffer_to_mid = size_so_far;
     size_t mid_to_end = 0;
-    while (mid_to_end + min(start_of_buffer_to_mid, target_buffer_pad) <
-               2 * target_buffer_pad and
+    while (mid_to_end + min(start_of_buffer_to_mid, target_buffer_pad_) <
+               2 * target_buffer_pad_ and
            interpolation_time_end != time_buffer_.end()) {
-      if(size_so_far > 2 * target_buffer_pad) {
+      if (size_so_far > 2 * target_buffer_pad_) {
         ++interpolation_time_begin;
         ++interpolation_coefficients_begin;
       }
@@ -267,9 +264,10 @@ class CceCauchyBoundaryDataManager {
       ++interpolation_time_end;
     }
 
-    DataVector interpolation_times{2 * target_buffer_pad};
+    DataVector interpolation_times{2 * target_buffer_pad_};
     size_t index = 0;
-    for(const auto& time_in_buffer : time_buffer_) {
+    // TODO change this to be the appropriate time begin, end
+    for (const auto& time_in_buffer : time_buffer_) {
       interpolation_times[index] = time_in_buffer;
       ++index;
     }
@@ -281,16 +279,16 @@ class CceCauchyBoundaryDataManager {
           tmpl::for_each<tmpl::list<InputTags::SpatialMetric,
                                     InputTags::Dr<InputTags::SpatialMetric>,
                                     InputTags::Dt<InputTags::SpatialMetric>>>(
-              [this, &i, &j, &offset, &interpolation_times](auto x) {
+              [this, &i, &j, &offset, &interpolation_times, &time](auto x) {
                 using tag = typename decltype(x)::type;
-                DataVector interpolation_data{2 * target_buffer_pad};
+                DataVector interpolation_data{2 * target_buffer_pad_};
                 size_t index = 0;
-                for (const auto& variables_in_buffer : coefficients_buffer_) {
+                for (const auto& variables_in_buffer : coefficients_buffers_) {
                   interpolation_data[index] =
                       get<tag>(variables_in_buffer).get(i, j)[offset];
                   ++index;
                 }
-                get<tag>(interpolated_coefficients).get(i, j)[offset] =
+                get<tag>(interpolated_coefficients_).get(i, j)[offset] =
                     Interp::interpolate(interpolation_times, interpolation_data,
                                         time);
               });
@@ -298,17 +296,16 @@ class CceCauchyBoundaryDataManager {
         tmpl::for_each<
             tmpl::list<InputTags::Shift, InputTags::Dr<InputTags::Shift>,
                        InputTags::Dt<InputTags::Shift>>>(
-            [this, &i, &ylm_iter, &ylm_spherepack_prefactor,
-             &interpolate_from_column, &column](auto x) {
+            [this, &i, &offset, &interpolation_times, &time](auto x) {
               using tag = typename decltype(x)::type;
-              DataVector interpolation_data{2 * target_buffer_pad};
+              DataVector interpolation_data{2 * target_buffer_pad_};
               size_t index = 0;
-              for (const auto& variables_in_buffer : coefficients_buffer_) {
+              for (const auto& variables_in_buffer : coefficients_buffers_) {
                 interpolation_data[index] =
                     get<tag>(variables_in_buffer).get(i)[offset];
                 ++index;
               }
-              get<tag>(interpolated_coefficients).get(i)[offset] =
+              get<tag>(interpolated_coefficients_).get(i)[offset] =
                   Interp::interpolate(interpolation_times, interpolation_data,
                                       time);
             });
@@ -317,17 +314,16 @@ class CceCauchyBoundaryDataManager {
       tmpl::for_each<
           tmpl::list<InputTags::Lapse, InputTags::Dr<InputTags::Lapse>,
                      InputTags::Dt<InputTags::Lapse>>>(
-          [this, &ylm_iter, &ylm_spherepack_prefactor, &interpolate_from_column,
-           &column](auto x) {
+          [this, &offset, &interpolation_times, &time](auto x) {
             using tag = typename decltype(x)::type;
-            DataVector interpolation_data{2 * target_buffer_pad};
+            DataVector interpolation_data{2 * target_buffer_pad_};
             size_t index = 0;
-            for (const auto& variables_in_buffer : coefficients_buffer_) {
+            for (const auto& variables_in_buffer : coefficients_buffers_) {
               interpolation_data[index] =
                   get(get<tag>(variables_in_buffer))[offset];
               ++index;
             }
-            get(get<tag>(interpolated_coefficients))[offset] =
+            get(get<tag>(interpolated_coefficients_))[offset] =
                 Interp::interpolate(interpolation_times, interpolation_data,
                                     time);
           });
@@ -346,23 +342,20 @@ class CceCauchyBoundaryDataManager {
         get<InputTags::Lapse>(interpolated_coefficients_),
         get<InputTags::Dt<InputTags::Lapse>>(interpolated_coefficients_),
         get<InputTags::Dr<InputTags::Lapse>>(interpolated_coefficients_),
-        extraction_radius_, l_max_, spherical_harmonic_,
-        radial_derivatives_need_renormalization_);
-
+        extraction_radius_, l_max_, spherical_harmonic_, false);
+    // TODO need to pop off the deque for all times we don't need anymore
   }
 
   size_t get_l_max() const noexcept { return l_max_; }
 
   size_t get_spherepack_l_max() const noexcept { return spherepack_l_max_; }
 
-  const deque<double>& get_time_buffer() const noexcept { return time_buffer_; }
-
-  std::pair<size_t, size_t> get_time_span() const noexcept {
-    return std::make_pair(time_span_start_, time_span_end_);
+  const std::deque<double>& get_time_buffer() const noexcept {
+    return time_buffer_;
   }
 
  private:
-  deque<double> time_buffer_;
+  std::deque<double> time_buffer_;
   size_t target_buffer_pad_;
 
   YlmSpherepack spherical_harmonic_;
@@ -371,7 +364,7 @@ class CceCauchyBoundaryDataManager {
   // updated every time a time is requested
   Variables<cce_input_tags> interpolated_coefficients_;
 
-  deque<Variables<cce_input_tags>> coefficients_buffers_;
+  std::deque<Variables<cce_input_tags>> coefficients_buffers_;
 
   // currently assumed to be constant
   double extraction_radius_;
@@ -395,12 +388,14 @@ class CceH5BoundaryDataManager {
   // will be immediately overwritten in the true constructor with a better
   // version with the spherical harmonic l_max determined by reading in the
   // file.
-  CceBoundaryDataManager(std::string cce_data_filename, size_t l_max) noexcept
+  CceH5BoundaryDataManager(std::string cce_data_filename, size_t l_max,
+                           size_t buffer_depth) noexcept
       : cce_data_file_{cce_data_filename},
-        spherical_harmonic_{2, 2},
-        l_max_{l_max},
         time_span_start_{0},
-        time_span_end_{0} {
+        time_span_end_{0},
+        l_max_{l_max},
+        spherical_harmonic_{2, 2},
+        buffer_depth_{buffer_depth} {
     get<InputTags::DataSet<InputTags::SpatialMetric>>(dataset_names_) = "/g";
     get<InputTags::DataSet<InputTags::Dr<InputTags::SpatialMetric>>>(
         dataset_names_) = "/Drg";
@@ -607,7 +602,7 @@ class CceH5BoundaryDataManager {
     }
     // find the time spans that are needed
     auto new_span_pair =
-        create_span_for_time_value(time, buffer_depth, 0, time_buffer_.size());
+        create_span_for_time_value(time, buffer_depth_, 0, time_buffer_.size());
     time_span_start_ = new_span_pair.first;
     time_span_end_ = new_span_pair.second;
     // load the desired time spans into the buffers
@@ -619,9 +614,6 @@ class CceH5BoundaryDataManager {
                                   InputTags::Dt<InputTags::SpatialMetric>>>(
             [this, &i, &j](auto x) {
               using tag = typename decltype(x)::type;
-              auto& dat =
-                  cce_data_file_.get<h5::Dat>(dataset_name_for_component(
-                      get<InputTags::DataSet<tag>>(dataset_names_), i, j));
               update_buffer(
                   make_not_null(&get<tag>(coefficients_buffers_).get(i, j)),
                   cce_data_file_.get<h5::Dat>(dataset_name_for_component(
@@ -740,6 +732,7 @@ class CceH5BoundaryDataManager {
 
   size_t time_span_start_;
   size_t time_span_end_;
+  size_t l_max_;
 
   YlmSpherepack spherical_harmonic_;
 
@@ -751,8 +744,8 @@ class CceH5BoundaryDataManager {
   Variables<cce_input_tags> coefficients_buffers_;
 
   double extraction_radius_;
-  size_t l_max_;
   size_t spherepack_l_max_;
+  size_t buffer_depth_;
 
   tuples::tagged_tuple_from_typelist<
       db::wrap_tags_in<InputTags::DataSet, cce_input_tags>>

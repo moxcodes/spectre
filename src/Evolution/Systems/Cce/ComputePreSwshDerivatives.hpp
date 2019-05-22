@@ -221,7 +221,7 @@ struct ComputePreSwshDerivatives<Tags::Exp2Beta> {
   using integrand_tags = tmpl::list<>;
 
   using return_tags = tmpl::list<Tags::Exp2Beta>;
-  using argument_tags = tmpl::append<tmpl::list<pre_swsh_derivative_tags>>;
+  using argument_tags = tmpl::append<pre_swsh_derivative_tags>;
   static void apply(
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*>
           exp_2_beta,

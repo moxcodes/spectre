@@ -29,6 +29,7 @@ namespace Cce {
  * B = - \frac{1}{2} R^3 (J|_{r = R} + R \partial_r J|_{r = R})
  * \f}
  */
+template <template <typename> class BoundaryPrefix>
 struct InitializeJ {
   using boundary_tags = tmpl::list<Tags::BoundaryValue<Tags::BondiJ>,
                                    Tags::BoundaryValue<Tags::Dr<Tags::BondiJ>>,

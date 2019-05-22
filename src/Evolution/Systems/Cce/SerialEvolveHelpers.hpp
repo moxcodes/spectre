@@ -14,7 +14,6 @@
 #include "Evolution/Systems/Cce/BoundaryData.hpp"
 #include "Evolution/Systems/Cce/Equations.hpp"
 #include "Evolution/Systems/Cce/LinearSolve.hpp"
-#include "Evolution/Systems/Cce/Precomputation.hpp"
 #include "Evolution/Systems/Cce/ReadBoundaryDataH5.hpp"
 #include "Time/History.hpp"
 #include "Time/TimeSteppers/RungeKutta3.hpp"
@@ -36,11 +35,11 @@ struct ModeComparisonManager {
     modes_ = ComplexModalVector{square(l_max + 1)};
     for (int l = 0; l <= static_cast<int>(l_max); ++l) {
       for (int m = -l; m <= l; ++m) {
-        auto& mode_data =
-            mode_data_file_.get<h5::Dat>(dataset_name_for_mode(l, m));
+        auto& mode_data = mode_data_file_.get<h5::Dat>(
+            dataset_name_for_mode(static_cast<size_t>(l), m));
         Matrix data_matrix =
             mode_data.get_data_subset(std::vector<size_t>{1, 2}, 0, 1);
-        modes_[l * l + l + m] =
+        modes_[static_cast<size_t>(static_cast<int>(square(l) + l) + m)] =
             std::complex<double>(data_matrix(0, 0), data_matrix(0, 1));
       }
     }
@@ -67,15 +66,17 @@ struct ModeComparisonManager {
     }
 
     auto mode_difference_at_time = ComplexModalVector{square(l_max_ + 1), 0.0};
-    for (int l = 0; l <= l_max_; ++l) {
+    for (int l = 0; l <= static_cast<int>(l_max_); ++l) {
       for (int m = -l; m <= l; ++m) {
-        auto& mode_data =
-            mode_data_file_.get<h5::Dat>(dataset_name_for_mode(l, m));
+        auto& mode_data = mode_data_file_.get<h5::Dat>(
+            dataset_name_for_mode(static_cast<size_t>(l), m));
         Matrix data_matrix = mode_data.get_data_subset(
             std::vector<size_t>{1, 2}, closest_time, 1);
-        mode_difference_at_time[l * l + l + m] =
+        mode_difference_at_time[static_cast<size_t>(
+            static_cast<int>(square(l) + l) + m)] =
             std::complex<double>(data_matrix(0, 0), data_matrix(0, 1)) -
-            vector_to_compare[l * l + l + m];
+            vector_to_compare[static_cast<size_t>(
+                static_cast<int>(square(l) + l) + m)];
       }
     }
     return mode_difference_at_time;

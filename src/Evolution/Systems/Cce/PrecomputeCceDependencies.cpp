@@ -41,27 +41,6 @@ void angular_derivative_of_r_divided_by_r_impl(
 }
 }  // namespace detail
 
-void PrecomputeCceDependencies<Tags::OneMinusY>::apply(
-    const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*>
-        one_minus_y,
-    const size_t l_max) noexcept {
-    size_t number_of_angular_points =
-        Spectral::Swsh::number_of_swsh_collocation_points(l_max);
-    size_t number_of_radial_points =
-        get(*one_minus_y).size() / number_of_angular_points;
-    const auto& one_minus_y_collocation =
-        1.0 - Spectral::collocation_points<Spectral::Basis::Legendre,
-                                           Spectral::Quadrature::GaussLobatto>(
-                  number_of_radial_points);
-    // iterate through the angular 'chunks' and set them to their 1-y value
-    for (size_t i = 0; i < number_of_radial_points; ++i) {
-      ComplexDataVector angular_view{
-          get(*one_minus_y).data().data() + number_of_angular_points * i,
-          number_of_angular_points};
-      angular_view = one_minus_y_collocation[i];
-    }
-}
-
 namespace detail {
 // explicit  template instantiations
 template void

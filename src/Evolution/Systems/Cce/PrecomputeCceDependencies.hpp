@@ -46,13 +46,18 @@ void angular_derivative_of_r_divided_by_r_impl(
  * - input : `boundary_values` with at least tags
  *   `pre_computation_boundary_tags`
  * - input : `pre_swsh_derivatives` with at least `Tags::J`.
+ *
+ * The `BoundaryPrefix` tag allows easy switching between the
+ * regularity-preserving version and standard CCE
+ *
  */
-template <typename Tag>
+template <template <typename> class BoundaryPrefix, typename Tag>
 struct PrecomputeCceDependencies;
 
+
 /// Computes \f$1 - y\f$ for the Cce system.
-template <>
-struct PrecomputeCceDependencies<Tags::OneMinusY> {
+template <template <typename> class BoundaryPrefix>
+struct PrecomputeCceDependencies<BoundaryPrefix, Tags::OneMinusY> {
   using boundary_tags = tmpl::list<>;
   using pre_swsh_derivative_tags = tmpl::list<>;
   using integration_independent_tags = tmpl::list<>;
@@ -63,14 +68,30 @@ struct PrecomputeCceDependencies<Tags::OneMinusY> {
   static void apply(
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*>
           one_minus_y,
-      const size_t l_max) noexcept;
+      const size_t l_max) noexcept {
+    size_t number_of_angular_points =
+        Spectral::Swsh::number_of_swsh_collocation_points(l_max);
+    size_t number_of_radial_points =
+        get(one_minus_y)->size() / number_of_angular_points;
+    const auto& one_minus_y_collocation =
+        1.0 - Spectral::collocation_points<Spectral::Basis::Legendre,
+                                           Spectral::Quadrature::GaussLobatto>(
+                  number_of_radial_points);
+    // iterate through the angular 'chunks' and set them to their 1-y value
+    for (size_t i = 0; i < number_of_radial_points; ++i) {
+      ComplexDataVector angular_view{
+          get(*one_minus_y).data().data() + number_of_angular_points * i,
+          number_of_angular_points};
+      angular_view = one_minus_y_collocation[i];
+    }
+  }
 };
 
 /// Computes \f$R\f$ from its boundary value (by repeating it over the radial
 /// dimension)
-template <>
-struct PrecomputeCceDependencies<Tags::BondiR> {
-  using boundary_tags = tmpl::list<Tags::BoundaryValue<Tags::BondiR>>;
+template <template <typename> class BoundaryPrefix>
+struct PrecomputeCceDependencies<BoundaryPrefix, Tags::BondiR> {
+  using boundary_tags = tmpl::list<BoundaryPrefix<Tags::BondiR>>;
   using pre_swsh_derivative_tags = tmpl::list<>;
   using integration_independent_tags = tmpl::list<>;
 
@@ -92,9 +113,9 @@ struct PrecomputeCceDependencies<Tags::BondiR> {
 
 /// Computes \f$\partial_u R / R\f$ from its boundary value (by repeating it
 /// over the radial dimension).
-template <>
-struct PrecomputeCceDependencies<Tags::DuRDividedByR> {
-  using boundary_tags = tmpl::list<Tags::BoundaryValue<Tags::DuRDividedByR>>;
+template <template <typename> class BoundaryPrefix>
+struct PrecomputeCceDependencies<BoundaryPrefix, Tags::DuRDividedByR> {
+  using boundary_tags = tmpl::list<BoundaryPrefix<Tags::DuRDividedByR>>;
   using pre_swsh_derivative_tags = tmpl::list<>;
   using integration_independent_tags = tmpl::list<>;
 
@@ -118,9 +139,9 @@ struct PrecomputeCceDependencies<Tags::DuRDividedByR> {
 
 /// Computes \f$\eth R / R\f$ by differentiating and repeating the boundary
 /// value of \f$R\f$.
-template <>
-struct PrecomputeCceDependencies<Tags::EthRDividedByR> {
-  using boundary_tags = tmpl::list<Tags::BoundaryValue<Tags::BondiR>>;
+template <template <typename> class BoundaryPrefix>
+struct PrecomputeCceDependencies<BoundaryPrefix, Tags::EthRDividedByR> {
+  using boundary_tags = tmpl::list<BoundaryPrefix<Tags::BondiR>>;
   using pre_swsh_derivative_tags = tmpl::list<>;
   using integration_independent_tags = tmpl::list<>;
 
@@ -141,9 +162,9 @@ struct PrecomputeCceDependencies<Tags::EthRDividedByR> {
 
 /// Computes \f$\eth \eth R / R\f$ by differentiating and repeating the boundary
 /// value of \f$R\f$.
-template <>
-struct PrecomputeCceDependencies<Tags::EthEthRDividedByR> {
-  using boundary_tags = tmpl::list<Tags::BoundaryValue<Tags::BondiR>>;
+template <template <typename> class BoundaryPrefix>
+struct PrecomputeCceDependencies<BoundaryPrefix, Tags::EthEthRDividedByR> {
+  using boundary_tags = tmpl::list<BoundaryPrefix<Tags::BondiR>>;
   using pre_swsh_derivative_tags = tmpl::list<>;
   using integration_independent_tags = tmpl::list<>;
 
@@ -164,9 +185,9 @@ struct PrecomputeCceDependencies<Tags::EthEthRDividedByR> {
 
 /// Computes \f$\eth \bar{\eth} R / R\f$ by differentiating and repeating the
 /// boundary value of \f$R\f$.
-template <>
-struct PrecomputeCceDependencies<Tags::EthEthbarRDividedByR> {
-  using boundary_tags = tmpl::list<Tags::BoundaryValue<Tags::BondiR>>;
+template <template <typename> class BoundaryPrefix>
+struct PrecomputeCceDependencies<BoundaryPrefix, Tags::EthEthbarRDividedByR> {
+  using boundary_tags = tmpl::list<BoundaryPrefix<Tags::BondiR>>;
   using pre_swsh_derivative_tags = tmpl::list<>;
   using integration_independent_tags = tmpl::list<>;
 
@@ -187,8 +208,8 @@ struct PrecomputeCceDependencies<Tags::EthEthbarRDividedByR> {
 };
 
 /// Computes \f$K = \sqrt{1 + J \bar{J}}\f$.
-template <>
-struct PrecomputeCceDependencies<Tags::BondiK> {
+template <template <typename> class BoundaryPrefix>
+struct PrecomputeCceDependencies<BoundaryPrefix, Tags::BondiK> {
   using boundary_tags = tmpl::list<>;
   using pre_swsh_derivative_tags = tmpl::list<Tags::BondiJ>;
   using integration_independent_tags = tmpl::list<>;
@@ -215,13 +236,17 @@ struct PrecomputeCceDependencies<Tags::BondiK> {
  * `Spectral::Swsh::Tags::LMax`), this function will apply all of the necessary
  * mutations to update the `pre_computation_tags` to their correct values for
  * the current values for the remaining (input) tags.
+ *
+ * The `BoundaryPrefix` tag allows easy switching between the
+ * regularity-preserving version and standard CCE
  */
-template <typename DataBoxType>
+template <template <typename> class BoundaryPrefix, typename DataBoxType>
 void mutate_all_precompute_cce_dependencies(
     const gsl::not_null<DataBoxType*> box) noexcept {
   tmpl::for_each<pre_computation_tags>([&box](auto x) {
     using integration_independent_tag = typename decltype(x)::type;
-    using mutation = PrecomputeCceDependencies<integration_independent_tag>;
+    using mutation =
+        PrecomputeCceDependencies<BoundaryPrefix, integration_independent_tag>;
     db::mutate_apply<mutation>(box);
   });
 }

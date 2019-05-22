@@ -142,16 +142,16 @@ void dlambda_null_metric_and_inverse(
     const tnsr::A<DataVector, 3>& null_l,
     const tnsr::aa<DataVector, 3>& psi) noexcept;
 
-void bondi_r(
-    const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> bondi_r,
-    const tnsr::aa<DataVector, 3>& null_metric) noexcept;
+void bondi_r(const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> r,
+             const tnsr::aa<DataVector, 3>& null_metric) noexcept;
 
-void d_bondi_r(const gsl::not_null<tnsr::a<DataVector, 3>*> d_bondi_r,
-               const Scalar<SpinWeighted<ComplexDataVector, 0>>& bondi_r,
-               const tnsr::aa<DataVector, 3>& dlambda_null_metric,
-               const tnsr::aa<DataVector, 3>& du_null_metric,
-               const tnsr::AA<DataVector, 3>& inverse_null_metric, size_t l_max,
-               const YlmSpherepack spherical_harmonic) noexcept;
+void d_bondi_r(
+    const gsl::not_null<tnsr::a<DataVector, 3>*> d_r,
+    const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> r,
+    const tnsr::aa<DataVector, 3>& dlambda_null_metric,
+    const tnsr::aa<DataVector, 3>& du_null_metric,
+    const tnsr::AA<DataVector, 3>& inverse_null_metric, size_t l_max,
+    const YlmSpherepack /*spherical_harmonic*/) noexcept;
 
 void dyads(
     const gsl::not_null<tnsr::i<ComplexDataVector, 2>*> down_dyad,
@@ -159,60 +159,60 @@ void dyads(
 
 void beta_worldtube_data(
     const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> beta,
-    const tnsr::a<DataVector, 3>& d_bondi_r) noexcept;
+    const tnsr::a<DataVector, 3>& d_r) noexcept;
 
 void bondi_u_worldtube_data(
     const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> bondi_u,
     const tnsr::i<ComplexDataVector, 2>& down_dyad,
-    const tnsr::a<DataVector, 3>& d_bondi_r,
+    const tnsr::a<DataVector, 3>& d_r,
     const tnsr::AA<DataVector, 3>& inverse_null_metric) noexcept;
 
 void bondi_w_worldtube_data(
     const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> bondi_w,
-    const tnsr::a<DataVector, 3>& d_bondi_r,
+    const tnsr::a<DataVector, 3>& d_r,
     const tnsr::AA<DataVector, 3>& inverse_null_metric,
-    const Scalar<SpinWeighted<ComplexDataVector, 0>>& bondi_r) noexcept;
+    const Scalar<SpinWeighted<ComplexDataVector, 0>>& r) noexcept;
 
 void bondi_j_worldtube_data(
     const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> bondi_j,
     const tnsr::aa<DataVector, 3>& null_metric,
-    const Scalar<SpinWeighted<ComplexDataVector, 0>> bondi_r,
+    const Scalar<SpinWeighted<ComplexDataVector, 0>> r,
     const tnsr::i<ComplexDataVector, 2>& up_dyad) noexcept;
 
 void dr_bondi_j(
-    const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> dr_bondi_j,
+    const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> dr_j,
     const tnsr::aa<DataVector, 3>& dlambda_null_metric,
-    const tnsr::a<DataVector, 3>& d_bondi_r,
+    const tnsr::a<DataVector, 3>& d_r,
     const Scalar<SpinWeighted<ComplexDataVector, 2>>& bondi_j,
-    const Scalar<SpinWeighted<ComplexDataVector, 0>>& bondi_r,
+    const Scalar<SpinWeighted<ComplexDataVector, 0>>& r,
     const tnsr::i<ComplexDataVector, 2>& up_dyad) noexcept;
 
 void d2lambda_bondi_r(
-    const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*>
-        d2lambda_bondi_r,
-    const tnsr::a<DataVector, 3>& d_bondi_r,
-    const Scalar<SpinWeighted<ComplexDataVector, 2>>& dr_bondi_j,
+    const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> d2lambda_r,
+    const tnsr::a<DataVector, 3>& d_r,
+    const Scalar<SpinWeighted<ComplexDataVector, 2>>& dr_j,
     const Scalar<SpinWeighted<ComplexDataVector, 2>>& bondi_j,
-    const Scalar<SpinWeighted<ComplexDataVector, 0>>& bondi_r) noexcept;
+    const Scalar<SpinWeighted<ComplexDataVector, 0>>& r) noexcept;
 
 void bondi_q_worldtube_data(
     const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> bondi_q,
-    const Scalar<SpinWeighted<ComplexDataVector, 0>>& d2lambda_bondi_r,
+    const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> dr_bondi_u,
+    const Scalar<SpinWeighted<ComplexDataVector, 0>>& d2lambda_r,
     const tnsr::AA<DataVector, 3>& dlambda_inverse_null_metric,
-    const tnsr::a<DataVector, 3>& d_bondi_r,
+    const tnsr::a<DataVector, 3>& d_r,
     const tnsr::i<ComplexDataVector, 2> down_dyad,
-    const tnsr::i<DataVector, 2> angular_d_dlambda_bondi_r,
+    const tnsr::i<DataVector, 2> angular_d_dlambda_r,
     const tnsr::AA<DataVector, 3>& inverse_null_metric,
     const Scalar<SpinWeighted<ComplexDataVector, 2>>& bondi_j,
-    const Scalar<SpinWeighted<ComplexDataVector, 0>>& bondi_r,
+    const Scalar<SpinWeighted<ComplexDataVector, 0>>& r,
     const Scalar<SpinWeighted<ComplexDataVector, 1>>& bondi_u) noexcept;
 
 void bondi_h_worldtube_data(
     const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> bondi_h,
-    const tnsr::a<DataVector, 3>& d_bondi_r,
+    const tnsr::a<DataVector, 3>& d_r,
     const Scalar<SpinWeighted<ComplexDataVector, 2>>& bondi_j,
     const tnsr::aa<DataVector, 3>& du_null_metric,
-    const Scalar<SpinWeighted<ComplexDataVector, 0>>& bondi_r,
+    const Scalar<SpinWeighted<ComplexDataVector, 0>>& r,
     const tnsr::i<ComplexDataVector, 2>& up_dyad) noexcept;
 
 /*!
@@ -386,15 +386,14 @@ void create_bondi_boundary_data_from_cauchy(
                                   cartesian_to_angular_jacobian, phi, dt_psi,
                                   du_null_l, inverse_null_metric, null_l, psi);
 
-  auto& bondi_r = get<Tags::BoundaryValue<Tags::R>>(*bondi_boundary_data);
-  bondi_r(make_not_null(&bondi_r), null_metric);
+  auto& r = get<Tags::BoundaryValue<Tags::R>>(*bondi_boundary_data);
+  bondi_r(make_not_null(&r), null_metric);
 
-  tnsr::a<DataVector, 3> d_bondi_r{size};
-  d_bondi_r(make_not_null(&d_bondi_r), dlambda_null_metric, du_null_metric,
-            inverse_null_metric, bondi_boundary_data, l_max,
-            spherical_harmonic);
-  get(get<Tags::DuR>(*bondi_boundary_data)).data() =
-      std::complex<double>{1.0, 0.0} * get<0>(d_bondi_r);
+  tnsr::a<DataVector, 3> d_r{size};
+  d_bondi_r(make_not_null(&d_r), make_not_null(&r), dlambda_null_metric,
+            du_null_metric, inverse_null_metric, l_max, spherical_harmonic);
+  get(get<Tags::BoundaryValue<Tags::DuRDividedByR>>(*bondi_boundary_data))
+      .data() = std::complex<double>{1.0, 0.0} * get<0>(d_r) / get(r).data();
 
   tnsr::i<ComplexDataVector, 2> down_dyad{size};
   tnsr::i<ComplexDataVector, 2> up_dyad{size};
@@ -402,54 +401,52 @@ void create_bondi_boundary_data_from_cauchy(
 
   beta_worldtube_data(make_not_null(&get<Tags::BoundaryValue<Tags::Beta>>(
                           *bondi_boundary_data)),
-                      d_bondi_r);
+                      d_r);
 
   auto& bondi_u = get<Tags::BoundaryValue<Tags::U>>(*bondi_boundary_data);
-  bondi_u_worldtube_data(make_not_null(&bondi_u), down_dyad, d_bondi_r,
+  bondi_u_worldtube_data(make_not_null(&bondi_u), down_dyad, d_r,
                          inverse_null_metric);
 
   bondi_w_worldtube_data(
       make_not_null(&get<Tags::BoundaryValue<Tags::W>>(*bondi_boundary_data)),
-      d_bondi_r, inverse_null_metric, bondi_r);
+      d_r, inverse_null_metric, r);
 
   auto& bondi_j = get<Tags::BoundaryValue<Tags::J>>(*bondi_boundary_data);
   get(bondi_j).data() = ComplexDataVector{size};
-  bondi_j_worldtube_data(make_not_null(&bondi_j), null_metric, bondi_r,
-                         up_dyad);
+  bondi_j_worldtube_data(make_not_null(&bondi_j), null_metric, r, up_dyad);
 
-  auto& dr_bondi_j =
+  auto& dr_j =
       get<Tags::BoundaryValue<Tags::Dr<Tags::J>>>(*bondi_boundary_data);
-  get(dr_bondi_j).data() = ComplexDataVector{size};
-  dr_bondi_j(make_not_null(&dr_bondi_j), dlambda_null_metric, d_bondi_r,
-             bondi_j, bondi_r, up_dyad);
+  get(dr_j).data() = ComplexDataVector{size};
+  dr_bondi_j(make_not_null(&dr_j), dlambda_null_metric, d_r, bondi_j, r,
+             up_dyad);
 
-  Scalar<SpinWeighted<ComplexDataVector, 0>> d2lambda_bondi_r;
-  get(d2lambda_bondi_r).data() = ComplexDataVector{size};
-  d2lambda_bondi_r(make_not_null(&d2lambda_bondi_r), d_bondi_r, dr_bondi_j,
-                   bondi_j, bondi_r);
+  Scalar<SpinWeighted<ComplexDataVector, 0>> d2lambda_r;
+  get(d2lambda_r).data() = ComplexDataVector{size};
+  d2lambda_bondi_r(make_not_null(&d2lambda_r), d_r, dr_j, bondi_j, r);
 
-  tnsr::i<DataVector, 2> angular_d_dlambda_bondi_r{size, 0.0};
-  buffer_for_derivatives.data() =
-      std::complex<double>(1.0, 0.0) * get<1>(d_bondi_r);
+  tnsr::i<DataVector, 2> angular_d_dlambda_r{size, 0.0};
+  buffer_for_derivatives.data() = std::complex<double>(1.0, 0.0) * get<1>(d_r);
   Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
       make_not_null(&eth_buffer), make_not_null(&buffer_for_derivatives),
       l_max);
-  angular_d_dlambda_bondi_r.get(0) = -real(eth_buffer.data());
-  angular_d_dlambda_bondi_r.get(1) = -imag(eth_buffer.data());
+  angular_d_dlambda_r.get(0) = -real(eth_buffer.data());
+  angular_d_dlambda_r.get(1) = -imag(eth_buffer.data());
 
   // TODO need also dr_u = d_lambda_u / d_lambda_r
 
   bondi_q_worldtube_data(
       make_not_null(&get<Tags::BoundaryValue<Tags::Q>>(*bondi_boundary_data)),
-      d2lambda_bondi_r, dlambda_inverse_null_metric, d_bondi_r, down_dyad,
-      angular_d_dlambda_bondi_r, inverse_null_metric, bondi_j, bondi_r,
-      bondi_u);
+      make_not_null(
+          &get<Tags::BoundaryValue<Tags::Dr<Tags::U>>>(*bondi_boundary_data)),
+      d2lambda_r, dlambda_inverse_null_metric, d_r, down_dyad,
+      angular_d_dlambda_r, inverse_null_metric, bondi_j, r, bondi_u);
 
   auto& bondi_h = get<Tags::BoundaryValue<Tags::H>>(*bondi_boundary_data);
-  bondi_h_worldtube_data(make_not_null(&bondi_h), d_bondi_r, bondi_j,
-                         du_null_metric, bondi_r, up_dyad);
+  bondi_h_worldtube_data(make_not_null(&bondi_h), d_r, bondi_j, du_null_metric,
+                         r, up_dyad);
 
   get(get<Tags::BoundaryValue<Tags::SpecH>>(*bondi_boundary_data)).data() =
-      get(bondi_h).data() - get<0>(d_bondi_r) * get(dr_bondi_j).data();
+      get(bondi_h).data() - get<0>(d_r) * get(dr_j).data();
 }
 }  // namespace Cce

@@ -10,13 +10,15 @@ set(LIBRARY_SOURCES
   LinearOperators.cpp
   LinearSolve.cpp
   PrecomputeCceDependencies.cpp
-  ReadBoundaryDataH5.cpp
   )
 
 add_spectre_library(${LIBRARY} ${LIBRARY_SOURCES})
 
 target_link_libraries(
   ${LIBRARY}
+  INTERFACE ApparentHorizons
   INTERFACE DataStructures
   INTERFACE ErrorHandling
+  INTERFACE IO
+  INTERFACE Time
   )
