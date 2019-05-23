@@ -12,6 +12,7 @@ set(LIBRARY_SOURCES
   Test_LinearOperators.cpp
   Test_LinearSolve.cpp
   Test_PrecomputeCceDependencies.cpp
+  Test_ScriPlusInterpolationManager.cpp
   )
 
 add_test_library(

@@ -300,8 +300,10 @@ SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.ComputeSwshDerivatives",
       Tags::BoundaryValue<Tags::DuRDividedByR>,
       Tags::BondiJ>::apply(make_not_null(&computation_box), expected_box);
 
-  mutate_all_precompute_cce_dependencies(make_not_null(&computation_box));
-  mutate_all_precompute_cce_dependencies(make_not_null(&expected_box));
+  mutate_all_precompute_cce_dependencies<Tags::BoundaryValue>(
+      make_not_null(&computation_box));
+  mutate_all_precompute_cce_dependencies<Tags::BoundaryValue>(
+      make_not_null(&expected_box));
 
   // duplicate the 'input' values to the computation box
   TestHelpers::CopyDataBoxTags<

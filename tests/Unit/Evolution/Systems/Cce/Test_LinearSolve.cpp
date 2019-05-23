@@ -172,7 +172,8 @@ void test_regular_integration(const gsl::not_null<Generator*> gen,
   make_boundary_data<BondiValueTag>(make_not_null(&box),
                                     make_not_null(&expected), l_max);
 
-  db::mutate_apply<RadialIntegrateBondi<BondiValueTag>>(make_not_null(&box));
+  db::mutate_apply<RadialIntegrateBondi<Tags::BoundaryValue, BondiValueTag>>(
+      make_not_null(&box));
 
   Approx numerical_differentiation_approximation =
       Approx::custom()
@@ -273,10 +274,12 @@ void test_pole_integration(const gsl::not_null<Generator*> gen,
   make_boundary_data<BondiValueTag>(make_not_null(&box),
                                     make_not_null(&expected), l_max);
 
-  db::mutate<Tags::OneMinusY>(make_not_null(&box),
-                              TestHelpers::compute_one_minus_y, l_max);
+  db::mutate_apply<
+      PrecomputeCceDependencies<Tags::BoundaryValue, Tags::OneMinusY>>(
+      make_not_null(&box));
 
-  db::mutate_apply<RadialIntegrateBondi<BondiValueTag>>(make_not_null(&box));
+  db::mutate_apply<RadialIntegrateBondi<Tags::BoundaryValue, BondiValueTag>>(
+      make_not_null(&box));
 
   Approx numerical_differentiation_approximation =
       Approx::custom()
@@ -430,10 +433,12 @@ void test_pole_integration_with_linear_operator(
   make_boundary_data<BondiValueTag>(make_not_null(&box),
                                     make_not_null(&expected), l_max);
 
-  db::mutate<Tags::OneMinusY>(make_not_null(&box),
-                              TestHelpers::compute_one_minus_y, l_max);
+  db::mutate_apply<
+      PrecomputeCceDependencies<Tags::BoundaryValue, Tags::OneMinusY>>(
+      make_not_null(&box));
 
-  db::mutate_apply<RadialIntegrateBondi<BondiValueTag>>(make_not_null(&box));
+  db::mutate_apply<RadialIntegrateBondi<Tags::BoundaryValue, BondiValueTag>>(
+      make_not_null(&box));
 
   Approx numerical_differentiation_approximation =
       Approx::custom()

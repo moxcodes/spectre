@@ -8,8 +8,14 @@
 
 #include "NumericalAlgorithms/Spectral/SwshCollocation.hpp"
 #include "NumericalAlgorithms/Spectral/SwshInterpolation.hpp"
-#include "tests/Unit/NumericalAlgorithms/Spectra/SwshTestHelpers.hpp"
+#include "NumericalAlgorithms/Spectral/SwshTransformJob.hpp"
+#include "tests/Unit/NumericalAlgorithms/Spectral/SwshTestHelpers.hpp"
+#include "tests/Unit/TestHelpers.hpp"
 #include "tests/Utilities/MakeWithRandomValues.hpp"
+
+namespace Spectral {
+namespace Swsh {
+namespace {
 
 template <typename Generator>
 void test_basis_function(const gsl::not_null<Generator*> generator) noexcept {
@@ -25,15 +31,26 @@ void test_basis_function(const gsl::not_null<Generator*> generator) noexcept {
                                         static_cast<int>(l)};
   const int m = m_dist(*generator);
 
-  std::complex<double> expected =
-      spin_weighted_spherical_harmonic(s, static_cast<int>(l), m, theta, phi);
-  auto test_harmonic = SpinWeightedSphericalHarmonic(spin, l, m);
+  std::complex<double> expected = TestHelpers::spin_weighted_spherical_harmonic(
+      spin, static_cast<int>(l), m, theta, phi);
+  auto test_harmonic = SpinWeightedSphericalHarmonic{spin, l, m};
   std::complex<double> test = test_harmonic.evaluate(theta, phi);
   std::complex<double> test_pfaffian =
-      test_harmonic.evaluate_pfaffian(theta, phi * sin(theta));
+      test_harmonic.evaluate_from_pfaffian(theta, phi * sin(theta));
+  CAPTURE(spin);
+  CAPTURE(l);
+  CAPTURE(m);
+  CAPTURE(theta);
+  CAPTURE(phi);
+  // need a slightly looser approx to accommodate the explicit factorials in the
+  // simpler TestHelper form
+  Approx factorial_approx =
+      Approx::custom()
+          .epsilon(std::numeric_limits<double>::epsilon() * 1.0e4)
+          .scale(1.0);
 
-  CHECK_ITERABLE_APPROX(test, expected);
-  CHECK_ITERABLE_APPROX(test_pfaffian, expected);
+  CHECK_ITERABLE_CUSTOM_APPROX(test, expected, factorial_approx);
+  CHECK_ITERABLE_CUSTOM_APPROX(test_pfaffian, expected, factorial_approx);
 }
 
 template <int spin, typename Generator>
@@ -45,17 +62,17 @@ void test_interpolation(const gsl::not_null<Generator*> generator) noexcept {
   const size_t number_of_target_points = 10;
 
   const DataVector target_phi = make_with_random_values<DataVector>(
-      make_not_null(&generator), make_not_null(&phi_dist), 10);
+      generator, make_not_null(&phi_dist), static_cast<size_t>(10));
   const DataVector target_theta = make_with_random_values<DataVector>(
-      make_not_null(&generator), make_not_null(&theta_dist), 10);
+      generator, make_not_null(&theta_dist), static_cast<size_t>(10));
   const DataVector target_phi_pfaffian = target_phi * sin(target_theta);
 
   SpinWeighted<ComplexModalVector, spin> generated_modes{
-      2 * Spectral::Swsh::number_of_swsh_coefficients(l_max)};
-  TestHelpers::generate_swsh_modes<spin>(make_not_null(&generated_modes.data()),
-                                         make_not_null(&generator), 1,
-                                         l_max);
-  auto generated_coefficients = Spectral::Swsh::inverse_swsh_transform(
+      2 * number_of_swsh_coefficients(l_max)};
+  TestHelpers::generate_swsh_modes<spin>(
+      make_not_null(&generated_modes.data()), generator,
+      make_not_null(&coefficient_distribution), 1, l_max);
+  auto generated_coefficients = inverse_swsh_transform(
       make_not_null(&generated_modes), l_max);
 }
 
@@ -70,3 +87,6 @@ SPECTRE_TEST_CASE("Unit.NumericalAlgorithms.Spectral.SwshInterpolation",
   test_interpolation<0>(make_not_null(&generator));
   test_interpolation<2>(make_not_null(&generator));
 }
+}  // namespace
+}  // namespace Swsh
+}  // namespace Spectral

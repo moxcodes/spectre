@@ -137,6 +137,11 @@ struct CauchyAngularCoords : db::SimpleTag {
   static std::string name() noexcept { return "CauchyAngularCoords";}
 };
 
+struct DuCauchyAngularCoords : db::SimpleTag {
+  using type = tnsr::i<DataVector, 2>;
+  static std::string name() noexcept { return "CauchyAngularCoords";}
+};
+
 struct InertialRetardedTime : db::SimpleTag {
   using type = Scalar<SpinWeighted<ComplexDataVector, 0>>;
   static std::string name() noexcept { return "InertialRetardedTime"; }

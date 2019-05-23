@@ -19,8 +19,6 @@
 #include "IO/H5/File.hpp"
 #include "IO/H5/Version.hpp"
 
-#include "Utilities/TmplDebugging.hpp"
-
 namespace Cce {
 
 // For the file-reading, we'll need several utilities to get it from the file in
@@ -113,6 +111,29 @@ class CubicInterpolator : Interpolator {
 
 // TODO: explore the possibility of moving this number to runtime and maybe
 // making it non-fixed?
+
+class FlexibleBarycentricInterpolator : Interpolator {
+ public:
+  static constexpr size_t required_number_of_points_before_and_after = 1;
+  static double interpolate(const DataVector& points, const DataVector& values,
+                            const double target) {
+    if (UNLIKELY(points.size() < 2)) {
+      ERROR("provided independent values for interpolation too small.");
+    }
+    if (UNLIKELY(values.size() < 2)) {
+      ERROR("provided dependent values for interpolation too small.");
+    }
+    boost::math::barycentric_rational<double> interpolant(
+        points.data(), values.data(), points.size(), points.size() / 2);
+    return interpolant(target);
+  }
+  static std::complex<double> interpolate(const DataVector& points,
+                                          const ComplexDataVector& values,
+                                          const double target) {
+    return std::complex<double>{interpolate(points, real(values), target),
+                                interpolate(points, imag(values), target)};
+    }
+};
 
 // A barycentric interpolator with a fixed, compile-time number of points. This
 // allows for an easier time ensuring the right amount of data is loaded in the

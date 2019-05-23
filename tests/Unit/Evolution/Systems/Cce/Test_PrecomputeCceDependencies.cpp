@@ -148,7 +148,8 @@ SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.PrecomputeCceDependencies",
       make_not_null(&generator), make_not_null(&precomputation_box),
       make_not_null(&expected_box), l_max, number_of_radial_grid_points);
 
-  mutate_all_precompute_cce_dependencies(make_not_null(&precomputation_box));
+  mutate_all_precompute_cce_dependencies<Tags::BoundaryValue>(
+      make_not_null(&precomputation_box));
 
   CHECK_VARIABLES_APPROX(db::get<boundary_variables_tag>(precomputation_box),
                          db::get<boundary_variables_tag>(expected_box));

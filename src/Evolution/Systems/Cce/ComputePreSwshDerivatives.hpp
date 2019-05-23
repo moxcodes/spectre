@@ -246,9 +246,8 @@ struct ComputePreSwshDerivatives<Tags::Dy<Tag>> {
       const gsl::not_null<
           Scalar<SpinWeighted<ComplexDataVector, Tag::type::type::spin>>*>
           dy_val,
-      const size_t l_max,
-      const Scalar<SpinWeighted<ComplexDataVector, Tag::type::type::spin>>&
-          val) noexcept {
+      const Scalar<SpinWeighted<ComplexDataVector, Tag::type::type::spin>>& val,
+      const size_t l_max) noexcept {
     logical_partial_directional_derivative_of_complex(
         make_not_null(&get(*dy_val).data()), get(val).data(),
         Mesh<3>{

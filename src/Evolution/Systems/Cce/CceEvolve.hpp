@@ -39,11 +39,15 @@ using gauge_transform_boundary_tags =
                Tags::EvolutionGaugeBoundaryValue<Tags::Q>,
                Tags::EvolutionGaugeBoundaryValue<Tags::U>,
                Tags::EvolutionGaugeBoundaryValue<Tags::W>,
-               Tags::EvolutionGaugeBoundaryValue<Tags::H>,
-               Tags::CauchyAngularCoords, Tags::Du<Tags::CauchyAngularCoords>,
-               Tags::GaugeA, Tags::GaugeB>;
+               Tags::EvolutionGaugeBoundaryValue<Tags::H>, Tags::GaugeA,
+               Tags::GaugeB, Tags::Du<Tags::GaugeA>, Tags::Du<Tags::GaugeB>,
+               Tags::U0>;
 
-using scri_tags = tmpl::list<Tags::News>;
+using angular_coordinate_tags =
+    tmpl::list<Tags::CauchyAngularCoords, Tags::DuCauchyAngularCoords>;
+
+using scri_tags = tmpl::list<Tags::News, Tags::InertialRetardedTime,
+                             Tags::Du<Tags::InertialRetardedTime>>;
 
 using all_boundary_tags =
     tmpl::append<boundary_value_tags, pre_computation_boundary_tags>;
@@ -82,4 +86,12 @@ void run_trial_cce(std::string input_filename,
                    bool calculate_psi4_diagnostic,
                    size_t l_filter_start, double start_time = 0.0,
                    double end_time = -1.0) noexcept;
+
+void run_trial_regularity_preserving_cce(
+    std::string input_filename, std::string comparison_file_prefix,
+    size_t simulation_l_max, size_t comparison_l_max,
+    size_t number_of_radial_points, std::string output_file_suffix,
+    size_t rational_timestep_numerator, size_t rational_timestep_denominator,
+    bool calculate_psi4_diagnostic, size_t l_filter_start,
+    double start_time = 0.0, double end_time = -1.0) noexcept;
 }  // namespace Cce
