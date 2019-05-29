@@ -14,13 +14,20 @@ struct CalculateScriPlusValue;
 
 template <>
 struct CalculateScriPlusValue<Tags::News> {
-  using argument_tags = tmpl::list<Tags::H, Tags::Beta, Tags::LMax>;
+  using argument_tags =
+      tmpl::list<Tags::H, Tags::Dy<Tags::J>, Tags::Beta,
+                 Tags::EvolutionGaugeBoundaryValue<Tags::R>,
+                 Tags::EvolutionGaugeBoundaryValue<Tags::DuRDividedByR>,
+                 Tags::LMax>;
   using return_tags = tmpl::list<Tags::News>;
 
   static void apply(
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> news,
       const Scalar<SpinWeighted<ComplexDataVector, 2>>& h,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& dy_j,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& beta,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& r,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& du_r_divided_by_r,
       const size_t l_max) noexcept {
     size_t number_of_angular_points =
         Spectral::Swsh::number_of_swsh_collocation_points(l_max);
@@ -53,9 +60,22 @@ struct CalculateScriPlusValue<Tags::News> {
         Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::EthEth>(
             make_not_null(&beta_at_scri), l_max);
 
+    ComplexDataVector dy_j_buffer = get(dy_j).data();
+    SpinWeighted<ComplexDataVector, 2> dy_j_at_scri;
+    dy_j_at_scri.data() = ComplexDataVector{
+        dy_j_buffer.data() +
+            (number_of_radial_points - 1) *
+                Spectral::Swsh::number_of_swsh_collocation_points(l_max),
+        Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
+
     // additional phase factor delta set to zero.
+    // Note: -2 * r extra factor due to derivative l to y
+    // Note Note: this should actually be the H derivative of J at fixed bondi r
+    // not fixed y.
     get(*news).data() =
-        (0.5 * exp(-2.0 * beta_at_scri.data()) * dy_h_at_scri +
+        (-get(r).data() * exp(-2.0 * beta_at_scri.data()) *
+             (dy_h_at_scri +
+              get(du_r_divided_by_r).data() * dy_j_at_scri.data()) +
          eth_eth_beta_at_scri.data() + 2.0 * square(eth_beta_at_scri.data()));
   }
 };

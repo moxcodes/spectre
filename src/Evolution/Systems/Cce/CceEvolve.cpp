@@ -664,9 +664,7 @@ void run_trial_regularity_preserving_cce(
       if (step_counter > 2) {
         interpolation_manager.insert_target_time(mean_time);
       }
-      printf("mean time : %f\n", mean_time);
       while (interpolation_manager.first_time_is_ready_to_interpolate()) {
-        printf("news interpolation ready!\n");
         auto interpolation =
             interpolation_manager.interpolate_and_pop_first_time();
         record_scri_output<2>(make_not_null(&recorder), interpolation, "News",

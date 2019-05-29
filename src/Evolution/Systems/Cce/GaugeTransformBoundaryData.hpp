@@ -328,7 +328,8 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::H> {
 };
 
 struct GaugeUpdateU {
-  using argument_tags = tmpl::list<Tags::GaugeA, Tags::GaugeB, Tags::LMax>;
+  using argument_tags =
+      tmpl::list<Tags::GaugeA, Tags::GaugeB, Tags::Exp2Beta, Tags::LMax>;
   using return_tags =
       tmpl::list<Tags::DuCauchyAngularCoords, Tags::Du<Tags::GaugeA>,
                  Tags::Du<Tags::GaugeB>, Tags::U0, Tags::U>;
@@ -341,6 +342,7 @@ struct GaugeUpdateU {
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> u,
       const Scalar<SpinWeighted<ComplexDataVector, 2>>& a,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& b,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& exp2beta,
       const size_t l_max) noexcept {
     size_t number_of_radial_points =
         get(*u).size() /
@@ -367,6 +369,8 @@ struct GaugeUpdateU {
     // of places sin(theta)'s appear. Unfortunately, without reformulating the
     // spin-weighted spherical harmonics themselves, we won't be able to
     // eliminate sin(theta)s completely
+
+    /// CHECK SIGNS
     get<0>(*du_x) = -real(get(*u_0).data());
     get<1>(*du_x) = -imag(get(*u_0).data());
     // at some point we might want to split these out into their own
@@ -380,6 +384,22 @@ struct GaugeUpdateU {
     auto ethbar_a_u0bar_plus_b_u0 =
         Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
             make_not_null(&a_u0bar_plus_b_u0), l_max);
+
+    ComplexDataVector exp2beta_buffer = get(exp2beta).data();
+    ComplexDataVector exp2beta_slice = ComplexDataVector{
+        exp2beta_buffer.data() +
+            (number_of_radial_points - 1) *
+                Spectral::Swsh::number_of_swsh_collocation_points(l_max),
+        Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
+
+    ComplexDataVector determinant = 0.25 *  exp2beta_slice *
+                                    (get(b).data() * conj(get(b).data()) -
+                                     get(a).data() * conj(get(a).data()));
+    printf("printing determinant\n");
+    for(auto val : determinant) {
+      printf("(%e, %e)\n",real(val), imag(val));
+    }
+    printf("\n");
 
     get(*du_a) = -0.25 * get(a) * ethbar_a_u0bar_plus_b_u0 -
                  0.25 * get(b) * eth_a_u0bar_plus_b_u0;
