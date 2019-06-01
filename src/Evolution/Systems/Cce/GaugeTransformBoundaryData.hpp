@@ -25,15 +25,19 @@ template <>
 struct ComputeGaugeAdjustedBoundaryValue<Tags::R> {
   using return_tags = tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::R>,
                                  Tags::BoundaryValue<Tags::R>>;
-  using argument_tags = tmpl::list<Tags::CauchyAngularCoords, Tags::LMax>;
+  using argument_tags =
+      tmpl::list<Tags::CauchyAngularCoords, Tags::GaugeOmega, Tags::LMax>;
   static void apply(
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*>
           evolution_gauge_r,
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> r,
-      const tnsr::i<DataVector, 2>& x_of_x_tilde, const size_t l_max) noexcept {
+      const tnsr::i<DataVector, 2>& x_of_x_tilde,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega,
+      const size_t l_max) noexcept {
     Spectral::Swsh::swsh_interpolate_from_pfaffian(
         make_not_null(&get(*evolution_gauge_r)), make_not_null(&get(*r)),
         get<0>(x_of_x_tilde), get<1>(x_of_x_tilde), l_max);
+    get(*evolution_gauge_r) /= omega;
   }
 };
 
@@ -42,17 +46,33 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::DuRDividedByR> {
   using return_tags =
       tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::DuRDividedByR>,
                  Tags::BoundaryValue<Tags::DuRDividedByR>>;
-  using argument_tags = tmpl::list<Tags::CauchyAngularCoords, Tags::LMax>;
+  using argument_tags =
+      tmpl::list<Tags::CauchyAngularCoords, Tags::U0,
+                 Tags::EvolutionGaugeBoundaryValue<Tags::R>, Tags::GaugeOmega,
+                 Tags::Du<Tags::GaugeOmega>, Tags::LMax>;
   static void apply(
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*>
           evolution_gauge_du_r_divided_by_r,
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*>
           du_r_divided_by_r,
+      const Scalar<SpinWeighted<ComplexDataVector, 1>>& u_0,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& evolution_gauge_r,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& du_omega,
       const tnsr::i<DataVector, 2>& x_of_x_tilde, const size_t l_max) noexcept {
     Spectral::Swsh::swsh_interpolate_from_pfaffian(
         make_not_null(&get(*evolution_gauge_du_r_divided_by_r)),
         make_not_null(&get(*du_r_divided_by_r)), get<0>(x_of_x_tilde),
         get<1>(x_of_x_tilde), l_max);
+    // taking this as argument saves an interpolation, which is significantly
+    // more expensive than the extra multiplication.
+    SpinWeighted<ComplexDataVector, 0> r_buffer =
+        get(evolution_gauge_r) * omega;
+    auto eth_r = Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
+        r_buffer, l_max);
+    get(*evolution_gauge_du_r_divided_by_r) +=
+        0.5 * (get(u_0) * conj(eth_r) + conj(get(u_0)) eth_r) / r_buffer -
+        du_omega / omega;
   }
 };
 
@@ -60,7 +80,7 @@ template <>
 struct ComputeGaugeAdjustedBoundaryValue<Tags::J> {
   using return_tags = tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::J>,
                                  Tags::BoundaryValue<Tags::J>>;
-  using argument_tags = tmpl::list<Tags::GaugeA, Tags::GaugeB,
+  using argument_tags = tmpl::list<Tags::GaugeA, Tags::GaugeB, Tags::GaugeOmega,
                                    Tags::CauchyAngularCoords, Tags::LMax>;
   static void apply(
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*>
@@ -68,17 +88,19 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::J> {
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> j,
       const Scalar<SpinWeighted<ComplexDataVector, 2>>& a,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& b,
+      const Scalar<SpinWeighted<ComplexDataVvector, 0>>& omega,
       const tnsr::i<DataVector, 2>& x_of_x_tilde, const size_t l_max) noexcept {
     Spectral::Swsh::swsh_interpolate_from_pfaffian(
         make_not_null(&get(*evolution_gauge_j)), make_not_null(&get(*j)),
         get<0>(x_of_x_tilde), get<1>(x_of_x_tilde), l_max);
 
     get(*evolution_gauge_j).data() =
-        (0.25 * square(get(b).data())) * get(*evolution_gauge_j).data() +
-        0.25 * square(get(a).data()) * conj(get(*evolution_gauge_j).data()) +
-        0.5 * get(a).data() * get(b).data() *
-            sqrt(1.0 + get(*evolution_gauge_j).data() *
-                           conj(get(*evolution_gauge_j).data()));
+        ((0.25 * square(get(b).data())) * get(*evolution_gauge_j).data() +
+         0.25 * square(get(a).data()) * conj(get(*evolution_gauge_j).data()) -
+         0.5 * get(a).data() * get(b).data() *
+             sqrt(1.0 + get(*evolution_gauge_j).data() *
+                            conj(get(*evolution_gauge_j).data()))) /
+        square(omega);
   }
 };
 
@@ -87,9 +109,9 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::Dr<Tags::J>> {
   using return_tags =
       tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::Dr<Tags::J>>,
                  Tags::BoundaryValue<Tags::Dr<Tags::J>>>;
-  using argument_tags =
-      tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::J>, Tags::GaugeA,
-                 Tags::GaugeB, Tags::CauchyAngularCoords, Tags::LMax>;
+  using argument_tags = tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::J>,
+                                   Tags::GaugeA, Tags::GaugeB, Tags::GaugeOmega,
+                                   Tags::CauchyAngularCoords, Tags::LMax>;
   static void apply(
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*>
           evolution_gauge_dr_j,
@@ -97,21 +119,25 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::Dr<Tags::J>> {
       const Scalar<SpinWeighted<ComplexDataVector, 2>>& evolution_gauge_j,
       const Scalar<SpinWeighted<ComplexDataVector, 2>>& a,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& b,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega,
       const tnsr::i<DataVector, 2>& x_of_x_tilde, const size_t l_max) noexcept {
     Spectral::Swsh::swsh_interpolate_from_pfaffian(
         make_not_null(&get(*evolution_gauge_dr_j)), make_not_null(&get(*dr_j)),
         get<0>(x_of_x_tilde), get<1>(x_of_x_tilde), l_max);
-
+    // two powers of omega from converting the angular part of the metric, one
+    // from the derivative
     get(*evolution_gauge_dr_j).data() =
-        (0.25 * square(get(b).data())) * get(*evolution_gauge_dr_j).data() +
-        0.25 * square(get(a).data()) * conj(get(*evolution_gauge_dr_j).data()) +
-        0.25 * get(a).data() * get(b).data() *
-            (get(*evolution_gauge_dr_j).data() *
-                 conj(get(evolution_gauge_j).data()) +
-             conj(get(*evolution_gauge_dr_j).data()) *
-                 get(evolution_gauge_j).data()) /
-            (1.0 + get(evolution_gauge_j).data() *
-                       conj(get(evolution_gauge_j).data()));
+        ((0.25 * square(get(b).data())) * get(*evolution_gauge_dr_j).data() +
+         0.25 * square(get(a).data()) *
+             conj(get(*evolution_gauge_dr_j).data()) -
+         0.25 * get(a).data() * get(b).data() *
+             (get(*evolution_gauge_dr_j).data() *
+                  conj(get(evolution_gauge_j).data()) +
+              conj(get(*evolution_gauge_dr_j).data()) *
+                  get(evolution_gauge_j).data()) /
+             (1.0 + get(evolution_gauge_j).data() *
+                        conj(get(evolution_gauge_j).data()))) /
+        pow<3>(omega);
   }
 };
 
@@ -121,15 +147,18 @@ template <>
 struct ComputeGaugeAdjustedBoundaryValue<Tags::Beta> {
   using return_tags = tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::Beta>,
                                  Tags::BoundaryValue<Tags::Beta>>;
-  using argument_tags = tmpl::list<Tags::CauchyAngularCoords, Tags::LMax>;
+  using argument_tags =
+      tmpl::list<Tags::CauchyAngularCoords, Tags::GaugeOmega, Tags::LMax>;
   static void apply(
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*>
           evolution_gauge_beta,
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> beta,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega,
       const tnsr::i<DataVector, 2>& x_of_x_tilde, const size_t l_max) noexcept {
     Spectral::Swsh::swsh_interpolate_from_pfaffian(
         make_not_null(&get(*evolution_gauge_beta)), make_not_null(&get(*beta)),
         get<0>(x_of_x_tilde), get<1>(x_of_x_tilde), l_max);
+    get(*evolution_gauge_beta) -= 0.5 * log(omega);
   }
 };
 
@@ -139,47 +168,66 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::Q> {
                                  Tags::BoundaryValue<Tags::Dr<Tags::U>>>;
   using argument_tags =
       tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::J>,
+                 Tags::EvolutionGaugeBoundaryValue<Tags::Dr<Tags::J>>,
                  Tags::EvolutionGaugeBoundaryValue<Tags::R>,
                  Tags::EvolutionGaugeBoundaryValue<Tags::Beta>, Tags::GaugeA,
-                 Tags::GaugeB, Tags::CauchyAngularCoords, Tags::LMax>;
+                 Tags::GaugeB, Tags::GaugeOmega,
+                 Spectral::Swsh::Tags::Derivative<Tags::GaugeOmega,
+                                                  Spectral::Swsh::Tags::Eth>,
+                 Tags::CauchyAngularCoords, Tags::LMax>;
 
   template <typename... Args>
   static void apply(
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*>
           evolution_gauge_bondi_q,
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> dr_u,
-      const Scalar<SpinWeighted<ComplexDataVector, 2>>& j,
-      const Scalar<SpinWeighted<ComplexDataVector, 0>>& bondi_r,
-      const Scalar<SpinWeighted<ComplexDataVector, 0>>& beta,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& j_tilde,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& dr_j_tilde,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& r_tilde,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& beta_tilde,
       const Scalar<SpinWeighted<ComplexDataVector, 2>>& a,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& b,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega,
+      const Scalar<SpinWeighted<ComplexDataVector, 1>>& eth_omega,
       const tnsr::i<DataVector, 2>& x_of_x_tilde, const size_t l_max) noexcept {
     apply_impl(make_not_null(&get(*evolution_gauge_bondi_q)),
-               make_not_null(&get(*dr_u)), get(j), get(bondi_r), get(beta),
-               get(a), get(b), x_of_x_tilde, l_max);
+               make_not_null(&get(*dr_u)), get(j_tilde), get(dr_j_tilde),
+               get(r_tilde), get(beta_tilde), get(a), get(b), get(omega),
+               get(eth_omega), x_of_x_tilde, l_max);
   }
   static void apply_impl(
       const gsl::not_null<SpinWeighted<ComplexDataVector, 1>*>
           evolution_gauge_bondi_q,
       const gsl::not_null<SpinWeighted<ComplexDataVector, 1>*> dr_u,
-      const SpinWeighted<ComplexDataVector, 2>& j,
-      const SpinWeighted<ComplexDataVector, 0>& bondi_r,
-      const SpinWeighted<ComplexDataVector, 0>& beta,
+      const SpinWeighted<ComplexDataVector, 2>& j_tilde,
+      const SpinWeighted<ComplexDataVector, 2>& dr_j_tilde,
+      const SpinWeighted<ComplexDataVector, 0>& r_tilde,
+      const SpinWeighted<ComplexDataVector, 0>& beta_tilde,
       const SpinWeighted<ComplexDataVector, 2>& a,
       const SpinWeighted<ComplexDataVector, 0>& b,
+      const SpinWeighted<ComplexDataVector, 0>& omega,
+      const SpinWeighted<ComplexDataVector, 1>& eth_omega,
       const tnsr::i<DataVector, 2>& x_of_x_tilde, const size_t l_max) noexcept {
     SpinWeighted<ComplexDataVector, 1> evolution_coords_dr_u =
         Spectral::Swsh::swsh_interpolate_from_pfaffian(
             dr_u, get<0>(x_of_x_tilde), get<1>(x_of_x_tilde), l_max);
+
     auto k = SpinWeighted<ComplexDataVector, 0>{
         sqrt(1.0 + j.data() * conj(j.data()))};
+    evolution_coords_dr_u =
+        0.5 / square(omega) *
+            (b * evolution_coords_dr_u + a * conj(evolution_coords_dr_u)) -
+        1.0 / (square(r_tilde) * square(omega)) *
+            (conj(eth_omega) * j_tilde - eth_omega * k) +
+        1.0 / (square(r_tilde) * square(omega)) *
+            (conj(eth_omega) * dr_j_tilde -
+             0.5 * eth_omega / (1.0 + j_tilde * conj(j_tilde)) *
+                 (j_tilde * conj(dr_j_tilde) + conj(j_tilde) * dr_j_tilde));
     auto exp_2_beta =
         SpinWeighted<ComplexDataVector, 0>{exp(-2.0 * beta.data())};
     *evolution_gauge_bondi_q =
         square(bondi_r) * exp_2_beta * 0.5 *
-        (j * (conj(a) * evolution_coords_dr_u +
-              conj(b) * conj(evolution_coords_dr_u)) +
-         k * (a * conj(evolution_coords_dr_u) + b * evolution_coords_dr_u));
+        (j_tilde * conj(evolution_coords_dr_u) + k * evolution_coords_dr_u);
   }
 };
 
@@ -188,22 +236,38 @@ template <>
 struct ComputeGaugeAdjustedBoundaryValue<Tags::U> {
   using return_tags = tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::U>,
                                  Tags::BoundaryValue<Tags::U>>;
-  using argument_tags = tmpl::list<Tags::GaugeA, Tags::GaugeB,
-                                   Tags::CauchyAngularCoords, Tags::LMax>;
+  using argument_tags =
+      tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::J>,
+                 Tags::EvolutionGaugeBoundaryValue<Tags::R>, Tags::GaugeA,
+                 Tags::GaugeB, Tags::GaugeOmega,
+                 Spectral::Swsh::Tags::Derivative<Tags::GaugeOmega,
+                                                  Spectral::Swsh::Tags::Eth>,
+                 Tags::CauchyAngularCoords, Tags::LMax>;
 
   static void apply(
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*>
           evolution_gauge_u,
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> u,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& j_tilde,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& r_tilde,
       const Scalar<SpinWeighted<ComplexDataVector, 2>>& a,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& b,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega,
+      const Scalar<SpinWeighted<ComplexDataVector, 1>>& eth_omega,
       const tnsr::i<DataVector, 2>& x_of_x_tilde, const size_t l_max) noexcept {
     SpinWeighted<ComplexDataVector, 1> evolution_coords_u =
         Spectral::Swsh::swsh_interpolate_from_pfaffian(
             make_not_null(&get(*u)), get<0>(x_of_x_tilde), get<1>(x_of_x_tilde),
             l_max);
+
+    SpinWeighted<ComplexDataVector, 0> k_tilde;
+    k_tilde.data() = sqrt(1.0 + j_tilde * conj(j_tilde));
     get(*evolution_gauge_u) =
-        0.5 * (get(a) * conj(evolution_coords_u) + get(b) * evolution_coords_u);
+        0.5 *
+            (get(a) * conj(evolution_coords_u) + get(b) * evolution_coords_u) /
+            square(omega) +
+        1.0 / (r_tilde * omega) *
+            (conj(eth_omega) * j_tilde - eth_omega * k_tilde);
   }
 };
 
@@ -213,14 +277,39 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::W> {
                                  Tags::BoundaryValue<Tags::W>>;
   using argument_tags = tmpl::list<Tags::CauchyAngularCoords, Tags::LMax>;
 
+  // TODO arguments apply impl etc
   static void apply(
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*>
           evolution_gauge_w,
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> w,
       const tnsr::i<DataVector, 2>& x_of_x_tilde, const size_t l_max) noexcept {
+    apply_impl();
+  }
+
+ private:
+  static void apply_impl(
+      const gsl::not_null<SpinWeighted<ComplexDataVector, 0>*>
+
+      ) noexcept {
     Spectral::Swsh::swsh_interpolate_from_pfaffian(
         make_not_null(&get(*evolution_gauge_w)), make_not_null(&get(*w)),
         get<0>(x_of_x_tilde), get<1>(x_of_x_tilde), l_max);
+    SpinWeighted<ComplexDataVector, 0> k_tilde;
+    k_tilde.data() = sqrt(1.0 + j_tilde * conj(j_tilde));
+    evolution_gauge_w =
+        evolution_gauge_w / omega +
+        1.0 / r_tilde * (1.0 / square(omega) - 1.0) -
+        2.0 * du_omega / square(omega) -
+        (1.0 / (2.0 * pow<4>(omega) * r_tilde)) *
+            (conj(eth_omega) *
+                 (b * (boundary_u - u_0) + a * conj(boundary_u - u_0)) +
+             eth_omega * (b * (conj(a) * (boundary_u - u_0) +
+                               conj(b) * conj(boundary_u - u_0)))) *
+            exp(2.0 * boundary_beta) -
+        exp(2.0 * boundary_beta) / (2.0 * pow<4>(omega) * r_tilde) *
+            (square(conj(eth_omega)) * j_tilde +
+             square(eth_omega) * conj(j_tilde) -
+             2.0 * eth_omega * conj(eth_omega) * k_tilde);
   }
 };
 
@@ -246,6 +335,9 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::H> {
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> r_tilde,
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> a,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& b,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& du_omega,
+      const Scalar<SpinWeighted<ComplexDataVector, 1>>& eth_omega,
       const Scalar<SpinWeighted<ComplexDataVector, 2>>& du_a,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& du_b,
       const Scalar<SpinWeighted<ComplexDataVector, 2>>& dr_j_tilde,
@@ -253,8 +345,9 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::H> {
     apply_impl(make_not_null(&get(*h_tilde)), make_not_null(&get(*j_tilde)),
                make_not_null(&get(*h)), make_not_null(&get(*j)),
                make_not_null(&get(*u0)), make_not_null(&get(*r_tilde)),
-               make_not_null(&get(*a)), get(b), get(du_a), get(du_b),
-               get(dr_j_tilde), x_of_x_tilde, l_max);
+               make_not_null(&get(*a)), get(b), get(omega), get(du_omega),
+               get(eth_omega), get(du_a), get(du_b), get(dr_j_tilde),
+               x_of_x_tilde, l_max);
   }
 
   static void apply_impl(
@@ -266,6 +359,9 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::H> {
       const gsl::not_null<SpinWeighted<ComplexDataVector, 0>*> r_tilde,
       const gsl::not_null<SpinWeighted<ComplexDataVector, 2>*> a,
       const SpinWeighted<ComplexDataVector, 0>& b,
+      const SpinWeighted<ComplexDataVector, 0>& omega,
+      const SpinWeighted<ComplexDataVector, 0>& du_omega,
+      const SpinWeighted<ComplexDataVector, 1>& eth_omega,
       const SpinWeighted<ComplexDataVector, 2>& du_a,
       const SpinWeighted<ComplexDataVector, 0>& du_b,
       const SpinWeighted<ComplexDataVector, 2>& dr_j_tilde,
@@ -273,7 +369,6 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::H> {
     // optimization note: this has many allocations. They can be made fewer.
     // optimization note: this has several spin-weighted derivatives, they can
     // be aggregated
-
     SpinWeighted<ComplexDataVector, 2> j_of_x_tilde =
         Spectral::Swsh::swsh_interpolate_from_pfaffian(
             j, get<0>(x_of_x_tilde), get<1>(x_of_x_tilde), l_max);
@@ -311,9 +406,9 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::H> {
 
     SpinWeighted<ComplexDataVector, 0> k;
     k.data() = sqrt(1.0 + j_of_x_tilde.data() * conj(j_of_x_tilde.data()));
-    auto angular_derivative_part = -0.25 * (*u0) * b * ethbar_j_tilde -
-                                   0.25 * (*u0) * abar_eth_j_tilde -
-                                   0.25 * conj(*u0) * (*a) * ethbar_j_tilde -
+    auto angular_derivative_part = 0.25 * (*u0) * b * ethbar_j_tilde +
+                                   0.25 * (*u0) * abar_eth_j_tilde +
+                                   0.25 * conj(*u0) * (*a) * ethbar_j_tilde +
                                    0.25 * conj(b) * u0bar_eth_j_tilde;
     auto time_derivative_part =
         0.25 * (square(b) * h_of_x_tilde + square(*a) * conj(h_of_x_tilde) -
@@ -323,16 +418,23 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::H> {
                     (1.0 + j_of_x_tilde * conj(j_of_x_tilde))) +
         0.5 * b * du_b * j_of_x_tilde + 0.5 * (*a) * du_a * conj(j_of_x_tilde) -
         0.5 * ((*a) * du_b + b * du_a) * k;
-    *h_tilde = angular_derivative_part + time_derivative_part;
+    *h_tilde =
+        angular_derivative_part + time_derivative_part / square(omega) -
+        2.0 *
+            (du_omega - 0.25 * (b * u_0 + (*a) * conj(u_0)) * conj(eth_omega) -
+             0.25 * (conj(*a) * u_0 + conj(b * u_0)) * eth_omega) /
+            pow<3>(omega) *
+            (0.25 * (square(b) * j_of_x_tilde + square(a) * conj(j_of_x_tilde) -
+                     2.0 * a * b * k));
   }
 };
 
 struct GaugeUpdateU {
   using argument_tags =
       tmpl::list<Tags::GaugeA, Tags::GaugeB, Tags::Exp2Beta, Tags::LMax>;
-  using return_tags =
-      tmpl::list<Tags::DuCauchyAngularCoords, Tags::Du<Tags::GaugeA>,
-                 Tags::Du<Tags::GaugeB>, Tags::U0, Tags::U>;
+  using return_tags = tmpl::list<Tags::DuCauchyAngularCoords,
+                                 Tags::Du<Tags::GaugeA>, Tags::Du<Tags::GaugeB>,
+                                 Tags::U0, Tags::U, Tags::Du<Tags::GaugeOmega>>;
 
   static void apply(
       const gsl::not_null<tnsr::i<DataVector, 2>*> du_x,
@@ -340,8 +442,10 @@ struct GaugeUpdateU {
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> du_b,
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> u_0,
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> u,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> du_omega,
       const Scalar<SpinWeighted<ComplexDataVector, 2>>& a,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& b,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& exp2beta,
       const size_t l_max) noexcept {
     size_t number_of_radial_points =
@@ -361,6 +465,9 @@ struct GaugeUpdateU {
           Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
       angular_view -= get(*u_0).data();
     }
+    // u_under_tilde_0 (note: other corrections from radial coordinate change
+    // don't appear as we are evaluating at scri+).
+    get(*u_0) = square(get(omega)) * u_0;
     // u_0
     get(*u_0) = (2.0 / (get(b) * conj(get(b)) - get(a) * conj(get(a)))) *
                 (conj(get(b)) * get(*u_0) - get(a) * conj(get(*u_0)));
@@ -370,7 +477,6 @@ struct GaugeUpdateU {
     // spin-weighted spherical harmonics themselves, we won't be able to
     // eliminate sin(theta)s completely
 
-    /// CHECK SIGNS
     get<0>(*du_x) = -real(get(*u_0).data());
     get<1>(*du_x) = -imag(get(*u_0).data());
     // at some point we might want to split these out into their own
@@ -392,19 +498,37 @@ struct GaugeUpdateU {
                 Spectral::Swsh::number_of_swsh_collocation_points(l_max),
         Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
 
-    ComplexDataVector determinant = 0.25 *  exp2beta_slice *
-                                    (get(b).data() * conj(get(b).data()) -
-                                     get(a).data() * conj(get(a).data()));
-    printf("printing determinant\n");
-    for(auto val : determinant) {
-      printf("(%e, %e)\n",real(val), imag(val));
-    }
-    printf("\n");
-
     get(*du_a) = -0.25 * get(a) * ethbar_a_u0bar_plus_b_u0 -
                  0.25 * get(b) * eth_a_u0bar_plus_b_u0;
     get(*du_b) = -0.25 * conj(get(b)) * ethbar_a_u0bar_plus_b_u0 -
                  0.25 * conj(get(a)) * eth_a_u0bar_plus_b_u0;
+    auto ethbar_u_0 =
+        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
+            make_not_null(&get(*u_0)), l_max);
+    get(*du_gauge_omega) = 0.25 * (ethbar_u_0 + conj(ethbar_u_0));
+  }
+};
+
+struct GaugeUpdateOmega {
+  using argument_tags = tmpl::list<Tags::GaugeA, Tags::GaugeB, Tags::LMax>;
+  using return_tags =
+      tmpl::list<Tags::GaugeOmega,
+                 Spectral::Swsh::Tags::Derivative<Tags::GaugeOmega,
+                                                  Spectral::Swsh::Tags::Eth>>;
+
+  static void apply(
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> a,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> b,
+      const size_t l_max) noexcept {
+    const auto& collocation = Spectral::Swsh::precomputed_collocation<
+        Spectral::Swsh::ComplexRepresentation::Interleaved>(l_max);
+    for (const auto& collocation_point : collocation) {
+      get<0>(*x_of_x_tilde)[collocation_point.offset] = collocation_point.theta;
+      get<1>(*x_of_x_tilde)[collocation_point.offset] =
+          collocation_point.phi * sin(collocation_point.theta);
+      get(*a).data() = 0.0;
+      get(*b).data() = 2.0;
+    }
   }
 };
 

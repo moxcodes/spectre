@@ -123,6 +123,11 @@ struct GaugeB : db::SimpleTag {
   static std::string name() noexcept { return "GaugeB"; }
 };
 
+struct GaugeOmega : db::SimpleTag {
+  using type = Scalar<SpinWeighted<ComplexDataVector, 0>>;
+  static std::string name() noexcept { return "GaugeB"; }
+};
+
 struct News : db::SimpleTag {
   using type = Scalar<SpinWeighted<ComplexDataVector, 2>>;
   static std::string name() noexcept { return "News"; }
