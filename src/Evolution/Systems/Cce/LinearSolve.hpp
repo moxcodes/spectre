@@ -3,17 +3,13 @@
 
 #pragma once
 
-// matrix routines prepare the matrix of the desired size, with the appropriate
-// boundary conditions, and apply it to the computed right-hand sides. It's
-// probably best to just write two routines - one which works for most
-// equations, one for the H equation.
-
 #include "DataStructures/ComplexDataVector.hpp"
 #include "DataStructures/Matrix.hpp"
 #include "DataStructures/Tags.hpp"
 #include "DataStructures/Variables.hpp"
 #include "Domain/Mesh.hpp"
 #include "Evolution/Systems/Cce/Tags.hpp"
+#include "Evolution/Systems/Cce/LinearOperators.hpp"
 #include "NumericalAlgorithms/LinearOperators/ApplyMatrices.hpp"
 #include "NumericalAlgorithms/LinearOperators/IndefiniteIntegral.hpp"
 #include "NumericalAlgorithms/LinearOperators/Transpose.hpp"

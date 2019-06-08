@@ -40,11 +40,20 @@ using gauge_transform_boundary_tags =
                Tags::EvolutionGaugeBoundaryValue<Tags::U>,
                Tags::EvolutionGaugeBoundaryValue<Tags::W>,
                Tags::EvolutionGaugeBoundaryValue<Tags::H>, Tags::GaugeA,
-               Tags::GaugeB, Tags::Du<Tags::GaugeA>, Tags::Du<Tags::GaugeB>,
-               Tags::U0>;
+               Tags::GaugeB, Tags::Du<Tags::GaugeA>, Tags::GaugeOmega,
+               Tags::Du<Tags::GaugeOmega>,
+               Spectral::Swsh::Tags::Derivative<Tags::GaugeOmega,
+                                                Spectral::Swsh::Tags::Eth>,
+               Tags::Du<Tags::GaugeB>, Tags::U0>;
+
+using gauge_confirmation_scri_tags =
+    tmpl::list<Tags::CauchyGaugeScriPlus<Tags::Beta>>;
 
 using angular_coordinate_tags =
-    tmpl::list<Tags::CauchyAngularCoords, Tags::DuCauchyAngularCoords>;
+    tmpl::list<Tags::CauchyAngularCoords, Tags::DuCauchyAngularCoords,
+               /* the following only used for gauge transform confirmation
+                  routine*/
+               Tags::InertialAngularCoords, Tags::DuInertialAngularCoords>;
 
 using scri_tags = tmpl::list<Tags::News, Tags::InertialRetardedTime,
                              Tags::Du<Tags::InertialRetardedTime>>;

@@ -84,6 +84,7 @@ class SpinWeightedSphericalHarmonic {
     // involved a nasty ternary that made Blaze sad :(
     DataVector theta_factor{theta.size(), 1.0};
     for (int r = 0; r <= (static_cast<int>(l_) - spin_); ++r) {
+      theta_factor = 1.0;
       if (2 * static_cast<int>(l_) > 2 * r + spin_ - m_) {
         theta_factor = pow(cos_theta_over_2, 2 * r + spin_ - m_) *
                        pow(sin_theta_over_2,

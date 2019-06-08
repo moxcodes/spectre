@@ -19,10 +19,11 @@ struct CalculateScriPlusValue<Tags::News> {
                  Tags::EvolutionGaugeBoundaryValue<Tags::R>,
                  Tags::EvolutionGaugeBoundaryValue<Tags::DuRDividedByR>,
                  Tags::LMax>;
-  using return_tags = tmpl::list<Tags::News>;
+  using return_tags = tmpl::list<Tags::News, Tags::U0>;
 
   static void apply(
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> news,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> u_0,
       const Scalar<SpinWeighted<ComplexDataVector, 2>>& h,
       const Scalar<SpinWeighted<ComplexDataVector, 2>>& dy_j,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& beta,
@@ -70,12 +71,12 @@ struct CalculateScriPlusValue<Tags::News> {
 
     // additional phase factor delta set to zero.
     // Note: -2 * r extra factor due to derivative l to y
-    // Note Note: this should actually be the H derivative of J at fixed bondi r
-    // not fixed y.
+    // Note also: extra factor of 2.0 for conversion to strain.
     get(*news).data() =
-        (-get(r).data() * exp(-2.0 * beta_at_scri.data()) *
-             (dy_h_at_scri +
-              get(du_r_divided_by_r).data() * dy_j_at_scri.data()) +
+        2.0 *
+        ((-get(r).data() * exp(-2.0 * beta_at_scri.data()) *
+          (dy_h_at_scri -/*SIGN?*/
+           get(du_r_divided_by_r).data() * dy_j_at_scri.data())) +
          eth_eth_beta_at_scri.data() + 2.0 * square(eth_beta_at_scri.data()));
   }
 };
@@ -95,6 +96,41 @@ struct CalculateScriPlusValue<Tags::Du<Tags::InertialRetardedTime>> {
         buffer.data() + buffer.size() - get(*du_inertial_time).size(),
         get(*du_inertial_time).size()};
 }
+};
+
+template <>
+struct CalculateScriPlusValue<Tags::CauchyGaugeScriPlus<Tags::Beta>> {
+  using argument_tags =
+      tmpl::list<Tags::GaugeOmega, Tags::InertialAngularCoords,
+                 Tags::CauchyAngularCoords, Tags::LMax>;
+  using return_tags =
+      tmpl::list<Tags::CauchyGaugeScriPlus<Tags::Beta>, Tags::Beta>;
+  static void apply(
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*>
+          cauchy_gauge_beta,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> beta,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega,
+      const tnsr::i<DataVector, 2>& x_tilde_of_x,
+      const tnsr::i<DataVector, 2>& x_of_x_tilde, const size_t l_max) noexcept {
+    SpinWeighted<ComplexDataVector, 0> beta_buffer;
+    size_t number_of_angular_points =
+        Spectral::Swsh::number_of_swsh_collocation_points(l_max);
+    size_t number_of_radial_points =
+        get(*beta).size() / number_of_angular_points;
+    beta_buffer.data() = ComplexDataVector{
+        get(*beta).data().data() +
+            (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points};
+    beta_buffer.data() -= 0.5 * log(get(omega).data());
+    Spectral::Swsh::swsh_interpolate_from_pfaffian(
+        make_not_null(&get(*cauchy_gauge_beta)), make_not_null(&beta_buffer),
+        get<0>(x_tilde_of_x), get<1>(x_tilde_of_x), l_max);
+
+    SpinWeighted<ComplexDataVector, 0> identity_test =
+        Spectral::Swsh::swsh_interpolate_from_pfaffian(
+            make_not_null(&get(*cauchy_gauge_beta)), get<0>(x_of_x_tilde),
+            get<1>(x_of_x_tilde), l_max);
+  }
 };
 
 template <typename Tag>
