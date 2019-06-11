@@ -69,14 +69,41 @@ struct CalculateScriPlusValue<Tags::News> {
                 Spectral::Swsh::number_of_swsh_collocation_points(l_max),
         Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
 
+    auto ethbar_u0 =
+        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
+            make_not_null(&get(*u_0)), l_max);
+    SpinWeighted<ComplexDataVector, 0> r_buffer = get(r);
+    SpinWeighted<ComplexDataVector, 1> u0bar_dy_j =
+        conj(get(*u_0)) * dy_j_at_scri;
+    SpinWeighted<ComplexDataVector, 2> u0bar_eth_dy_j =
+        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
+            make_not_null(&u0bar_dy_j), l_max) -
+        dy_j_at_scri *
+            conj(Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
+                make_not_null(&get(*u_0)), l_max)) +
+        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
+            make_not_null(&r_buffer), l_max) /
+            r_buffer * u0bar_dy_j;
+    SpinWeighted<ComplexDataVector, 1> ethbar_dy_j =
+        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
+            make_not_null(&dy_j_at_scri), l_max) +
+        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
+            make_not_null(&r_buffer), l_max) /
+            r_buffer * dy_j_at_scri;
+    // TEST
+    SpinWeighted<ComplexDataVector, 2> u_term =
+        0.5 * u0bar_eth_dy_j + 0.5 * get(*u_0) * ethbar_dy_j +
+        .75 * dy_j_at_scri * conj(ethbar_u0) - 0.25 * ethbar_u0 * dy_j_at_scri;
+
     // additional phase factor delta set to zero.
     // Note: -2 * r extra factor due to derivative l to y
     // Note also: extra factor of 2.0 for conversion to strain.
+    /// TODO currently using SpecH for this computation
     get(*news).data() =
         2.0 *
         ((-get(r).data() * exp(-2.0 * beta_at_scri.data()) *
-          (dy_h_at_scri -/*SIGN?*/
-           get(du_r_divided_by_r).data() * dy_j_at_scri.data())) +
+          (dy_h_at_scri + get(du_r_divided_by_r).data() * dy_j_at_scri.data() +
+           u_term.data())) +
          eth_eth_beta_at_scri.data() + 2.0 * square(eth_beta_at_scri.data()));
   }
 };
