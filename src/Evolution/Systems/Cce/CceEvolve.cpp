@@ -602,37 +602,6 @@ void run_trial_regularity_preserving_cce(
     mutate_all_precompute_cce_dependencies<Tags::EvolutionGaugeBoundaryValue>(
         make_not_null(&box));
 
-    // Fix boundary condition for H to be like that of SpEC (there's a
-    // coordinates on boundary vs coordinates in bulk problem so the
-    // definitions do not quite align).
-    // TODO: investigate if this is still necessary. If it is, there is
-    // still a problem.
-
-    db::mutate_apply<ComputePreSwshDerivatives<Tags::Dy<Tags::J>>>(
-        make_not_null(&box));
-    db::mutate<Tags::EvolutionGaugeBoundaryValue<Tags::H>,
-               Tags::BoundaryValue<Tags::DuRDividedByR>, Tags::Dy<Tags::J>>(
-        make_not_null(&box),
-        [&l_max](
-            const gsl::not_null<db::item_type<Tags::BoundaryValue<Tags::H>>*>
-                boundary_h,
-            const gsl::not_null<
-                db::item_type<Tags::BoundaryValue<Tags::DuRDividedByR>>*>
-                du_r_divided_by_r,
-            const gsl::not_null<db::item_type<Tags::Dy<Tags::J>>*> dy_j,
-            const db::item_type<Tags::BoundaryValue<Tags::SpecH>>& spec_h) {
-          ComplexDataVector boundary_dy_j{
-              get(*dy_j).data().data(),
-              Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
-          ComplexDataVector boundary_du_r_divided_by_r{
-              get(*du_r_divided_by_r).data().data(),
-              Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
-          get(*boundary_h).data() =
-              get(spec_h).data() +
-              2.0 * boundary_du_r_divided_by_r * boundary_dy_j;
-        },
-        db::get<Tags::BoundaryValue<Tags::SpecH>>(box));
-
     tmpl::for_each<tmpl::list<Tags::Beta, Tags::Q, Tags::U, Tags::W, Tags::H>>(
         [&box, &l_max, &l_filter_start](auto x) {
           using bondi_tag = typename decltype(x)::type;

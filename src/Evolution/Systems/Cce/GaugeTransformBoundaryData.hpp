@@ -48,8 +48,9 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::DuRDividedByR> {
                  Tags::BoundaryValue<Tags::DuRDividedByR>>;
   using argument_tags =
       tmpl::list<Tags::U0, Tags::EvolutionGaugeBoundaryValue<Tags::R>,
-                 Tags::GaugeOmega, Tags::Du<Tags::GaugeOmega>,
-                 Tags::CauchyAngularCoords, Tags::LMax>;
+                 Tags::GaugeA, Tags::GaugeB, Tags::GaugeOmega,
+                 Tags::Du<Tags::GaugeOmega>, Tags::CauchyAngularCoords,
+                 Tags::LMax>;
   static void apply(
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*>
           evolution_gauge_du_r_divided_by_r,
@@ -57,6 +58,8 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::DuRDividedByR> {
           du_r_divided_by_r,
       const Scalar<SpinWeighted<ComplexDataVector, 1>>& u_0,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& evolution_gauge_r,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& a,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& b,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& du_omega,
       const tnsr::i<DataVector, 2>& x_of_x_tilde, const size_t l_max) noexcept {
@@ -70,9 +73,16 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::DuRDividedByR> {
         get(evolution_gauge_r) * get(omega);
     auto eth_r = Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
         make_not_null(&r_buffer), l_max);
-    // FIXME this coordinate transform probably isn't quite right
+    // FIXME this coordinate transform probably isn't quite right past the first
+    // timestep -- note that the eth_r's are angular derivatives in the tilded
+    // (inertial) frame
     get(*evolution_gauge_du_r_divided_by_r) +=
-        0.5 * (get(u_0) * conj(eth_r) + conj(get(u_0)) * eth_r) / r_buffer -
+        0.25 *
+            (get(u_0) * get(b) * conj(eth_r) +
+             conj(get(u_0)) * get(a) * conj(eth_r) +
+             conj(get(u_0)) * conj(get(b)) * eth_r +
+             get(u_0) * conj(get(a)) * eth_r) /
+            r_buffer -
         get(du_omega) / get(omega);
     // TEST
     get(*evolution_gauge_du_r_divided_by_r) = get(*du_r_divided_by_r);
@@ -243,9 +253,6 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::Q> {
     *evolution_gauge_bondi_q =
         square(r_tilde) * exp_minus_2_beta *
         (j_tilde * conj(evolution_coords_dr_u) + k * evolution_coords_dr_u);
-    // TEST
-    *evolution_gauge_bondi_q = *boundary_q;
-    // TEST
   }
 };
 
@@ -292,9 +299,6 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::U> {
             (get(a) * conj(evolution_coords_u) + get(b) * evolution_coords_u) -
         exp_2_beta_tilde / (get(r_tilde)) *
             (conj(get(eth_omega)) * get(j_tilde) - get(eth_omega) * k_tilde);
-    // TEST
-    get(*evolution_gauge_u) = get(*u);
-    // TEST
   }
 };
 
@@ -550,8 +554,8 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::H> {
     // 0.5 * (ethbar_u0 + conj(ethbar_u0)) * j_of_x_tilde +
     // du_r_divided_by_r_tilde * (*r_tilde) * (dr_j_of_x_tilde);
     // TEST TEST
-    // *h_tilde =
-    // h_of_x_tilde + du_r_divided_by_r_tilde * (*r_tilde) * (dr_j_of_x_tilde);
+    *h_tilde =
+        h_of_x_tilde + du_r_divided_by_r_tilde * (*r_tilde) * (dr_j_of_x_tilde);
 
     // angular_derivative_part +
     // time_derivative_part / square(omega) -
@@ -624,10 +628,6 @@ struct GaugeUpdateU {
     get<1>(*du_x) = -imag(get(*u_0).data()) + get<1>(x_of_x_tilde) *
                                                   cos(get<0>(x_of_x_tilde)) *
                                                   get<0>(*du_x);
-    // TEST
-    get<0>(*du_x) = 0.0;
-    get<1>(*du_x) = 0.0;
-    // TEST
 
     // at some point we might want to split these out into their own
     // computational function
@@ -686,9 +686,6 @@ struct GaugeUpdateU {
             (conj(get(*a)) * get(*b) * eth_u_0 + square(get(*b)) * ethbar_u_0) +
         0.25 * (conj(get(*u_0)) * get(*a) * ethbar_b +
                 conj(get(*u_0)) * conj(get(*b)) * eth_b);
-
-    get(*du_a) = -0.0 * eth_u_0;
-    get(*du_b) = -0.0 * ethbar_u_0;
 
     // TEST
     get(*du_omega) =
