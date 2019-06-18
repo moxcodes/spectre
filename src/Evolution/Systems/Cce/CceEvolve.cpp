@@ -40,7 +40,7 @@ ComplexModalVector compute_mode_difference_at_scri(
     filename = "HScriNoninertial.h5";
   }
   if (cpp17::is_same_v<BondiTag, Tags::News>) {
-    filename = "NewsNoninertial.h5";
+    filename = "News.h5";
     ComplexModalVector news_corrected_modes{modes.size()};
     for (int l = 0; l <= l_max; ++l) {
       for (int m = -l; m <= l; ++m) {
@@ -191,6 +191,31 @@ void compare_and_record_scri_values(
           comparison_l_max);
     }
   });
+}
+
+template <typename Tag>
+void compare_and_record_scri_values(
+    const gsl::not_null<ModeRecorder*> recorder,
+    const ComplexDataVector& slice_data,
+    const std::string comparison_file_prefix, const double time,
+    const size_t l_max, const size_t comparison_l_max,
+    const size_t number_of_radial_points) noexcept {
+  typename db::item_type<Tag>::type scri_slice_buffer;
+  scri_slice_buffer.data() = slice_data;
+  auto scri_goldberg_modes = Spectral::Swsh::libsharp_to_goldberg_modes(
+      Spectral::Swsh::swsh_transform(make_not_null(&scri_slice_buffer), l_max),
+      l_max);
+  recorder->append_mode_data("/" + Tag::name() + "_scri", time,
+                             scri_goldberg_modes.data(), comparison_l_max);
+
+  if (comparison_file_prefix != "") {
+    recorder->append_mode_data(
+        "/" + Tag::name() + "_scri_difference", time,
+        compute_mode_difference_at_scri<Tag>(time, comparison_file_prefix,
+                                             scri_goldberg_modes.data(),
+                                             comparison_l_max),
+        comparison_l_max);
+    }
 }
 
 template <int spin>
@@ -742,10 +767,19 @@ void run_trial_regularity_preserving_cce(
       while (interpolation_manager.first_time_is_ready_to_interpolate()) {
         auto interpolation =
             interpolation_manager.interpolate_and_pop_first_time();
-        // TEST
-        // record_scri_output<2>(make_not_null(&recorder), interpolation,
-        // "News", l_max, comparison_l_max);
-        // TEST
+        // DEBUG output
+        record_scri_output<2>(make_not_null(&recorder), interpolation, "News",
+                              l_max, comparison_l_max);
+        // if (std::find_if(times.begin(), times.end(),
+                         // [&interpolation](auto x) {
+                           // return abs(x - interpolation.second) < 1.0e-8;
+                         // }) != times.end() or
+            // (comparison_file_prefix == "" and step_counter % 12 == 0)) {
+          // compare_and_record_scri_values<Tags::News>(
+              // make_not_null(&recorder), interpolation.first,
+              // comparison_file_prefix, interpolation.second, l_max,
+              // comparison_l_max, 1);
+        // }
       }
     }
 
@@ -779,8 +813,8 @@ void run_trial_regularity_preserving_cce(
             make_not_null(&box), make_not_null(&recorder),
             time.step_time().value(), l_max, comparison_l_max);
 
-        compare_and_record_scri_values<tmpl::list<
-            Tags::CauchyGaugeScriPlus<Tags::Beta>, Tags::U0, Tags::News>>(
+        compare_and_record_scri_values<
+            tmpl::list<Tags::CauchyGaugeScriPlus<Tags::Beta>, Tags::U0>>(
             make_not_null(&box), make_not_null(&recorder),
             comparison_file_prefix, time.step_time().value(), l_max,
             comparison_l_max, 1);
