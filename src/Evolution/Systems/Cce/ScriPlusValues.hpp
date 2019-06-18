@@ -102,8 +102,8 @@ struct CalculateScriPlusValue<Tags::News> {
     get(*news).data() =
         2.0 *
         ((-get(r).data() * exp(-2.0 * beta_at_scri.data()) *
-          (dy_h_at_scri + get(du_r_divided_by_r).data() * dy_j_at_scri.data() +
-           u_term.data())) +
+          (dy_h_at_scri + get(du_r_divided_by_r).data() * dy_j_at_scri.data()
+           /*+0.0 * u_term.data()*/)) +
          eth_eth_beta_at_scri.data() + 2.0 * square(eth_beta_at_scri.data()));
   }
 };
