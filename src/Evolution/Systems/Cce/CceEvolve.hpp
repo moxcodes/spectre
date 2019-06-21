@@ -47,7 +47,12 @@ using gauge_transform_boundary_tags =
                Tags::Du<Tags::GaugeB>, Tags::U0>;
 
 using gauge_confirmation_scri_tags =
-    tmpl::list<Tags::CauchyGaugeScriPlus<Tags::Beta>>;
+    tmpl::list<Tags::CauchyGaugeScriPlus<Tags::Beta>,
+               Tags::CauchyGaugeScriPlus<Tags::U0>>;
+
+using gauge_confirmation_volume_tags =
+    tmpl::list<Tags::CauchyGauge<Tags::Beta>, Tags::CauchyGauge<Tags::J>,
+               Tags::CauchyGauge<Tags::U>, Tags::CauchyGauge<Tags::Q>>;
 
 using angular_coordinate_tags =
     tmpl::list<Tags::CauchyAngularCoords, Tags::DuCauchyAngularCoords,

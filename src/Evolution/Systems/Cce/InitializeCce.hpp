@@ -8,6 +8,8 @@
 #include "DataStructures/Matrix.hpp"
 #include "Evolution/Systems/Cce/Tags.hpp"
 #include "NumericalAlgorithms/Spectral/Spectral.hpp"
+#include "NumericalAlgorithms/Spectral/SwshFiltering.hpp"
+#include "NumericalAlgorithms/Spectral/SwshInterpolation.hpp"
 #include "Utilities/Gsl.hpp"
 
 namespace Cce {
@@ -66,5 +68,77 @@ struct InitializeJ {
           pow<3>(one_minus_y_collocation[i]) * one_minus_y_cubed_coefficient;
     }
   }
-};  // namespace Cce
+};
+
+struct GaugeAdjustInitialJ {
+  using boundary_tags = tmpl::list<Tags::GaugeA, Tags::GaugeB, Tags::GaugeOmega,
+                                   Tags::CauchyAngularCoords,
+                                   Tags::InertialAngularCoords, Tags::LMax>;
+  using return_tags = tmpl::list<Tags::J>;
+  using argument_tags = tmpl::append<boundary_tags>;
+
+  static void apply(
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> j,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& a,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& b,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega,
+      const tnsr::i<DataVector, 2>& x_of_x_tilde,
+      const tnsr::i<DataVector, 2>& x_tilde_of_x, const size_t l_max) noexcept {
+    const size_t number_of_radial_points = get(*j).size() / get(a).size();
+
+    const auto& one_minus_y_collocation =
+        1.0 - Spectral::collocation_points<Spectral::Basis::Legendre,
+                                           Spectral::Quadrature::GaussLobatto>(
+                  number_of_radial_points);
+
+    for (size_t i = 0; i < number_of_radial_points; i++) {
+      SpinWeighted<ComplexDataVector, 2> angular_slice_j{get(a).size()};
+      angular_slice_j.data() = ComplexDataVector{
+          get(*j).data().data() + get(a).size() * i, get(a).size()};
+      ComplexDataVector angular_view_j{
+          get(*j).data().data() + get(a).size() * i, get(a).size()};
+      // TODO it's probably better to use the volume filtering to combine
+      // evaluations of the swsh transform
+
+      // TODO review all filtering to double-check their necessity
+      Spectral::Swsh::filter_swsh_boundary_quantity(
+          make_not_null(&angular_slice_j), l_max, l_max - 2);
+      SpinWeighted<ComplexDataVector, 2> evolution_coords_j_view =
+          Spectral::Swsh::swsh_interpolate_from_pfaffian(
+              make_not_null(&angular_slice_j), get<0>(x_of_x_tilde),
+              get<1>(x_of_x_tilde), l_max);
+      Spectral::Swsh::filter_swsh_boundary_quantity(
+          make_not_null(&evolution_coords_j_view), l_max, l_max - 2);
+
+      // for(size_t i = 0; i < angular_view_j.size(); ++i) {
+      // printf(
+      // "(%e, %e)\n",
+      // real(evolution_coords_j_view.data()[i] - angular_slice_j.data()[i]),
+      // imag(evolution_coords_j_view.data()[i] -
+      // angular_slice_j.data()[i]));
+      // }
+
+      // TEST
+      angular_view_j =
+          0.25 *
+          (square(get(b).data()) * evolution_coords_j_view.data() +
+           square(get(a).data()) * conj(evolution_coords_j_view.data()) -
+           2.0 * get(a).data() * get(b).data() *
+               sqrt(1.0 + evolution_coords_j_view.data() *
+                              conj(evolution_coords_j_view.data()))) /
+          square(get(omega).data());
+      // TEST: just interpolate
+      // angular_view_j = evolution_coords_j_view.data();
+      // TEST
+      // angular_view_j = 0.25 *
+      // (square(get(b).data()) * angular_slice_j.data() +
+      // square(get(a).data()) * conj(angular_slice_j.data()) -
+      // 2.0 * get(a).data() * get(b).data() *
+      // sqrt(1.0 + angular_slice_j.data() *
+      // conj(angular_slice_j.data()))) /
+      // square(get(omega).data());
+    }
+  }
+};
+
 }  // namespace Cce

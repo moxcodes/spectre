@@ -55,6 +55,7 @@ void test_basis_function(const gsl::not_null<Generator*> generator) noexcept {
 
 template <int spin, typename Generator>
 void test_interpolation(const gsl::not_null<Generator*> generator) noexcept {
+  INFO("Testing interpolation for spin " << spin);
   UniformCustomDistribution<double> coefficient_distribution{-2.0, 2.0};
   const size_t l_max = 16;
   UniformCustomDistribution<double> phi_dist{0.0, 2.0 * M_PI};
@@ -62,9 +63,9 @@ void test_interpolation(const gsl::not_null<Generator*> generator) noexcept {
   const size_t number_of_target_points = 10;
 
   const DataVector target_phi = make_with_random_values<DataVector>(
-      generator, make_not_null(&phi_dist), static_cast<size_t>(10));
+      generator, make_not_null(&phi_dist), number_of_target_points);
   const DataVector target_theta = make_with_random_values<DataVector>(
-      generator, make_not_null(&theta_dist), static_cast<size_t>(10));
+      generator, make_not_null(&theta_dist), number_of_target_points);
   const DataVector target_phi_pfaffian = target_phi * sin(target_theta);
 
   SpinWeighted<ComplexModalVector, spin> generated_modes{
@@ -72,8 +73,45 @@ void test_interpolation(const gsl::not_null<Generator*> generator) noexcept {
   TestHelpers::generate_swsh_modes<spin>(
       make_not_null(&generated_modes.data()), generator,
       make_not_null(&coefficient_distribution), 1, l_max);
-  auto generated_coefficients = inverse_swsh_transform(
-      make_not_null(&generated_modes), l_max);
+  auto generated_collocation =
+      inverse_swsh_transform(make_not_null(&generated_modes), l_max);
+
+  auto goldberg_modes = libsharp_to_goldberg_modes(generated_modes, l_max);
+
+  ComplexDataVector expected{number_of_target_points, 0.0};
+  ComplexDataVector another_expected{number_of_target_points, 0.0};
+  for(int l = 0; l <= l_max; ++l) {
+    for(int m = -l; m <= l; ++m) {
+      for(size_t i = 0; i < number_of_target_points; ++i) {
+        expected[i] +=
+            goldberg_modes.data()[static_cast<size_t>(square(l) + l + m)] *
+            TestHelpers::spin_weighted_spherical_harmonic(
+                spin, l, m, target_theta[i], target_phi[i]);
+        auto sYlm =
+            SpinWeightedSphericalHarmonic{spin, static_cast<size_t>(l), m};
+        another_expected[i] +=
+            goldberg_modes.data()[static_cast<size_t>(square(l) + l + m)] *
+            sYlm.evaluate(target_theta[i], target_phi[i]);
+      }
+    }
+  }
+  auto pfaffian_interp =
+      swsh_interpolate_from_pfaffian(make_not_null(&generated_collocation),
+                                     target_theta, target_phi_pfaffian, l_max);
+  auto standard_interp = swsh_interpolate(make_not_null(&generated_collocation),
+                                          target_theta, target_phi, l_max);
+
+  Approx factorial_approx =
+      Approx::custom()
+      .epsilon(std::numeric_limits<double>::epsilon() * 1.0e6)
+      .scale(1.0);
+
+  CHECK_ITERABLE_CUSTOM_APPROX(expected, another_expected, factorial_approx);
+
+  CHECK_ITERABLE_CUSTOM_APPROX(pfaffian_interp.data(), expected,
+                               factorial_approx);
+  CHECK_ITERABLE_CUSTOM_APPROX(standard_interp.data(), expected,
+                               factorial_approx);
 }
 
 SPECTRE_TEST_CASE("Unit.NumericalAlgorithms.Spectral.SwshInterpolation",

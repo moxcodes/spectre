@@ -142,6 +142,15 @@ struct CauchyGaugeScriPlus : db::PrefixTag, db::SimpleTag {
   }
 };
 
+template <typename Tag>
+struct CauchyGauge : db::PrefixTag, db::SimpleTag {
+  using type = db::item_type<Tag>;
+  using tag = Tag;
+  static std::string name() noexcept {
+    return "CauchyGaugeScriPlus(" + Tag::name() + ")";
+  }
+};
+
 // For expressing the Cauchy angular coordinates for the worldtube data in terms
 // of the evolution angular coordinates.
 struct CauchyAngularCoords : db::SimpleTag {

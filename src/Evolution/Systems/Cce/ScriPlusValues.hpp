@@ -110,7 +110,6 @@ struct CalculateScriPlusValue<Tags::News> {
 
 template <>
 struct CalculateScriPlusValue<Tags::Du<Tags::InertialRetardedTime>> {
-
   using argument_tags = tmpl::list<Tags::Exp2Beta>;
   using return_tags = tmpl::list<Tags::Du<Tags::InertialRetardedTime>>;
 
@@ -122,7 +121,7 @@ struct CalculateScriPlusValue<Tags::Du<Tags::InertialRetardedTime>> {
     get(*du_inertial_time).data() = ComplexDataVector{
         buffer.data() + buffer.size() - get(*du_inertial_time).size(),
         get(*du_inertial_time).size()};
-}
+  }
 };
 
 template <>
@@ -139,16 +138,16 @@ struct CalculateScriPlusValue<Tags::CauchyGaugeScriPlus<Tags::Beta>> {
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega,
       const tnsr::i<DataVector, 2>& x_tilde_of_x,
       const tnsr::i<DataVector, 2>& x_of_x_tilde, const size_t l_max) noexcept {
-    SpinWeighted<ComplexDataVector, 0> beta_buffer;
     size_t number_of_angular_points =
         Spectral::Swsh::number_of_swsh_collocation_points(l_max);
     size_t number_of_radial_points =
         get(*beta).size() / number_of_angular_points;
-    beta_buffer.data() = ComplexDataVector{
+    SpinWeighted<ComplexDataVector, 0> beta_buffer{number_of_angular_points};
+    ComplexDataVector beta_scri_view{
         get(*beta).data().data() +
             (number_of_radial_points - 1) * number_of_angular_points,
         number_of_angular_points};
-    beta_buffer.data() -= 0.5 * log(get(omega).data());
+    beta_buffer.data() = beta_scri_view - 0.5 * log(get(omega).data());
     Spectral::Swsh::swsh_interpolate_from_pfaffian(
         make_not_null(&get(*cauchy_gauge_beta)), make_not_null(&beta_buffer),
         get<0>(x_tilde_of_x), get<1>(x_tilde_of_x), l_max);
@@ -157,6 +156,49 @@ struct CalculateScriPlusValue<Tags::CauchyGaugeScriPlus<Tags::Beta>> {
         Spectral::Swsh::swsh_interpolate_from_pfaffian(
             make_not_null(&get(*cauchy_gauge_beta)), get<0>(x_of_x_tilde),
             get<1>(x_of_x_tilde), l_max);
+  }
+};
+
+// template <>
+// struct CalculateScriPlusValue<Tags::CauchyGaugeScriPlus<Tags::Q>> {
+//   using argument_tags =
+//       tmpl::list<Tags::GaugeOmega, Tags::GaugeA, Tags::GaugeB>;
+//   using return_tags =
+//       tmpl::list<Tags::CauchyGaugeScriPlus<Tags::Q>, Tags::Dy<Tags::U>>;
+//   static void apply(
+//       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*>
+//       q_scri,
+//       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> dy_u,
+//       const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega,
+//       const tnsr::i<DataVector, 2>& x_tilde_of_x,
+//       const tnsr::i<DataVector, 2>& x_of_x_tilde, const size_t l_max)
+//       noexcept {
+//     Spectral::Swsh::swsh_interpolate_from_pfaffian(
+//         make_not_null(&get(*cauchy_gauge_u0)), make_not_null(&get(*u0)),
+//         get<0>(x_tilde_of_x), get<1>(x_tilde_of_x), l_max);
+//   }
+// };
+
+template <>
+struct CalculateScriPlusValue<Tags::CauchyGaugeScriPlus<Tags::U0>> {
+  using argument_tags =
+      tmpl::list<Tags::GaugeOmega, Tags::InertialAngularCoords,
+                 Tags::CauchyAngularCoords, Tags::LMax>;
+  using return_tags = tmpl::list<Tags::CauchyGaugeScriPlus<Tags::U0>, Tags::U0>;
+  static void apply(
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*>
+          cauchy_gauge_u0,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> u0,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega,
+      const tnsr::i<DataVector, 2>& x_tilde_of_x,
+      const tnsr::i<DataVector, 2>& x_of_x_tilde, const size_t l_max) noexcept {
+    Spectral::Swsh::filter_swsh_boundary_quantity(make_not_null(&get(*u0)),
+                                                  l_max, l_max - 2);
+    Spectral::Swsh::swsh_interpolate_from_pfaffian(
+        make_not_null(&get(*cauchy_gauge_u0)), make_not_null(&get(*u0)),
+        get<0>(x_tilde_of_x), get<1>(x_tilde_of_x), l_max);
+    Spectral::Swsh::filter_swsh_boundary_quantity(
+        make_not_null(&get(*cauchy_gauge_u0)), l_max, l_max - 2);
   }
 };
 
@@ -175,6 +217,251 @@ struct InitializeScriPlusValue<Tags::InertialRetardedTime> {
     // this is arbitrary, has to do with choosing a BMS frame. We choose one
     // that has a particular specified initial time value.
     get(*inertial_time).data() = initial_time;
+  }
+};
+
+template <typename Tag>
+struct CalculateCauchyGauge;
+
+// Note these are for debugging output, and are still in the inertial angular
+// grid. After any radial interpolation, the angular grid needs to be
+// interpolated to the desired Cauchy grid.
+
+template <>
+struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::Beta>> {
+  using argument_tags = tmpl::list<Tags::GaugeOmega, Tags::GaugeA, Tags::GaugeB,
+                                   Tags::InertialAngularCoords, Tags::LMax>;
+  using return_tags = tmpl::list<Tags::CauchyGauge<Tags::Beta>, Tags::Beta>;
+
+  static void apply(
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*>
+          cauchy_beta,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> beta,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& a,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& b,
+      const tnsr::i<DataVector, 2>& x_tilde_of_x, const size_t l_max) noexcept {
+    // angular slices
+    size_t number_of_angular_points =
+        Spectral::Swsh::number_of_swsh_collocation_points(l_max);
+    size_t number_of_radial_points =
+        get(*beta).size() / number_of_angular_points;
+    for (size_t i = 0; i < number_of_radial_points; ++i) {
+      ComplexDataVector beta_slice{
+          get(*beta).data().data() + i * number_of_angular_points,
+          number_of_angular_points};
+      ComplexDataVector cauchy_beta_slice{
+          get(*cauchy_beta).data().data() + i * number_of_angular_points,
+          number_of_angular_points};
+      cauchy_beta_slice = beta_slice - 0.5 * log(get(omega).data());
+    }
+
+    // TEST double-checking identity properties
+    // Note: the slices y = constant and y_tilde = constant should be the same
+    // slices, so we test the consistency of the numerical derivatives.
+
+    //   auto interpolated_cauchy_beta =
+    //   Spectral::Swsh::swsh_interpolate_from_pfaffian(
+    //       make_not_null(&get(*cauchy_beta)), get<0>(x_tilde_of_x),
+    //       get<1>(x_tilde_of_x), l_max);
+
+    //   SpinWeighted<ComplexDataVector, 1> eth_tilde_beta =
+    //       Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
+    //           make_not_null(&get(*beta)), l_max);
+    //   SpinWeighted<ComplexDataVector, -1> ethbar_tilde_beta =
+    //       Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
+    //           make_not_null(&get(*beta)), l_max);
+    //   SpinWeighted<ComplexDataVector, 1> eth_beta =
+    //       Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
+    //           make_not_null(&interpolated_cauchy_beta), l_max);
+    //   SpinWeighted<ComplexDataVector, 1> cauchy_eth_beta{eth_beta.size()};
+    //   for(size_t i = 0; i < number_of_radial_points; ++i) {
+    //     ComplexDataVector cauchy_eth_beta_slice{
+    //         cauchy_eth_beta.data().data() + i * number_of_angular_points,
+    //         number_of_angular_points};
+    //     ComplexDataVector eth_tilde_beta_slice{
+    //         eth_tilde_beta.data().data() + i * number_of_angular_points,
+    //         number_of_angular_points};
+    //     ComplexDataVector ethbar_tilde_beta_slice{
+    //         ethbar_tilde_beta.data().data() + i * number_of_angular_points,
+    //         number_of_angular_points};
+    //     cauchy_eth_beta_slice = 0.5 * (conj(get(b).data()) *
+    //     eth_tilde_beta_slice +
+    //                                    get(a).data() *
+    //                                    ethbar_tilde_beta_slice);
+    //   }
+
+    //   auto identity_test = Spectral::Swsh::swsh_interpolate_from_pfaffian(
+    //       make_not_null(&cauchy_eth_beta), get<0>(x_tilde_of_x),
+    //       get<1>(x_tilde_of_x), l_max);
+
+    //   for (size_t i = 0; i < identity_test.size(); ++i) {
+    //     printf("(%e, %e) from (%e, %e)\n",
+    //            real(identity_test.data()[i] - eth_beta.data()[i]),
+    //            imag(identity_test.data()[i] - eth_beta.data()[i]),
+    //            real(identity_test.data()[i]), imag(identity_test.data()[i]));
+    //     }
+    //   printf("done\n");
+  }
+};
+
+template <>
+struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::J>> {
+  using argument_tags =
+      tmpl::list<Tags::GaugeA, Tags::GaugeB, Tags::GaugeOmega, Tags::LMax>;
+  using return_tags = tmpl::list<Tags::CauchyGauge<Tags::J>, Tags::J>;
+
+  static void apply(
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> cauchy_j,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> j,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& a,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& b,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega,
+      const size_t l_max) noexcept {
+    size_t number_of_angular_points =
+        Spectral::Swsh::number_of_swsh_collocation_points(l_max);
+    size_t number_of_radial_points = get(*j).size() / number_of_angular_points;
+
+    for (size_t i = 0; i < number_of_radial_points; ++i) {
+      ComplexDataVector j_slice{
+          get(*j).data().data() + i * number_of_angular_points,
+          number_of_angular_points};
+      ComplexDataVector cauchy_j_slice{
+          get(*cauchy_j).data().data() + i * number_of_angular_points,
+          number_of_angular_points};
+      cauchy_j_slice = 0.25 *
+                       (square(conj(get(b).data())) * j_slice +
+                        square(get(a).data()) * conj(j_slice) +
+                        2.0 * get(a).data() * conj(get(b).data()) *
+                            sqrt(1.0 + j_slice * conj(j_slice))) /
+                       square(get(omega).data());
+    }
+  }
+};
+
+template <>
+struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::U>> {
+  using argument_tags =
+      tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::R>, Tags::U0,
+                 Tags::GaugeOmega,
+                 Spectral::Swsh::Tags::Derivative<Tags::GaugeOmega,
+                                                  Spectral::Swsh::Tags::Eth>,
+                 Tags::GaugeA, Tags::GaugeB, Tags::LMax>;
+  using return_tags =
+      tmpl::list<Tags::CauchyGauge<Tags::U>, Tags::U, Tags::J, Tags::Beta>;
+
+  static void apply(
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> cauchy_u,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> u,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> j,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> beta,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& r,
+      const Scalar<SpinWeighted<ComplexDataVector, 1>>& u_0,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega,
+      const Scalar<SpinWeighted<ComplexDataVector, 1>>& eth_omega,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& a,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& b,
+      const size_t l_max) noexcept {
+    size_t number_of_angular_points =
+        Spectral::Swsh::number_of_swsh_collocation_points(l_max);
+    size_t number_of_radial_points = get(*u).size() / number_of_angular_points;
+
+    const auto& one_minus_y_collocation =
+        1.0 - Spectral::collocation_points<Spectral::Basis::Legendre,
+                                           Spectral::Quadrature::GaussLobatto>(
+                  number_of_radial_points);
+
+    for (size_t i = 0; i < number_of_radial_points; ++i) {
+      ComplexDataVector u_slice{
+          get(*u).data().data() + i * number_of_angular_points,
+          number_of_angular_points};
+      ComplexDataVector cauchy_u_slice{
+          get(*cauchy_u).data().data() + i * number_of_angular_points,
+          number_of_angular_points};
+
+      ComplexDataVector beta_slice{
+          get(*beta).data().data() + i * number_of_angular_points,
+          number_of_angular_points};
+      ComplexDataVector j_tilde_slice{
+          get(*j).data().data() + i * number_of_angular_points,
+          number_of_angular_points};
+
+      ComplexDataVector u_undertilde =
+          u_slice + exp(2.0 * beta_slice) * one_minus_y_collocation[i] /
+                        (2.0 * get(r).data() * get(omega).data()) *
+                        (conj(get(eth_omega).data()) * j_tilde_slice -
+                         get(eth_omega).data() *
+                             sqrt(1.0 + j_tilde_slice * conj(j_tilde_slice)));
+      cauchy_u_slice = 0.5 / square(get(omega).data()) *
+                           (conj(get(b).data()) * u_undertilde -
+                            get(a).data() * conj(u_undertilde)) +
+                       get(u_0).data();
+    }
+  }
+};
+
+template <>
+struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::Q>> {
+  using argument_tags =
+      tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::R>, Tags::U0,
+                 Tags::GaugeOmega,
+                 Spectral::Swsh::Tags::Derivative<Tags::GaugeOmega,
+                                                  Spectral::Swsh::Tags::Eth>,
+                 Tags::GaugeA, Tags::GaugeB, Tags::LMax>;
+  using return_tags =
+      tmpl::list<Tags::CauchyGauge<Tags::Q>, Tags::Dy<Tags::U>,
+                 Tags::CauchyGauge<Tags::J>, Tags::CauchyGauge<Tags::Beta>>;
+
+  static void apply(
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> cauchy_q,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> dy_u,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> cauchy_j,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*>
+          cauchy_beta,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& r,
+      const Scalar<SpinWeighted<ComplexDataVector, 1>>& u_0,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega,
+      const Scalar<SpinWeighted<ComplexDataVector, 1>>& eth_omega,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& a,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& b,
+      const size_t l_max) noexcept {
+    size_t number_of_angular_points =
+        Spectral::Swsh::number_of_swsh_collocation_points(l_max);
+    size_t number_of_radial_points =
+        get(*dy_u).size() / number_of_angular_points;
+
+    // FIXME this is currently specialized to omega = 1
+    const auto& one_minus_y_collocation =
+        1.0 - Spectral::collocation_points<Spectral::Basis::Legendre,
+                                           Spectral::Quadrature::GaussLobatto>(
+                  number_of_radial_points);
+
+    for (size_t i = 0; i < number_of_radial_points; ++i) {
+      ComplexDataVector dy_u_slice{
+          get(*dy_u).data().data() + i * number_of_angular_points,
+          number_of_angular_points};
+      ComplexDataVector cauchy_q_slice{
+          get(*cauchy_q).data().data() + i * number_of_angular_points,
+          number_of_angular_points};
+
+      ComplexDataVector cauchy_j_slice{
+          get(*cauchy_j).data().data() + i * number_of_angular_points,
+          number_of_angular_points};
+      ComplexDataVector cauchy_beta_slice{
+          get(*cauchy_beta).data().data() + i * number_of_angular_points,
+          number_of_angular_points};
+
+      // note a 1-y^2 / 1-y^2 has been canceled to avoid divergences.
+      ComplexDataVector cauchy_dr_u =
+          0.25 / (pow<3>(get(omega).data()) * get(r).data()) *
+          (conj(get(b).data()) * dy_u_slice - get(a).data() * conj(dy_u_slice));
+
+      cauchy_q_slice =
+          4.0 * square(get(r).data() * get(omega).data()) *
+          exp(-2.0 * cauchy_beta_slice) *
+          (cauchy_j_slice * conj(cauchy_dr_u) +
+           sqrt(1.0 + cauchy_j_slice * conj(cauchy_j_slice)) * cauchy_dr_u);
+    }
   }
 };
 

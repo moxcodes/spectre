@@ -91,4 +91,9 @@ ComplexDataVector interpolate_to_bondi_r(ComplexDataVector to_interpolate,
                                          double target_r,
                                          size_t l_max) noexcept;
 
+ComplexDataVector interpolate_to_bondi_r(ComplexDataVector to_interpolate,
+                                         ComplexDataVector boundary_r,
+                                         ComplexDataVector target_r,
+                                         size_t l_max) noexcept;
+
 }  // namespace Cce

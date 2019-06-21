@@ -15,6 +15,7 @@
 #include "NumericalAlgorithms/Spectral/SwshCoefficients.hpp"  // IWYU pragma: keep
 #include "NumericalAlgorithms/Spectral/SwshCollocation.hpp"
 #include "NumericalAlgorithms/Spectral/SwshTags.hpp"
+#include "NumericalAlgorithms/Spectral/SwshTransformJob.hpp"
 #include "Utilities/Gsl.hpp"
 #include "Utilities/TMPL.hpp"
 
@@ -53,7 +54,7 @@ class SpinWeightedSphericalHarmonic {
     if (l < static_cast<size_t>(abs(spin))) {
       if (spin < 0) {
         r_prefactors_ =
-            std::vector<double>(l + static_cast<size_t>(abs(spin)), 0.0);
+            std::vector<double>(l + static_cast<size_t>(abs(spin)) + 1, 0.0);
       }
     } else {
       for (int r = 0; r <= (static_cast<int>(l) - spin); ++r) {
@@ -70,6 +71,20 @@ class SpinWeightedSphericalHarmonic {
         } else {
           r_prefactors_.push_back(0.0);
         }
+      }
+    }
+  }
+
+  // TEST to see if blaze causes power problems
+  DataVector power(const DataVector& arg, const int exponent) {
+    DataVector result{arg.size(), 1.0};
+    if (exponent > 0) {
+      for (size_t i = 0; i < static_cast<int>(exponent); ++i) {
+        result *= arg;
+      }
+    } else {
+      for (size_t i = 0; i < static_cast<int>(-exponent); ++i) {
+        result /= arg;
       }
     }
   }
@@ -179,7 +194,7 @@ void swsh_interpolate_from_pfaffian(
   DataVector sin_theta_over_2 = sin(target_theta / 2.0);
   DataVector cos_theta_over_2 = cos(target_theta / 2.0);
   DataVector phi = target_phi_times_sin_theta / sin(target_theta);
-  for (size_t l = 0; l <= l_max; ++l) {
+  for (size_t l = abs(Spin); l <= l_max; ++l) {
     for (int m = -static_cast<int>(l); m <= static_cast<int>(l); ++m) {
       auto sYlm = SpinWeightedSphericalHarmonic{Spin, l, m};
       target_collocation->data() +=
@@ -220,7 +235,7 @@ void swsh_interpolate(
   target_collocation->data() = 0.0;
   DataVector sin_theta_over_2 = sin(target_theta / 2);
   DataVector cos_theta_over_2 = cos(target_theta / 2);
-  for (size_t l = 0; l <= l_max; ++l) {
+  for (size_t l = abs(Spin); l <= l_max; ++l) {
     for (int m = -static_cast<int>(l); m <= static_cast<int>(l); ++m) {
       auto sYlm = SpinWeightedSphericalHarmonic{Spin, l, m};
       target_collocation->data() +=
