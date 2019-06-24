@@ -92,23 +92,33 @@ struct GaugeAdjustInitialJ {
                   number_of_radial_points);
 
     for (size_t i = 0; i < number_of_radial_points; i++) {
-      SpinWeighted<ComplexDataVector, 2> angular_slice_j{get(a).size()};
-      angular_slice_j.data() = ComplexDataVector{
-          get(*j).data().data() + get(a).size() * i, get(a).size()};
       ComplexDataVector angular_view_j{
           get(*j).data().data() + get(a).size() * i, get(a).size()};
       // TODO it's probably better to use the volume filtering to combine
       // evaluations of the swsh transform
 
+      // note: the jacobian factors a and b are only representable in the cauchy
+      // coordinates, so this transformation must be performed prior to the
+      // interpolation.
+      SpinWeighted<ComplexDataVector, 2> jacobian_transformed_j_view;
+      jacobian_transformed_j_view.data() =
+          0.25 *
+          (square(get(b).data()) * angular_view_j +
+           square(get(a).data()) * conj(angular_view_j) -
+           2.0 * get(a).data() * get(b).data() *
+               sqrt(1.0 + angular_view_j * conj(angular_view_j))) /
+          square(get(omega).data());
+
       // TODO review all filtering to double-check their necessity
       Spectral::Swsh::filter_swsh_boundary_quantity(
-          make_not_null(&angular_slice_j), l_max, l_max - 2);
+          make_not_null(&jacobian_transformed_j_view), l_max, l_max - 2);
       SpinWeighted<ComplexDataVector, 2> evolution_coords_j_view =
-          Spectral::Swsh::swsh_interpolate(make_not_null(&angular_slice_j),
-                                           get<0>(x_of_x_tilde),
-                                           get<1>(x_of_x_tilde), l_max);
+          Spectral::Swsh::swsh_interpolate(
+              make_not_null(&jacobian_transformed_j_view), get<0>(x_of_x_tilde),
+              get<1>(x_of_x_tilde), l_max);
       Spectral::Swsh::filter_swsh_boundary_quantity(
           make_not_null(&evolution_coords_j_view), l_max, l_max - 2);
+      angular_view_j = evolution_coords_j_view.data();
 
       // for(size_t i = 0; i < angular_view_j.size(); ++i) {
       // printf(
@@ -119,14 +129,7 @@ struct GaugeAdjustInitialJ {
       // }
 
       // TEST
-      angular_view_j =
-          0.25 *
-          (square(get(b).data()) * evolution_coords_j_view.data() +
-           square(get(a).data()) * conj(evolution_coords_j_view.data()) -
-           2.0 * get(a).data() * get(b).data() *
-               sqrt(1.0 + evolution_coords_j_view.data() *
-                              conj(evolution_coords_j_view.data()))) /
-          square(get(omega).data());
+
       // TEST: just interpolate
       // angular_view_j = evolution_coords_j_view.data();
       // TEST

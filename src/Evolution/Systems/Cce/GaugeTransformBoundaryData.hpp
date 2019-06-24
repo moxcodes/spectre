@@ -39,15 +39,15 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::R> {
       const tnsr::i<DataVector, 2>& x_of_x_tilde,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega,
       const size_t l_max) noexcept {
-    Spectral::Swsh::filter_swsh_boundary_quantity(make_not_null(&get(*r)),
+    SpinWeighted<ComplexDataVector, 0> r_over_omega = get(*r) / get(omega);
+    Spectral::Swsh::filter_swsh_boundary_quantity(make_not_null(&r_over_omega),
                                                   l_max, l_max - 2);
     Spectral::Swsh::swsh_interpolate(
-        make_not_null(&get(*evolution_gauge_r)), make_not_null(&get(*r)),
+        make_not_null(&get(*evolution_gauge_r)), make_not_null(&r_over_omega),
         get<0>(x_of_x_tilde), get<1>(x_of_x_tilde), l_max);
 
     Spectral::Swsh::filter_swsh_boundary_quantity(
         make_not_null(&get(*evolution_gauge_r)), l_max, l_max - 2);
-    get(*evolution_gauge_r) = get(*evolution_gauge_r) / get(omega);
   }
 };
 
@@ -73,6 +73,7 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::DuRDividedByR> {
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& du_omega,
       const tnsr::i<DataVector, 2>& x_of_x_tilde, const size_t l_max) noexcept {
+    // TODO fix transformation for representability problems
     Spectral::Swsh::filter_swsh_boundary_quantity(
         make_not_null(&get(*du_r_divided_by_r)), l_max, l_max - 2);
 
@@ -116,6 +117,7 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::J> {
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& b,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega,
       const tnsr::i<DataVector, 2>& x_of_x_tilde, const size_t l_max) noexcept {
+    // TODO fix transformation for representability problems
     Spectral::Swsh::filter_swsh_boundary_quantity(make_not_null(&get(*j)),
                                                   l_max, l_max - 2);
 
@@ -153,6 +155,7 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::Dr<Tags::J>> {
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& b,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega,
       const tnsr::i<DataVector, 2>& x_of_x_tilde, const size_t l_max) noexcept {
+    // TODO fix transformation for representability problems
     Spectral::Swsh::filter_swsh_boundary_quantity(make_not_null(&get(*dr_j)),
                                                   l_max, l_max - 2);
 
@@ -193,18 +196,18 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::Beta> {
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega,
       const tnsr::i<DataVector, 2>& x_of_x_tilde,
       const tnsr::i<DataVector, 2>& x_tilde_of_x, const size_t l_max) noexcept {
-    // try filtering to try to get the interpolations to match up.
-    Spectral::Swsh::filter_swsh_boundary_quantity(make_not_null(&get(*beta)),
+    SpinWeighted<ComplexDataVector, 0> beta_buffer;
+    beta_buffer.data() = get(*beta).data() - 0.5 * log(get(omega).data());
+
+    Spectral::Swsh::filter_swsh_boundary_quantity(make_not_null(&beta_buffer),
                                                   l_max, l_max - 2);
 
     Spectral::Swsh::swsh_interpolate(
-        make_not_null(&get(*evolution_gauge_beta)), make_not_null(&get(*beta)),
+        make_not_null(&get(*evolution_gauge_beta)), make_not_null(&beta_buffer),
         get<0>(x_of_x_tilde), get<1>(x_of_x_tilde), l_max);
 
     Spectral::Swsh::filter_swsh_boundary_quantity(
         make_not_null(&get(*evolution_gauge_beta)), l_max, l_max - 2);
-
-    get(*evolution_gauge_beta) += 0.5 * log(get(omega).data());
   }
 };
 
@@ -1004,7 +1007,7 @@ struct GaugeUpdateDuXtildeOfX {
 
     // TEST simple analytic form
     // get<0>(*du_x_tilde_of_x) = 0.0;
-    // get<1>(*du_x_tilde_of_x) = 1.0e-3 * cos(theta);
+    // get<1>(*du_x_tilde_of_x) = 1.0e-3 * sin(theta);
   }
 };
 
@@ -1024,27 +1027,18 @@ struct InitializeXtildeOfX {
 
       // full test: has nontrivial a, b, and omega
       // get<0>(*x_tilde_of_x)[collocation_point.offset] =
-      // collocation_point.theta; auto rootfind = boost::math::tools::bisect(
-      //     [&collocation_point](double x) {
-      //       return collocation_point.phi - (x - 1.0e-3 * sin(x));
-      //     },
-      //     collocation_point.phi - 2.0e-3, collocation_point.phi + 2.0e-3,
-      //     [](double x, double y) { return abs(x - y) < 1.0e-14; });
-      // // printf("rootfind test %e, %e, %e\n", collocation_point.phi,
-      // // rootfind.first, rootfind.second);
+      // collocation_point.theta;
       // get<1>(*x_tilde_of_x)[collocation_point.offset] =
-      //     0.5 * (rootfind.first + rootfind.second) *
-      //     sin(collocation_point.theta);
+      // (collocation_point.phi - 1.0e-3 * sin(collocation_point.phi));
 
       // partial test: omega=1
-      // get<0>(*x_tilde_of_x)[collocation_point.offset] =
-      // collocation_point.theta;
+      get<0>(*x_tilde_of_x)[collocation_point.offset] = collocation_point.theta;
       // get<1>(*x_tilde_of_x)[collocation_point.offset] =
       // ((collocation_point.phi + 1.0e-3 * cos(collocation_point.theta)));
       // another trial, not sure if representable
-      // get<1>(*x_tilde_of_x)[collocation_point.offset] =
-      // ((collocation_point.phi + 1.0e-3 * sin(collocation_point.theta) *
-      // cos(collocation_point.phi)));
+      get<1>(*x_tilde_of_x)[collocation_point.offset] =
+          (collocation_point.phi +
+           1.0e-3 * sin(collocation_point.theta) * cos(collocation_point.phi));
     }
   }
 };
@@ -1093,11 +1087,6 @@ struct InitializeGauge {
 
       // full test, has nontrivial a, b, omega, and angular derivatives of omega
       // NOT REPRESENTABLE AS SPIN-2, EXPECT BAD TRANSFORMS
-      // get<0>(*x_of_x_tilde)[collocation_point.offset] =
-      // collocation_point.theta;
-      // get<1>(*x_of_x_tilde)[collocation_point.offset] =
-      // (collocation_point.phi - 1.0e-3 * sin(collocation_point.phi)) *
-      // sin(collocation_point.theta);
       // get(*a).data()[collocation_point.offset] =
       // 1.0e-3 * cos(collocation_point.phi);
       // get(*b).data()[collocation_point.offset] =
@@ -1115,10 +1104,23 @@ struct InitializeGauge {
       // 2.0 - std::complex<double>(0.0, 1.0) * 1.0e-3 *
       // square(sin(collocation_point.theta));
 
+      get<0>(*x_of_x_tilde)[collocation_point.offset] = collocation_point.theta;
+      auto rootfind = boost::math::tools::bisect(
+          [&collocation_point](double x) {
+            return collocation_point.phi -
+                   (x + 1.0e-3 * cos(x) * sin(collocation_point.theta));
+          },
+          collocation_point.phi - 2.0e-3, collocation_point.phi + 2.0e-3,
+          [](double x, double y) { return abs(x - y) < 1.0e-14; });
+      // printf("rootfind test %e, %e, %e\n", collocation_point.phi,
+      // rootfind.first, rootfind.second);
+      get<1>(*x_of_x_tilde)[collocation_point.offset] =
+          0.5 * (rootfind.first + rootfind.second);
+
       // TEST
     }
-    get(*a).data() = 0.0;
-    get(*b).data() = 2.0;
+    // get(*a).data() = 0.0;
+    // get(*b).data() = 2.0;
   }
 };
 }  // namespace Cce

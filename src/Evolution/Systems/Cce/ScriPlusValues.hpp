@@ -256,7 +256,15 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::Beta>> {
       ComplexDataVector cauchy_beta_slice{
           get(*cauchy_beta).data().data() + i * number_of_angular_points,
           number_of_angular_points};
-      // TEST
+      // TEST : ensure beta representability
+      // const auto& collocation = Spectral::Swsh::precomputed_collocation<
+        // Spectral::Swsh::ComplexRepresentation::Interleaved>(l_max);
+      // for (const auto& collocation_point : collocation) {
+        // beta_slice[collocation_point.offset] =
+            // sin(collocation_point.theta) * sin(collocation_point.phi) +
+            // 0.5 * cos(collocation_point.theta);
+      // }
+      // TEST : ensure beta representability
       cauchy_beta_slice = beta_slice /*- 0.5 * log(get(omega).data())*/;
     }
 
