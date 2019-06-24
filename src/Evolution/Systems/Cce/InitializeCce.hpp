@@ -104,9 +104,9 @@ struct GaugeAdjustInitialJ {
       Spectral::Swsh::filter_swsh_boundary_quantity(
           make_not_null(&angular_slice_j), l_max, l_max - 2);
       SpinWeighted<ComplexDataVector, 2> evolution_coords_j_view =
-          Spectral::Swsh::swsh_interpolate_from_pfaffian(
-              make_not_null(&angular_slice_j), get<0>(x_of_x_tilde),
-              get<1>(x_of_x_tilde), l_max);
+          Spectral::Swsh::swsh_interpolate(make_not_null(&angular_slice_j),
+                                           get<0>(x_of_x_tilde),
+                                           get<1>(x_of_x_tilde), l_max);
       Spectral::Swsh::filter_swsh_boundary_quantity(
           make_not_null(&evolution_coords_j_view), l_max, l_max - 2);
 

@@ -135,6 +135,7 @@ void regularity_preserving_hypersurface_computation(
       RadialIntegrateBondi<Tags::EvolutionGaugeBoundaryValue, BondiTag>>(box);
 
   if (cpp17::is_same_v<BondiTag, Tags::U>) {
+    db::mutate_apply<GaugeUpdateDuXtildeOfX>(box);
     db::mutate_apply<GaugeUpdateU>(box);
     db::mutate_apply<ComputeGaugeAdjustedBoundaryValue<Tags::DuRDividedByR>>(
         box);
@@ -302,20 +303,25 @@ void compare_and_record_r200_values_from_rp(
     typename db::item_type<tag>::type r200_cauchy_gauge{r200_slice.size()};
     Spectral::Swsh::filter_swsh_boundary_quantity(make_not_null(&r200_slice),
                                                   l_max, l_max - 2);
-    Spectral::Swsh::swsh_interpolate_from_pfaffian(
+    Spectral::Swsh::swsh_interpolate(
         make_not_null(&r200_cauchy_gauge), make_not_null(&r200_slice),
         get<0>(db::get<Tags::InertialAngularCoords>(*box)),
         get<1>(db::get<Tags::InertialAngularCoords>(*box)), l_max);
     Spectral::Swsh::filter_swsh_boundary_quantity(
         make_not_null(&r200_cauchy_gauge), l_max, l_max - 2);
 
-    // for(size_t i =0; i < r200_slice.size(); ++i) {
-    // printf("(%e, %e) from (%e, %e)\n",
-    // real(r200_slice.data()[i] - identity_check.data()[i]),
-    // imag(r200_slice.data()[i] - identity_check.data()[i]),
-    // real(r200_slice.data()[i]), imag(r200_slice.data()[i]));
-    // }
-    // printf("done\n");
+    auto identity_check = Spectral::Swsh::swsh_interpolate(
+        make_not_null(&r200_cauchy_gauge),
+        get<0>(db::get<Tags::CauchyAngularCoords>(*box)),
+        get<1>(db::get<Tags::CauchyAngularCoords>(*box)), l_max);
+    printf("Identity Check\n");
+    for (size_t i = 0; i < r200_slice.size(); ++i) {
+      printf("(%e, %e) from (%e, %e)\n",
+             real(r200_slice.data()[i] - identity_check.data()[i]),
+             imag(r200_slice.data()[i] - identity_check.data()[i]),
+             real(r200_slice.data()[i]), imag(r200_slice.data()[i]));
+    }
+    printf("done\n");
 
     auto r200_goldberg_modes = Spectral::Swsh::libsharp_to_goldberg_modes(
         Spectral::Swsh::swsh_transform(make_not_null(&r200_cauchy_gauge),
@@ -681,6 +687,7 @@ void run_trial_regularity_preserving_cce(
   db::mutate_apply<InitializeJ<Tags::BoundaryValue>>(make_not_null(&box));
   db::mutate_apply<InitializeGauge>(make_not_null(&box));
   db::mutate_apply<InitializeXtildeOfX>(make_not_null(&box));
+  db::mutate_apply<GaugeUpdateJacobianFromCoords>(make_not_null(&box));
   db::mutate_apply<GaugeUpdateOmega>(make_not_null(&box));
   db::mutate_apply<GaugeAdjustInitialJ>(make_not_null(&box));
 
@@ -779,7 +786,6 @@ void run_trial_regularity_preserving_cce(
     gauge_b_history.insert(time.time(), get(db::get<Tags::GaugeB>(box)).data(),
                            std::move(du_gauge_b));
 
-    db::mutate_apply<GaugeUpdateDuXtildeOfX>(make_not_null(&box));
     DataVector du_theta_tilde =
         get<0>(db::get<Tags::DuInertialAngularCoords>(box));
     theta_tilde_history.insert(
@@ -963,13 +969,14 @@ void run_trial_regularity_preserving_cce(
           stepper.update_u(make_not_null(&get(*u_bondi).data()),
                            make_not_null(&u_bondi_history), time_step);
 
-          stepper.update_u(make_not_null(&get(*gauge_a).data()),
-                           make_not_null(&gauge_a_history), time_step);
-          stepper.update_u(make_not_null(&get(*gauge_b).data()),
-                           make_not_null(&gauge_b_history), time_step);
+          // stepper.update_u(make_not_null(&get(*gauge_a).data()),
+          // make_not_null(&gauge_a_history), time_step);
+          // stepper.update_u(make_not_null(&get(*gauge_b).data()),
+          // make_not_null(&gauge_b_history), time_step);
         });
     time = stepper.next_time_id(time, time_step);
     printf("next time: %f\n", time.time().value());
+    db::mutate_apply<GaugeUpdateJacobianFromCoords>(make_not_null(&box));
     db::mutate_apply<GaugeUpdateOmega>(make_not_null(&box));
     // db::mutate<Tags::GaugeOmega>(
     // make_not_null(&box),

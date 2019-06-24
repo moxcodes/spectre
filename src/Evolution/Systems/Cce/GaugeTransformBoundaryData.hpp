@@ -41,7 +41,7 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::R> {
       const size_t l_max) noexcept {
     Spectral::Swsh::filter_swsh_boundary_quantity(make_not_null(&get(*r)),
                                                   l_max, l_max - 2);
-    Spectral::Swsh::swsh_interpolate_from_pfaffian(
+    Spectral::Swsh::swsh_interpolate(
         make_not_null(&get(*evolution_gauge_r)), make_not_null(&get(*r)),
         get<0>(x_of_x_tilde), get<1>(x_of_x_tilde), l_max);
 
@@ -76,7 +76,7 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::DuRDividedByR> {
     Spectral::Swsh::filter_swsh_boundary_quantity(
         make_not_null(&get(*du_r_divided_by_r)), l_max, l_max - 2);
 
-    Spectral::Swsh::swsh_interpolate_from_pfaffian(
+    Spectral::Swsh::swsh_interpolate(
         make_not_null(&get(*evolution_gauge_du_r_divided_by_r)),
         make_not_null(&get(*du_r_divided_by_r)), get<0>(x_of_x_tilde),
         get<1>(x_of_x_tilde), l_max);
@@ -119,7 +119,7 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::J> {
     Spectral::Swsh::filter_swsh_boundary_quantity(make_not_null(&get(*j)),
                                                   l_max, l_max - 2);
 
-    Spectral::Swsh::swsh_interpolate_from_pfaffian(
+    Spectral::Swsh::swsh_interpolate(
         make_not_null(&get(*evolution_gauge_j)), make_not_null(&get(*j)),
         get<0>(x_of_x_tilde), get<1>(x_of_x_tilde), l_max);
 
@@ -156,7 +156,7 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::Dr<Tags::J>> {
     Spectral::Swsh::filter_swsh_boundary_quantity(make_not_null(&get(*dr_j)),
                                                   l_max, l_max - 2);
 
-    Spectral::Swsh::swsh_interpolate_from_pfaffian(
+    Spectral::Swsh::swsh_interpolate(
         make_not_null(&get(*evolution_gauge_dr_j)), make_not_null(&get(*dr_j)),
         get<0>(x_of_x_tilde), get<1>(x_of_x_tilde), l_max);
 
@@ -197,7 +197,7 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::Beta> {
     Spectral::Swsh::filter_swsh_boundary_quantity(make_not_null(&get(*beta)),
                                                   l_max, l_max - 2);
 
-    Spectral::Swsh::swsh_interpolate_from_pfaffian(
+    Spectral::Swsh::swsh_interpolate(
         make_not_null(&get(*evolution_gauge_beta)), make_not_null(&get(*beta)),
         get<0>(x_of_x_tilde), get<1>(x_of_x_tilde), l_max);
 
@@ -260,8 +260,8 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::Q> {
     Spectral::Swsh::filter_swsh_boundary_quantity(dr_u, l_max, l_max - 6);
 
     SpinWeighted<ComplexDataVector, 1> evolution_coords_dr_u =
-        Spectral::Swsh::swsh_interpolate_from_pfaffian(
-            dr_u, get<0>(x_of_x_tilde), get<1>(x_of_x_tilde), l_max);
+        Spectral::Swsh::swsh_interpolate(dr_u, get<0>(x_of_x_tilde),
+                                         get<1>(x_of_x_tilde), l_max);
     Spectral::Swsh::filter_swsh_boundary_quantity(
         make_not_null(&evolution_coords_dr_u), l_max, l_max - 6);
 
@@ -328,9 +328,9 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::U> {
     Spectral::Swsh::filter_swsh_boundary_quantity(make_not_null(&get(*u)),
                                                   l_max, l_max - 6);
     SpinWeighted<ComplexDataVector, 1> evolution_coords_u =
-        Spectral::Swsh::swsh_interpolate_from_pfaffian(
-            make_not_null(&get(*u)), get<0>(x_of_x_tilde), get<1>(x_of_x_tilde),
-            l_max);
+        Spectral::Swsh::swsh_interpolate(make_not_null(&get(*u)),
+                                         get<0>(x_of_x_tilde),
+                                         get<1>(x_of_x_tilde), l_max);
     Spectral::Swsh::filter_swsh_boundary_quantity(
         make_not_null(&evolution_coords_u), l_max, l_max - 6);
 
@@ -410,9 +410,8 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::W> {
       const SpinWeighted<ComplexDataVector, 2>& a,
       const tnsr::i<DataVector, 2>& x_of_x_tilde, const size_t l_max) noexcept {
     Spectral::Swsh::filter_swsh_boundary_quantity(w, l_max, l_max - 2);
-    Spectral::Swsh::swsh_interpolate_from_pfaffian(evolution_gauge_w, w,
-                                                   get<0>(x_of_x_tilde),
-                                                   get<1>(x_of_x_tilde), l_max);
+    Spectral::Swsh::swsh_interpolate(evolution_gauge_w, w, get<0>(x_of_x_tilde),
+                                     get<1>(x_of_x_tilde), l_max);
     Spectral::Swsh::filter_swsh_boundary_quantity(evolution_gauge_w, l_max,
                                                   l_max - 2);
 
@@ -420,18 +419,18 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::W> {
 
     Spectral::Swsh::filter_swsh_boundary_quantity(boundary_u, l_max, l_max - 2);
 
-    Spectral::Swsh::swsh_interpolate_from_pfaffian(
-        make_not_null(&boundary_u_of_x_tilde), boundary_u, get<0>(x_of_x_tilde),
-        get<1>(x_of_x_tilde), l_max);
+    Spectral::Swsh::swsh_interpolate(make_not_null(&boundary_u_of_x_tilde),
+                                     boundary_u, get<0>(x_of_x_tilde),
+                                     get<1>(x_of_x_tilde), l_max);
     Spectral::Swsh::filter_swsh_boundary_quantity(boundary_u, l_max, l_max - 2);
 
     // TODO use beta_tilde instead for efficiency (fewer interpolations)
     SpinWeighted<ComplexDataVector, 0> boundary_beta_of_x_tilde{};
     Spectral::Swsh::filter_swsh_boundary_quantity(boundary_beta, l_max,
                                                   l_max - 2);
-    Spectral::Swsh::swsh_interpolate_from_pfaffian(
-        make_not_null(&boundary_beta_of_x_tilde), boundary_beta,
-        get<0>(x_of_x_tilde), get<1>(x_of_x_tilde), l_max);
+    Spectral::Swsh::swsh_interpolate(make_not_null(&boundary_beta_of_x_tilde),
+                                     boundary_beta, get<0>(x_of_x_tilde),
+                                     get<1>(x_of_x_tilde), l_max);
     Spectral::Swsh::filter_swsh_boundary_quantity(
         make_not_null(&boundary_beta_of_x_tilde), l_max, l_max - 2);
 
@@ -526,14 +525,14 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::H> {
     Spectral::Swsh::filter_swsh_boundary_quantity(dr_j, l_max, l_max - 2);
     Spectral::Swsh::filter_swsh_boundary_quantity(spec_h, l_max, l_max - 2);
     SpinWeighted<ComplexDataVector, 2> j_of_x_tilde =
-        Spectral::Swsh::swsh_interpolate_from_pfaffian(
-            j, get<0>(x_of_x_tilde), get<1>(x_of_x_tilde), l_max);
+        Spectral::Swsh::swsh_interpolate(j, get<0>(x_of_x_tilde),
+                                         get<1>(x_of_x_tilde), l_max);
     SpinWeighted<ComplexDataVector, 2> dr_j_of_x_tilde =
-        Spectral::Swsh::swsh_interpolate_from_pfaffian(
-            dr_j, get<0>(x_of_x_tilde), get<1>(x_of_x_tilde), l_max);
+        Spectral::Swsh::swsh_interpolate(dr_j, get<0>(x_of_x_tilde),
+                                         get<1>(x_of_x_tilde), l_max);
     SpinWeighted<ComplexDataVector, 2> h_of_x_tilde =
-        Spectral::Swsh::swsh_interpolate_from_pfaffian(
-            spec_h, get<0>(x_of_x_tilde), get<1>(x_of_x_tilde), l_max);
+        Spectral::Swsh::swsh_interpolate(spec_h, get<0>(x_of_x_tilde),
+                                         get<1>(x_of_x_tilde), l_max);
     Spectral::Swsh::filter_swsh_boundary_quantity(make_not_null(&j_of_x_tilde),
                                                   l_max, l_max - 2);
     Spectral::Swsh::filter_swsh_boundary_quantity(
@@ -700,9 +699,7 @@ struct GaugeUpdateU {
     get<0>(*du_x) = -real(get(*u_0).data());
     // // note this is actually sin theta * du_phi, so we need to include a
     // // correction.
-    get<1>(*du_x) = -imag(get(*u_0).data()) + get<1>(x_of_x_tilde) *
-                                                  cos(get<0>(x_of_x_tilde)) *
-                                                  get<0>(*du_x);
+    get<1>(*du_x) = -imag(get(*u_0).data()) * sin(get<0>(x_of_x_tilde));
     // TEST
     // get<0>(*du_x) = 0.0;
     // // note this is actually sin theta * du_phi, so we need to include a
@@ -799,168 +796,77 @@ struct GaugeUpdateJacobianFromCoords {
         Spectral::Swsh::number_of_swsh_theta_collocation_points(l_max);
     const size_t number_of_phi_points =
         Spectral::Swsh::number_of_swsh_phi_collocation_points(l_max);
-    tnsr::i<DataVector, 2> x_tilde_of_x_gl{get(*a).size()};
-    DataVector phi_angles{number_of_phi_points};
-    for (size_t i = 0; i < number_of_phi_points; ++i) {
-      phi_angles[i] = static_cast<double>(i) * 2.0 * M_PI /
-                      static_cast<double>(number_of_phi_points);
+    tnsr::I<ComplexDataVector, 3> x_tilde_cartesian{get(*a).size()};
+    // TODO switch away from pfaffian versions everywhere if this works alright
+    get<0>(x_tilde_cartesian) = std::complex<double>(1.0, 0.0) *
+                                sin(get<0>(*x_tilde_of_x)) *
+                                cos(get<1>(*x_tilde_of_x));
+    get<1>(x_tilde_cartesian) = std::complex<double>(1.0, 0.0) *
+                                sin(get<0>(*x_tilde_of_x)) *
+                                sin(get<1>(*x_tilde_of_x));
+    get<2>(x_tilde_cartesian) =
+        std::complex<double>(1.0, 0.0) * cos(get<0>(*x_tilde_of_x));
+
+    tnsr::iJ<DataVector, 3> dx_x_tilde_cartesian{get(*a).size()};
+    SpinWeighted<ComplexDataVector, 0> buffer{get(*a).size()};
+    SpinWeighted<ComplexDataVector, 1> derivative_buffer{get(*a).size()};
+    for (size_t i = 0; i < 3; ++i) {
+      buffer = x_tilde_cartesian.get(i);
+      Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
+          make_not_null(&derivative_buffer), make_not_null(&buffer), l_max);
+      dx_x_tilde_cartesian.get(0, i) = -real(derivative_buffer.data());
+      dx_x_tilde_cartesian.get(1, i) = -imag(derivative_buffer.data());
     }
-    // TODO turn this into gauss-lobatto and add the additional duplicate
-    // collocation point at the end to make the interpolation work.
-    const auto& gl_collocation =
-        Spectral::collocation_points<Spectral::Basis::Legendre,
-                                     Spectral::Quadrature::Gauss>(
-            number_of_phi_points);
-    DataVector phi_gl_collocation = gl_collocation * M_PI + M_PI;
-    const auto& theta_size_gl_collocation =
-        Spectral::collocation_points<Spectral::Basis::Legendre,
-                                     Spectral::Quadrature::Gauss>(
-            number_of_theta_points);
-    DataVector theta_gl_collocation = gl_collocation * M_PI / 2.0 + M_PI / 2.0;
-
-    // TODO this needs to be changed so that it doesn't demand so large a
-    // collocation set, this is unreasonably expensive at ~50 points
-    printf("collocation %zu, %zu\n", phi_gl_collocation.size(),
-           number_of_phi_points);
-    for (auto val : phi_gl_collocation) {
-      printf("%e\n", val);
+    tnsr::iJ<DataVector, 2> dx_x_tilde_of_x{get(*a).size()};
+    for (size_t i = 0; i < 2; ++i) {
+      dx_x_tilde_of_x.get(i, 0) = sqrt(
+          square(dx_x_tilde_cartesian.get(i, 2)) +
+          square(cos(get<1>(*x_tilde_of_x)) * dx_x_tilde_cartesian.get(i, 0) +
+                 sin(get<1>(*x_tilde_of_x)) * dx_x_tilde_cartesian.get(i, 1)));
+      dx_x_tilde_of_x.get(i, 1) =
+          cos(get<1>(*x_tilde_of_x)) * dx_x_tilde_cartesian.get(i, 1) -
+          sin(get<1>(*x_tilde_of_x)) * dx_x_tilde_cartesian.get(i, 0);
     }
-    printf("interpolating to gl grid\n");
-    for (size_t i = 0; i < number_of_theta_points; ++i) {
-      DataVector theta_gl_view{
-          get<0>(x_tilde_of_x_gl).data() + i * number_of_phi_points,
-          number_of_phi_points};
-      DataVector phi_gl_view{
-          get<1>(x_tilde_of_x_gl).data() + i * number_of_phi_points,
-          number_of_phi_points};
-      DataVector theta_view{
-          get<0>(*x_tilde_of_x).data() + i * number_of_phi_points,
-          number_of_phi_points};
-      DataVector phi_view{
-          get<1>(*x_tilde_of_x).data() + i * number_of_phi_points,
-          number_of_phi_points};
-      boost::math::barycentric_rational<double> theta_interpolator(
-          phi_angles.data(), theta_view.data(), number_of_phi_points,
-          number_of_phi_points / 2);
-      boost::math::barycentric_rational<double> phi_interpolator(
-          phi_angles.data(), phi_view.data(), number_of_phi_points,
-          number_of_phi_points / 2);
-      for (size_t j = 0; j < number_of_phi_points; ++j) {
-        printf("original coordinates, %e, %e\n", theta_view[j], phi_view[j]);
-        printf("Anticipated theta collocation value %e\n",
-               theta_gl_collocation[i]);
-      }
-      for (size_t j = 0; j < number_of_phi_points; ++j) {
-        theta_gl_view[j] = theta_interpolator(phi_gl_collocation[j]);
-        printf("theta : %e, %e\n", theta_gl_view[j], phi_gl_collocation[j]);
-        phi_gl_view[j] = phi_interpolator(phi_gl_collocation[j]);
-        printf("phi : %e, %e\n", phi_gl_view[j], phi_gl_collocation[j]);
-      }
-    }
-
-    // With the new grid, we can now use the standard differentiation matrices
-    // applied in the two respective directions to obtain the four Jacobian
-    // components. By convention, the first index is the derivative and the
-    // second is the coordinate being differentiated. Note that this is
-    // \partial_x \tilde{x}.
-    tnsr::iJ<DataVector, 2> dx_of_x_tilde_gl{get(*a).size()};
-    printf("applying differentiation matrix\n");
-    const Matrix& phi_differentiation_matrix =
-        Spectral::differentiation_matrix<Spectral::Basis::Legendre,
-                                         Spectral::Quadrature::Gauss>(
-            number_of_phi_points);
-    const Matrix& theta_differentiation_matrix =
-        Spectral::differentiation_matrix<Spectral::Basis::Legendre,
-                                         Spectral::Quadrature::Gauss>(
-            number_of_theta_points);
-    const std::array<Matrix, 2> theta_derivative =
-        make_array(Matrix{}, theta_differentiation_matrix);
-    const std::array<Matrix, 2> phi_derivative =
-        make_array(phi_differentiation_matrix, Matrix{});
-    Index<2> extents{number_of_phi_points, number_of_theta_points};
-    apply_matrices(make_not_null(&get<0, 0>(dx_of_x_tilde_gl)),
-                   theta_derivative, get<0>(x_tilde_of_x_gl), extents);
-    apply_matrices(make_not_null(&get<0, 1>(dx_of_x_tilde_gl)),
-                   theta_derivative, get<1>(x_tilde_of_x_gl), extents);
-    apply_matrices(make_not_null(&get<1, 0>(dx_of_x_tilde_gl)), phi_derivative,
-                   get<0>(x_tilde_of_x_gl), extents);
-    apply_matrices(make_not_null(&get<1, 1>(dx_of_x_tilde_gl)), phi_derivative,
-                   get<1>(x_tilde_of_x_gl), extents);
-
-    // Apply extra factors of Pi to the derivatives.
-    get<0, 0>(dx_of_x_tilde_gl) /= M_PI / 2.0;
-    printf("dtheta theta tilde\n");
-    get<0, 1>(dx_of_x_tilde_gl) /= M_PI / 2.0;
-    get<1, 0>(dx_of_x_tilde_gl) /= M_PI;
-    get<1, 1>(dx_of_x_tilde_gl) /= M_PI;
-
     for (size_t A = 0; A < 2; ++A) {
       for (size_t B = 0; B < 2; ++B) {
-        printf("dx of x tilde %zu, %zu\n", A, B);
-        for (auto val : dx_of_x_tilde_gl.get(A, B)) {
+        printf("dx_x_tilde_of_x %zu, %zu\n", A, B);
+        for (auto val : dx_x_tilde_of_x.get(A, B)) {
           printf("%e\n", val);
         }
       }
     }
-    printf("interpolating back to angular grid\n");
-    tnsr::iJ<DataVector, 2> dx_of_x_tilde{get(*a).size()};
-    // interpolate the derivatives back to the equiangular grid
-    for (size_t A = 0; A < 2; ++A) {
-      for (size_t B = 0; B < 2; ++B) {
-        for (size_t i = 0; i < number_of_theta_points; ++i) {
-          DataVector gl_view{
-              dx_of_x_tilde_gl.get(A, B).data() + i * number_of_phi_points,
-              number_of_phi_points};
-          DataVector target_view{
-              dx_of_x_tilde.get(A, B).data() + i * number_of_phi_points,
-              number_of_phi_points};
-          boost::math::barycentric_rational<double> interpolator(
-              phi_gl_collocation.data(), gl_view.data(), number_of_phi_points,
-              number_of_phi_points / 2);
-          for (size_t j = 0; j < number_of_phi_points; ++j) {
-            target_view[j] = interpolator(phi_angles[j]);
-          }
-        }
-      }
-    }
-
-    // We also need to populate a DataVector of the theta collocation points for
-    // use in the spin-weighted jacobian factors below
-    DataVector theta_collocation{get(*a).size()};
-    const auto& collocation = Spectral::Swsh::precomputed_collocation<
-        Spectral::Swsh::ComplexRepresentation::Interleaved>(l_max);
-    for (const auto& collocation_point : collocation) {
-      theta_collocation[collocation_point.offset] = collocation_point.theta;
-    }
-    printf("creating a and b spin-weighted scalars\n");
 
     SpinWeighted<ComplexDataVector, 2> a_of_x;
     a_of_x.data() =
         std::complex<double>(1.0, 0.0) *
-            (get<0, 0>(dx_of_x_tilde) - sin(get<0>(*x_tilde_of_x)) /
-                                            sin(theta_collocation) *
-                                            get<1, 1>(dx_of_x_tilde)) +
+            (get<0, 0>(dx_x_tilde_of_x) - get<1, 1>(dx_x_tilde_of_x)) +
         std::complex<double>(0.0, 1.0) *
-            (1.0 / sin(theta_collocation) * get<1, 0>(dx_of_x_tilde) +
-             sin(get<0>(*x_tilde_of_x)) * get<0, 1>(dx_of_x_tilde));
+            (get<1, 0>(dx_x_tilde_of_x) + get<0, 1>(dx_x_tilde_of_x));
     SpinWeighted<ComplexDataVector, 0> b_of_x;
     b_of_x.data() =
         std::complex<double>(1.0, 0.0) *
-            (get<0, 0>(dx_of_x_tilde) + sin(get<0>(*x_tilde_of_x)) /
-                                            sin(theta_collocation) *
-                                            get<1, 1>(dx_of_x_tilde)) +
+            (get<0, 0>(dx_x_tilde_of_x) + get<1, 1>(dx_x_tilde_of_x)) +
         std::complex<double>(0.0, 1.0) *
-            (-1.0 / sin(theta_collocation) * get<1, 0>(dx_of_x_tilde) +
-             sin(get<0>(*x_tilde_of_x)) * get<0, 1>(dx_of_x_tilde));
+            (-get<1, 0>(dx_x_tilde_of_x) + get<0, 1>(dx_x_tilde_of_x));
+
+    Spectral::Swsh::filter_swsh_boundary_quantity(make_not_null(&a_of_x), l_max,
+                                                  l_max - 2);
+    Spectral::Swsh::filter_swsh_boundary_quantity(make_not_null(&b_of_x), l_max,
+                                                  l_max - 2);
 
     // extra allocation for debugging purposes - need to copy in order to check
     // the current values of a and b.
-    auto a_interpolated = Spectral::Swsh::swsh_interpolate_from_pfaffian(
+    auto a_interpolated = Spectral::Swsh::swsh_interpolate(
         make_not_null(&a_of_x), get<0>(*x_of_x_tilde), get<1>(*x_of_x_tilde),
         l_max);
-    auto b_interpolated = Spectral::Swsh::swsh_interpolate_from_pfaffian(
+    auto b_interpolated = Spectral::Swsh::swsh_interpolate(
         make_not_null(&b_of_x), get<0>(*x_of_x_tilde), get<1>(*x_of_x_tilde),
         l_max);
+    Spectral::Swsh::filter_swsh_boundary_quantity(
+        make_not_null(&a_interpolated), l_max, l_max - 2);
+    Spectral::Swsh::filter_swsh_boundary_quantity(
+        make_not_null(&a_interpolated), l_max, l_max - 2);
+
     printf("Identity check : Jacobian vs explicit derivatives : a");
     for (size_t i = 0; i < a_interpolated.size(); ++i) {
       printf("(%e, %e) from (%e, %e)\n",
@@ -976,13 +882,17 @@ struct GaugeUpdateJacobianFromCoords {
              imag(get(*b).data()[i] - b_interpolated.data()[i]),
              real(get(*b).data()[i]), imag(get(*b).data()[i]));
     }
+    // get(*a) = a_interpolated;
+    // get(*b) = b_interpolated;
+    get(*a) = a_of_x;
+    get(*b) = b_of_x;
   }
 };
 
 struct GaugeUpdateDuXtildeOfX {
   using argument_tags = tmpl::list<Tags::InertialAngularCoords, Tags::LMax>;
   using return_tags = tmpl::list<Tags::DuInertialAngularCoords, Tags::GaugeA,
-                                 Tags::GaugeB, Tags::U0>;
+                                 Tags::GaugeB, Tags::U, Tags::U0>;
 
   static void apply(
       const gsl::not_null<tnsr::i<DataVector, 2>*> du_x_tilde_of_x,
@@ -990,6 +900,7 @@ struct GaugeUpdateDuXtildeOfX {
           a_of_x_tilde,
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*>
           b_of_x_tilde,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> u,
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*>
           u_0_of_x_tilde,
       const tnsr::i<DataVector, 2>& x_tilde_of_x, const size_t l_max) noexcept {
@@ -1002,19 +913,19 @@ struct GaugeUpdateDuXtildeOfX {
         make_not_null(&get(*u_0_of_x_tilde)), l_max, l_max - 2);
 
     SpinWeighted<ComplexDataVector, 2> a_of_x =
-        Spectral::Swsh::swsh_interpolate_from_pfaffian(
-            make_not_null(&get(*a_of_x_tilde)), get<0>(x_tilde_of_x),
-            get<1>(x_tilde_of_x), l_max);
+        Spectral::Swsh::swsh_interpolate(make_not_null(&get(*a_of_x_tilde)),
+                                         get<0>(x_tilde_of_x),
+                                         get<1>(x_tilde_of_x), l_max);
 
     SpinWeighted<ComplexDataVector, 0> b_of_x =
-        Spectral::Swsh::swsh_interpolate_from_pfaffian(
-            make_not_null(&get(*b_of_x_tilde)), get<0>(x_tilde_of_x),
-            get<1>(x_tilde_of_x), l_max);
+        Spectral::Swsh::swsh_interpolate(make_not_null(&get(*b_of_x_tilde)),
+                                         get<0>(x_tilde_of_x),
+                                         get<1>(x_tilde_of_x), l_max);
 
     SpinWeighted<ComplexDataVector, 1> u_0_of_x =
-        Spectral::Swsh::swsh_interpolate_from_pfaffian(
-            make_not_null(&get(*u_0_of_x_tilde)), get<0>(x_tilde_of_x),
-            get<1>(x_tilde_of_x), l_max);
+        Spectral::Swsh::swsh_interpolate(make_not_null(&get(*u_0_of_x_tilde)),
+                                         get<0>(x_tilde_of_x),
+                                         get<1>(x_tilde_of_x), l_max);
 
     Spectral::Swsh::filter_swsh_boundary_quantity(make_not_null(&a_of_x), l_max,
                                                   l_max - 2);
@@ -1040,27 +951,60 @@ struct GaugeUpdateDuXtildeOfX {
     // get<1>(x_tilde_of_x) * cos(get<0>(x_tilde_of_x)) *
     // get<0>(*du_x_tilde_of_x);
 
-    get<0>(*du_x_tilde_of_x) =
-        0.25 *
-        real(u_0_of_x.data() * (b_of_x.data() + conj(a_of_x.data())) +
-             conj(u_0_of_x.data()) * (a_of_x.data() + conj(b_of_x.data())));
-    get<1>(*du_x_tilde_of_x) =
-        0.25 * real(std::complex<double>(0.0, -1.0) *
-                    (u_0_of_x.data() * (b_of_x.data() - conj(a_of_x.data())) +
-                     conj(u_0_of_x.data()) *
-                         (a_of_x.data() - conj(b_of_x.data())))) +
-        get<1>(x_tilde_of_x) * cos(get<0>(x_tilde_of_x)) *
-            get<0>(*du_x_tilde_of_x);
+    // get<0>(*du_x_tilde_of_x) =
+    // 0.25 *
+    // real(u_0_of_x.data() * (b_of_x.data() + conj(a_of_x.data())) +
+    // conj(u_0_of_x.data()) * (a_of_x.data() + conj(b_of_x.data())));
+    // get<1>(*du_x_tilde_of_x) =
+    // 0.25 *
+    // real(std::complex<double>(0.0, -1.0) *
+    // (u_0_of_x.data() * (b_of_x.data() - conj(a_of_x.data())) +
+    // conj(u_0_of_x.data()) * (a_of_x.data() - conj(b_of_x.data())))) *
+    // sin(get<0>(x_tilde_of_x));
+
+    // obtain a datavector filled with theta collocation values
+    DataVector theta{a_of_x.size()};
+    const auto& collocation = Spectral::Swsh::precomputed_collocation<
+        Spectral::Swsh::ComplexRepresentation::Interleaved>(l_max);
+    for (const auto& collocation_point : collocation) {
+      theta[collocation_point.offset] = collocation_point.theta;
+    }
+    size_t number_of_radial_points =
+        get(*u).size() /
+        Spectral::Swsh::number_of_swsh_collocation_points(l_max);
+
+    SpinWeighted<ComplexDataVector, 1> u_scri_slice;
+    u_scri_slice.data() = ComplexDataVector{
+        get(*u).data().data() +
+            (number_of_radial_points - 1) *
+                Spectral::Swsh::number_of_swsh_collocation_points(l_max),
+        Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
+
+    auto u_scri_interpolated = Spectral::Swsh::swsh_interpolate(
+        make_not_null(&u_scri_slice), get<0>(x_tilde_of_x),
+        get<1>(x_tilde_of_x), l_max);
+    SpinWeighted<ComplexDataVector, 1> u_scri_transformed =
+        (u_scri_interpolated * conj(get(*b_of_x_tilde)) -
+         conj(u_scri_interpolated) * get(*a_of_x_tilde)) *
+        2.0 /
+        (get(*b_of_x_tilde) * conj(get(*b_of_x_tilde)) -
+         get(*a_of_x_tilde) * conj(get(*a_of_x_tilde)));
+
+    // get(*u_0) = (2.0 / (get(*b) * conj(get(*b)) - get(*a) * conj(get(*a)))) *
+    // (conj(get(*b)) * get(*u_0) - get(*a) * conj(get(*u_0)));
 
     // TEST linearized approximation
     // get<0>(*du_x_tilde_of_x) = real(u_0_of_x.data());
-    // get<1>(*du_x_tilde_of_x) =
-    // imag(u_0_of_x.data()) + get<1>(x_tilde_of_x) *
-    // cos(get<0>(x_tilde_of_x)) *
-    // get<0>(*du_x_tilde_of_x);
+    // get<1>(*du_x_tilde_of_x) = imag(u_0_of_x.data()) *
+    // sin(get<0>(x_tilde_of_x));
 
+    // TEST
+    get<0>(*du_x_tilde_of_x) = real(u_scri_transformed.data());
+    get<1>(*du_x_tilde_of_x) = imag(u_scri_transformed.data()) * sin(theta);
+
+    // TEST simple analytic form
     // get<0>(*du_x_tilde_of_x) = 0.0;
-    // get<1>(*du_x_tilde_of_x) = 0.0;
+    // get<1>(*du_x_tilde_of_x) = 1.0e-3 * cos(theta);
   }
 };
 
@@ -1074,8 +1018,7 @@ struct InitializeXtildeOfX {
         Spectral::Swsh::ComplexRepresentation::Interleaved>(l_max);
     for (const auto& collocation_point : collocation) {
       get<0>(*x_tilde_of_x)[collocation_point.offset] = collocation_point.theta;
-      get<1>(*x_tilde_of_x)[collocation_point.offset] =
-          collocation_point.phi * sin(collocation_point.theta);
+      get<1>(*x_tilde_of_x)[collocation_point.offset] = collocation_point.phi;
       // TEST: attempting a deliberately screwball set of coordinates to
       // highlight mistakes in first timestep
 
@@ -1097,8 +1040,11 @@ struct InitializeXtildeOfX {
       // get<0>(*x_tilde_of_x)[collocation_point.offset] =
       // collocation_point.theta;
       // get<1>(*x_tilde_of_x)[collocation_point.offset] =
-      // ((collocation_point.phi + 1.0e-3 * cos(collocation_point.theta))) *
-      // sin(collocation_point.theta);
+      // ((collocation_point.phi + 1.0e-3 * cos(collocation_point.theta)));
+      // another trial, not sure if representable
+      // get<1>(*x_tilde_of_x)[collocation_point.offset] =
+      // ((collocation_point.phi + 1.0e-3 * sin(collocation_point.theta) *
+      // cos(collocation_point.phi)));
     }
   }
 };
@@ -1141,8 +1087,7 @@ struct InitializeGauge {
         Spectral::Swsh::ComplexRepresentation::Interleaved>(l_max);
     for (const auto& collocation_point : collocation) {
       get<0>(*x_of_x_tilde)[collocation_point.offset] = collocation_point.theta;
-      get<1>(*x_of_x_tilde)[collocation_point.offset] =
-          collocation_point.phi * sin(collocation_point.theta);
+      get<1>(*x_of_x_tilde)[collocation_point.offset] = collocation_point.phi;
       // TEST: attempting a deliberately screwball set of coordinates to
       // highlight mistakes in first timestep
 
@@ -1162,8 +1107,7 @@ struct InitializeGauge {
       // get<0>(*x_of_x_tilde)[collocation_point.offset] =
       // collocation_point.theta;
       // get<1>(*x_of_x_tilde)[collocation_point.offset] =
-      // (collocation_point.phi - 1.0e-3 * cos(collocation_point.theta)) *
-      // sin(collocation_point.theta);
+      // (collocation_point.phi - 1.0e-3 * cos(collocation_point.theta));
       // get(*a).data()[collocation_point.offset] =
       // -std::complex<double>(0.0, 1.0) * 1.0e-3 *
       // square(sin(collocation_point.theta));

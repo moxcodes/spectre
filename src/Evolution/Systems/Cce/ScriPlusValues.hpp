@@ -148,12 +148,12 @@ struct CalculateScriPlusValue<Tags::CauchyGaugeScriPlus<Tags::Beta>> {
             (number_of_radial_points - 1) * number_of_angular_points,
         number_of_angular_points};
     beta_buffer.data() = beta_scri_view - 0.5 * log(get(omega).data());
-    Spectral::Swsh::swsh_interpolate_from_pfaffian(
+    Spectral::Swsh::swsh_interpolate(
         make_not_null(&get(*cauchy_gauge_beta)), make_not_null(&beta_buffer),
         get<0>(x_tilde_of_x), get<1>(x_tilde_of_x), l_max);
 
     SpinWeighted<ComplexDataVector, 0> identity_test =
-        Spectral::Swsh::swsh_interpolate_from_pfaffian(
+        Spectral::Swsh::swsh_interpolate(
             make_not_null(&get(*cauchy_gauge_beta)), get<0>(x_of_x_tilde),
             get<1>(x_of_x_tilde), l_max);
   }
@@ -173,7 +173,7 @@ struct CalculateScriPlusValue<Tags::CauchyGaugeScriPlus<Tags::Beta>> {
 //       const tnsr::i<DataVector, 2>& x_tilde_of_x,
 //       const tnsr::i<DataVector, 2>& x_of_x_tilde, const size_t l_max)
 //       noexcept {
-//     Spectral::Swsh::swsh_interpolate_from_pfaffian(
+//     Spectral::Swsh::swsh_interpolate(
 //         make_not_null(&get(*cauchy_gauge_u0)), make_not_null(&get(*u0)),
 //         get<0>(x_tilde_of_x), get<1>(x_tilde_of_x), l_max);
 //   }
@@ -194,7 +194,7 @@ struct CalculateScriPlusValue<Tags::CauchyGaugeScriPlus<Tags::U0>> {
       const tnsr::i<DataVector, 2>& x_of_x_tilde, const size_t l_max) noexcept {
     Spectral::Swsh::filter_swsh_boundary_quantity(make_not_null(&get(*u0)),
                                                   l_max, l_max - 2);
-    Spectral::Swsh::swsh_interpolate_from_pfaffian(
+    Spectral::Swsh::swsh_interpolate(
         make_not_null(&get(*cauchy_gauge_u0)), make_not_null(&get(*u0)),
         get<0>(x_tilde_of_x), get<1>(x_tilde_of_x), l_max);
     Spectral::Swsh::filter_swsh_boundary_quantity(
@@ -230,7 +230,8 @@ struct CalculateCauchyGauge;
 template <>
 struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::Beta>> {
   using argument_tags = tmpl::list<Tags::GaugeOmega, Tags::GaugeA, Tags::GaugeB,
-                                   Tags::InertialAngularCoords, Tags::LMax>;
+                                   Tags::InertialAngularCoords,
+                                   Tags::CauchyAngularCoords, Tags::LMax>;
   using return_tags = tmpl::list<Tags::CauchyGauge<Tags::Beta>, Tags::Beta>;
 
   static void apply(
@@ -240,12 +241,14 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::Beta>> {
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega,
       const Scalar<SpinWeighted<ComplexDataVector, 2>>& a,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& b,
-      const tnsr::i<DataVector, 2>& x_tilde_of_x, const size_t l_max) noexcept {
+      const tnsr::i<DataVector, 2>& x_tilde_of_x,
+      const tnsr::i<DataVector, 2>& x_of_x_tilde, const size_t l_max) noexcept {
     // angular slices
     size_t number_of_angular_points =
         Spectral::Swsh::number_of_swsh_collocation_points(l_max);
     size_t number_of_radial_points =
         get(*beta).size() / number_of_angular_points;
+
     for (size_t i = 0; i < number_of_radial_points; ++i) {
       ComplexDataVector beta_slice{
           get(*beta).data().data() + i * number_of_angular_points,
@@ -253,55 +256,117 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::Beta>> {
       ComplexDataVector cauchy_beta_slice{
           get(*cauchy_beta).data().data() + i * number_of_angular_points,
           number_of_angular_points};
-      cauchy_beta_slice = beta_slice - 0.5 * log(get(omega).data());
+      // TEST
+      cauchy_beta_slice = beta_slice /*- 0.5 * log(get(omega).data())*/;
     }
 
     // TEST double-checking identity properties
     // Note: the slices y = constant and y_tilde = constant should be the same
     // slices, so we test the consistency of the numerical derivatives.
 
-    //   auto interpolated_cauchy_beta =
-    //   Spectral::Swsh::swsh_interpolate_from_pfaffian(
-    //       make_not_null(&get(*cauchy_beta)), get<0>(x_tilde_of_x),
-    //       get<1>(x_tilde_of_x), l_max);
+    Spectral::Swsh::filter_swsh_volume_quantity(make_not_null(&get(*beta)),
+                                                l_max, l_max - 4, 0.0, 8);
 
-    //   SpinWeighted<ComplexDataVector, 1> eth_tilde_beta =
-    //       Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
-    //           make_not_null(&get(*beta)), l_max);
-    //   SpinWeighted<ComplexDataVector, -1> ethbar_tilde_beta =
-    //       Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
-    //           make_not_null(&get(*beta)), l_max);
-    //   SpinWeighted<ComplexDataVector, 1> eth_beta =
-    //       Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
-    //           make_not_null(&interpolated_cauchy_beta), l_max);
-    //   SpinWeighted<ComplexDataVector, 1> cauchy_eth_beta{eth_beta.size()};
-    //   for(size_t i = 0; i < number_of_radial_points; ++i) {
-    //     ComplexDataVector cauchy_eth_beta_slice{
-    //         cauchy_eth_beta.data().data() + i * number_of_angular_points,
-    //         number_of_angular_points};
-    //     ComplexDataVector eth_tilde_beta_slice{
-    //         eth_tilde_beta.data().data() + i * number_of_angular_points,
-    //         number_of_angular_points};
-    //     ComplexDataVector ethbar_tilde_beta_slice{
-    //         ethbar_tilde_beta.data().data() + i * number_of_angular_points,
-    //         number_of_angular_points};
-    //     cauchy_eth_beta_slice = 0.5 * (conj(get(b).data()) *
-    //     eth_tilde_beta_slice +
-    //                                    get(a).data() *
-    //                                    ethbar_tilde_beta_slice);
-    //   }
+    auto interpolated_cauchy_beta = Spectral::Swsh::swsh_interpolate(
+        make_not_null(&get(*beta)), get<0>(x_tilde_of_x), get<1>(x_tilde_of_x),
+        l_max);
 
-    //   auto identity_test = Spectral::Swsh::swsh_interpolate_from_pfaffian(
-    //       make_not_null(&cauchy_eth_beta), get<0>(x_tilde_of_x),
-    //       get<1>(x_tilde_of_x), l_max);
+    Spectral::Swsh::filter_swsh_volume_quantity(
+        make_not_null(&interpolated_cauchy_beta), l_max, l_max - 4, 0.0, 8);
 
-    //   for (size_t i = 0; i < identity_test.size(); ++i) {
-    //     printf("(%e, %e) from (%e, %e)\n",
-    //            real(identity_test.data()[i] - eth_beta.data()[i]),
-    //            imag(identity_test.data()[i] - eth_beta.data()[i]),
-    //            real(identity_test.data()[i]), imag(identity_test.data()[i]));
-    //     }
-    //   printf("done\n");
+    SpinWeighted<ComplexDataVector, 1> eth_tilde_beta =
+        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
+            make_not_null(&get(*beta)), l_max);
+    SpinWeighted<ComplexDataVector, -1> ethbar_tilde_beta =
+        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
+            make_not_null(&get(*beta)), l_max);
+    SpinWeighted<ComplexDataVector, 1> eth_beta =
+        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
+            make_not_null(&interpolated_cauchy_beta), l_max);
+    SpinWeighted<ComplexDataVector, 1> cauchy_eth_beta{eth_beta.size()};
+    for (size_t i = 0; i < 1; ++i) {
+      ComplexDataVector cauchy_eth_beta_slice{
+          cauchy_eth_beta.data().data() + i * number_of_angular_points,
+          number_of_angular_points};
+      ComplexDataVector eth_tilde_beta_slice{
+          eth_tilde_beta.data().data() + i * number_of_angular_points,
+          number_of_angular_points};
+      ComplexDataVector ethbar_tilde_beta_slice{
+          ethbar_tilde_beta.data().data() + i * number_of_angular_points,
+          number_of_angular_points};
+      cauchy_eth_beta_slice =
+          0.5 * (conj(get(b).data()) * eth_tilde_beta_slice +
+                 get(a).data() * ethbar_tilde_beta_slice);
+    }
+
+    auto eth_tilde_beta_interpolated = Spectral::Swsh::swsh_interpolate(
+        make_not_null(&eth_tilde_beta), get<0>(x_tilde_of_x),
+        get<1>(x_tilde_of_x), l_max);
+
+    auto ethbar_tilde_beta_interpolated = Spectral::Swsh::swsh_interpolate(
+        make_not_null(&ethbar_tilde_beta), get<0>(x_tilde_of_x),
+        get<1>(x_tilde_of_x), l_max);
+    cauchy_eth_beta =
+        0.5 * (conj(get(b).data()) * eth_tilde_beta_interpolated.data() +
+               get(a).data() * ethbar_tilde_beta_interpolated.data());
+
+    Spectral::Swsh::filter_swsh_volume_quantity(make_not_null(&cauchy_eth_beta),
+                                                l_max, l_max - 4, 0.0, 8);
+
+    // auto identity_test = Spectral::Swsh::swsh_interpolate(
+        // make_not_null(&cauchy_eth_beta), get<0>(x_tilde_of_x),
+        // get<1>(x_tilde_of_x), l_max);
+
+    auto identity_test = cauchy_eth_beta;
+
+    Spectral::Swsh::filter_swsh_volume_quantity(make_not_null(&identity_test),
+                                                l_max, l_max - 4, 0.0, 8);
+    printf("Identity test: Jacobian vs x_tilde_of_x\n");
+    for (size_t i = 0; i < identity_test.size(); ++i) {
+      printf("(%e, %e) from (%e, %e)\n",
+             real(identity_test.data()[i] - eth_beta.data()[i]),
+             imag(identity_test.data()[i] - eth_beta.data()[i]),
+             real(identity_test.data()[i]), imag(identity_test.data()[i]));
+    }
+    printf("done\n");
+
+    SpinWeighted<ComplexDataVector, -1> ethbar_beta =
+        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
+            make_not_null(&interpolated_cauchy_beta), l_max);
+    SpinWeighted<ComplexDataVector, 1> inertial_eth_beta{eth_beta.size()};
+    for (size_t i = 0; i < 1; ++i) {
+      ComplexDataVector inertial_eth_beta_slice{
+          inertial_eth_beta.data().data() + i * number_of_angular_points,
+          number_of_angular_points};
+      ComplexDataVector eth_beta_slice{
+          eth_beta.data().data() + i * number_of_angular_points,
+          number_of_angular_points};
+      ComplexDataVector ethbar_beta_slice{
+          ethbar_beta.data().data() + i * number_of_angular_points,
+          number_of_angular_points};
+      inertial_eth_beta_slice =
+          0.5 / square(get(omega).data()) *
+          (get(b).data() * eth_beta_slice - get(a).data() * ethbar_beta_slice);
+    }
+
+    Spectral::Swsh::filter_swsh_volume_quantity(
+        make_not_null(&inertial_eth_beta), l_max, l_max - 4, 0.0, 8);
+
+    auto inverse_identity_test = Spectral::Swsh::swsh_interpolate(
+        make_not_null(&inertial_eth_beta), get<0>(x_of_x_tilde),
+        get<1>(x_of_x_tilde), l_max);
+
+    Spectral::Swsh::filter_swsh_volume_quantity(
+        make_not_null(&inverse_identity_test), l_max, l_max - 4, 0.0, 8);
+    printf("Identity test: Jacobian vs x_of_x_tilde\n");
+    for (size_t i = 0; i < identity_test.size(); ++i) {
+      printf("(%e, %e) from (%e, %e)\n",
+             real(inverse_identity_test.data()[i] - eth_tilde_beta.data()[i]),
+             imag(inverse_identity_test.data()[i] - eth_tilde_beta.data()[i]),
+             real(inverse_identity_test.data()[i]),
+             imag(inverse_identity_test.data()[i]));
+    }
+    printf("done\n");
   }
 };
 
@@ -334,7 +399,7 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::J>> {
                         square(get(a).data()) * conj(j_slice) +
                         2.0 * get(a).data() * conj(get(b).data()) *
                             sqrt(1.0 + j_slice * conj(j_slice))) /
-                       square(get(omega).data());
+                       pow<4>(get(omega).data());
     }
   }
 };
