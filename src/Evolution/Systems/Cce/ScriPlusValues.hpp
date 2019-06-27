@@ -291,116 +291,119 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::Beta>> {
           interpolated_cauchy_beta_slice.data() - 0.5 * log(get(omega).data());
     }
 
-    SpinWeighted<ComplexDataVector, 0> test_beta_cauchy{get(d).size()};
-    const auto& collocation = Spectral::Swsh::precomputed_collocation<
-        Spectral::Swsh::ComplexRepresentation::Interleaved>(l_max);
-    for (const auto& collocation_point : collocation) {
-      test_beta_cauchy.data()[collocation_point.offset] =
-          sin(collocation_point.theta) * sin(collocation_point.phi);
-    }
+    // SpinWeighted<ComplexDataVector, 0> test_beta_cauchy{get(d).size()};
+    // const auto& collocation = Spectral::Swsh::precomputed_collocation<
+    //     Spectral::Swsh::ComplexRepresentation::Interleaved>(l_max);
+    // for (const auto& collocation_point : collocation) {
+    //   test_beta_cauchy.data()[collocation_point.offset] =
+    //       sin(collocation_point.theta) * sin(collocation_point.phi);
+    // }
 
-    auto interpolated_cauchy_beta = Spectral::Swsh::swsh_interpolate(
-        make_not_null(&test_beta_cauchy), get<0>(x_tilde_of_x),
-        get<1>(x_tilde_of_x), l_max);
+    // auto interpolated_cauchy_beta = Spectral::Swsh::swsh_interpolate(
+    //     make_not_null(&test_beta_cauchy), get<0>(x_tilde_of_x),
+    //     get<1>(x_tilde_of_x), l_max);
 
-    Spectral::Swsh::filter_swsh_volume_quantity(
-        make_not_null(&interpolated_cauchy_beta), l_max, l_max - 2, 0.0, 8);
+    // Spectral::Swsh::filter_swsh_volume_quantity(
+    //     make_not_null(&interpolated_cauchy_beta), l_max, l_max - 2, 0.0, 8);
 
-    SpinWeighted<ComplexDataVector, 1> eth_tilde_beta =
-        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
-            make_not_null(&test_beta_cauchy), l_max);
-    SpinWeighted<ComplexDataVector, -1> ethbar_tilde_beta =
-        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
-            make_not_null(&test_beta_cauchy), l_max);
-    SpinWeighted<ComplexDataVector, 1> eth_beta =
-        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
-            make_not_null(&interpolated_cauchy_beta), l_max);
+    // SpinWeighted<ComplexDataVector, 1> eth_tilde_beta =
+    //     Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
+    //         make_not_null(&test_beta_cauchy), l_max);
+    // SpinWeighted<ComplexDataVector, -1> ethbar_tilde_beta =
+    //     Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
+    //         make_not_null(&test_beta_cauchy), l_max);
+    // SpinWeighted<ComplexDataVector, 1> eth_beta =
+    //     Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
+    //         make_not_null(&interpolated_cauchy_beta), l_max);
 
-    auto eth_tilde_beta_interpolated = Spectral::Swsh::swsh_interpolate(
-        make_not_null(&eth_tilde_beta), get<0>(x_tilde_of_x),
-        get<1>(x_tilde_of_x), l_max);
-    auto ethbar_tilde_beta_interpolated = Spectral::Swsh::swsh_interpolate(
-        make_not_null(&ethbar_tilde_beta), get<0>(x_tilde_of_x),
-        get<1>(x_tilde_of_x), l_max);
-    SpinWeighted<ComplexDataVector, 1> identity_test_eth_beta =
-        0.5 * (conj(get(b)) * eth_tilde_beta_interpolated +
-               get(a) * ethbar_tilde_beta_interpolated);
+    // auto eth_tilde_beta_interpolated = Spectral::Swsh::swsh_interpolate(
+    //     make_not_null(&eth_tilde_beta), get<0>(x_tilde_of_x),
+    //     get<1>(x_tilde_of_x), l_max);
+    // auto ethbar_tilde_beta_interpolated = Spectral::Swsh::swsh_interpolate(
+    //     make_not_null(&ethbar_tilde_beta), get<0>(x_tilde_of_x),
+    //     get<1>(x_tilde_of_x), l_max);
+    // SpinWeighted<ComplexDataVector, 1> identity_test_eth_beta =
+    //     0.5 * (conj(get(b)) * eth_tilde_beta_interpolated +
+    //            get(a) * ethbar_tilde_beta_interpolated);
 
-    Spectral::Swsh::filter_swsh_volume_quantity(
-        make_not_null(&identity_test_eth_beta), l_max, l_max - 2, 0.0, 8);
+    // Spectral::Swsh::filter_swsh_volume_quantity(
+    //     make_not_null(&identity_test_eth_beta), l_max, l_max - 2, 0.0, 8);
 
-    Spectral::Swsh::filter_swsh_volume_quantity(
-        make_not_null(&identity_test_eth_beta), l_max, l_max - 2, 0.0, 8);
-    printf("Identity test: Jacobian vs x_tilde_of_x\n");
-    for (size_t i = 0; i < identity_test_eth_beta.size(); ++i) {
-      printf("(%e, %e) from (%e, %e)\n",
-             real(identity_test_eth_beta.data()[i] - eth_beta.data()[i]),
-             imag(identity_test_eth_beta.data()[i] - eth_beta.data()[i]),
-             real(identity_test_eth_beta.data()[i]),
-             imag(identity_test_eth_beta.data()[i]));
-    }
-    printf("done\n");
+    // Spectral::Swsh::filter_swsh_volume_quantity(
+    //     make_not_null(&identity_test_eth_beta), l_max, l_max - 2, 0.0, 8);
+    // printf("Identity test: Jacobian vs x_tilde_of_x\n");
+    // for (size_t i = 0; i < identity_test_eth_beta.size(); ++i) {
+    //   printf("(%e, %e) from (%e, %e)\n",
+    //          real(identity_test_eth_beta.data()[i] - eth_beta.data()[i]),
+    //          imag(identity_test_eth_beta.data()[i] - eth_beta.data()[i]),
+    //          real(identity_test_eth_beta.data()[i]),
+    //          imag(identity_test_eth_beta.data()[i]));
+    // }
+    // printf("done\n");
 
-    SpinWeighted<ComplexDataVector, 0> test_beta{get(d).size()};
-    for (const auto& collocation_point : collocation) {
-      test_beta.data()[collocation_point.offset] =
-          sin(collocation_point.theta) * sin(collocation_point.phi);
-    }
-    // Note: using the beta 'nice' values in both coordinate systems, subverting
-    // their true meaning in order to make a more desirable test
-    SpinWeighted<ComplexDataVector, -1> ethbar_beta =
-        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
-            make_not_null(&test_beta), l_max);
-    SpinWeighted<ComplexDataVector, 1> eth_beta_cauchy =
-        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
-            make_not_null(&test_beta), l_max);
+    // SpinWeighted<ComplexDataVector, 0> test_beta{get(d).size()};
+    // for (const auto& collocation_point : collocation) {
+    //   test_beta.data()[collocation_point.offset] =
+    //       sin(collocation_point.theta) * sin(collocation_point.phi);
+    // }
+    // // Note: using the beta 'nice' values in both coordinate systems,
+    // subverting
+    // // their true meaning in order to make a more desirable test
+    // SpinWeighted<ComplexDataVector, -1> ethbar_beta =
+    //     Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
+    //         make_not_null(&test_beta), l_max);
+    // SpinWeighted<ComplexDataVector, 1> eth_beta_cauchy =
+    //     Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
+    //         make_not_null(&test_beta), l_max);
 
-    auto eth_beta_interpolated_to_inertial = Spectral::Swsh::swsh_interpolate(
-        make_not_null(&eth_beta_cauchy), get<0>(x_of_x_tilde),
-        get<1>(x_of_x_tilde), l_max);
-    auto ethbar_beta_interpolated_to_inertial =
-        Spectral::Swsh::swsh_interpolate(make_not_null(&ethbar_beta),
-                                         get<0>(x_of_x_tilde),
-                                         get<1>(x_of_x_tilde), l_max);
-    SpinWeighted<ComplexDataVector, 1> identity_test_eth_tilde_beta =
-        0.5 * (conj(get(d)) * eth_beta_interpolated_to_inertial +
-               get(c) * ethbar_beta_interpolated_to_inertial);
+    // auto eth_beta_interpolated_to_inertial =
+    // Spectral::Swsh::swsh_interpolate(
+    //     make_not_null(&eth_beta_cauchy), get<0>(x_of_x_tilde),
+    //     get<1>(x_of_x_tilde), l_max);
+    // auto ethbar_beta_interpolated_to_inertial =
+    //     Spectral::Swsh::swsh_interpolate(make_not_null(&ethbar_beta),
+    //                                      get<0>(x_of_x_tilde),
+    //                                      get<1>(x_of_x_tilde), l_max);
+    // SpinWeighted<ComplexDataVector, 1> identity_test_eth_tilde_beta =
+    //     0.5 * (conj(get(d)) * eth_beta_interpolated_to_inertial +
+    //            get(c) * ethbar_beta_interpolated_to_inertial);
 
-    auto beta_interpolated_to_inertial = Spectral::Swsh::swsh_interpolate(
-        make_not_null(&test_beta), get<0>(x_of_x_tilde), get<1>(x_of_x_tilde),
-        l_max);
-    SpinWeighted<ComplexDataVector, 1> eth_tilde_beta_inertial =
-        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
-            make_not_null(&beta_interpolated_to_inertial), l_max);
+    // auto beta_interpolated_to_inertial = Spectral::Swsh::swsh_interpolate(
+    //     make_not_null(&test_beta), get<0>(x_of_x_tilde),
+    //     get<1>(x_of_x_tilde), l_max);
+    // SpinWeighted<ComplexDataVector, 1> eth_tilde_beta_inertial =
+    //     Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
+    //         make_not_null(&beta_interpolated_to_inertial), l_max);
 
-    Spectral::Swsh::filter_swsh_volume_quantity(
-        make_not_null(&identity_test_eth_tilde_beta), l_max, l_max - 2, 0.0, 8);
-    printf("Identity test: Jacobian vs x_of_x_tilde\n");
-    for (size_t i = 0; i < identity_test_eth_tilde_beta.size(); ++i) {
-      printf("(%e, %e) from (%e, %e)\n",
-             real(identity_test_eth_tilde_beta.data()[i] -
-                  eth_tilde_beta_inertial.data()[i]),
-             imag(identity_test_eth_tilde_beta.data()[i] -
-                  eth_tilde_beta_inertial.data()[i]),
-             real(identity_test_eth_tilde_beta.data()[i]),
-             imag(identity_test_eth_tilde_beta.data()[i]));
-    }
-    printf("done\n");
+    // Spectral::Swsh::filter_swsh_volume_quantity(
+    //     make_not_null(&identity_test_eth_tilde_beta), l_max, l_max - 2, 0.0,
+    //     8);
+    // printf("Identity test: Jacobian vs x_of_x_tilde\n");
+    // for (size_t i = 0; i < identity_test_eth_tilde_beta.size(); ++i) {
+    //   printf("(%e, %e) from (%e, %e)\n",
+    //          real(identity_test_eth_tilde_beta.data()[i] -
+    //               eth_tilde_beta_inertial.data()[i]),
+    //          imag(identity_test_eth_tilde_beta.data()[i] -
+    //               eth_tilde_beta_inertial.data()[i]),
+    //          real(identity_test_eth_tilde_beta.data()[i]),
+    //          imag(identity_test_eth_tilde_beta.data()[i]));
+    // }
+    // printf("done\n");
 
-    SpinWeighted<ComplexDataVector, 0> beta_interpolated_back_to_cauchy =
-        Spectral::Swsh::swsh_interpolate(
-            make_not_null(&beta_interpolated_to_inertial), get<0>(x_tilde_of_x),
-            get<1>(x_tilde_of_x), l_max);
-    printf("Identity test: Inverse transformation\n");
-    for (size_t i = 0; i < identity_test_eth_tilde_beta.size(); ++i) {
-      printf("(%e, %e) from (%e, %e)\n",
-             real(test_beta.data()[i] -
-                  beta_interpolated_back_to_cauchy.data()[i]),
-             imag(test_beta.data()[i] -
-                  beta_interpolated_back_to_cauchy.data()[i]),
-             real(test_beta.data()[i]), imag(test_beta.data()[i]));
-    }
-    printf("done\n");
+    // SpinWeighted<ComplexDataVector, 0> beta_interpolated_back_to_cauchy =
+    //     Spectral::Swsh::swsh_interpolate(
+    //         make_not_null(&beta_interpolated_to_inertial),
+    //         get<0>(x_tilde_of_x), get<1>(x_tilde_of_x), l_max);
+    // printf("Identity test: Inverse transformation\n");
+    // for (size_t i = 0; i < identity_test_eth_tilde_beta.size(); ++i) {
+    //   printf("(%e, %e) from (%e, %e)\n",
+    //          real(test_beta.data()[i] -
+    //               beta_interpolated_back_to_cauchy.data()[i]),
+    //          imag(test_beta.data()[i] -
+    //               beta_interpolated_back_to_cauchy.data()[i]),
+    //          real(test_beta.data()[i]), imag(test_beta.data()[i]));
+    // }
+    // printf("done\n");
   }
 };
 

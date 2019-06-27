@@ -298,42 +298,35 @@ void compare_and_record_r200_values_from_rp(
         get(db::get<tag>(*box)).data(),
         get(db::get<Tags::BoundaryValue<Tags::R>>(*box)).data(), 200.0, l_max);
 
-    // for(const auto& val : get(db::get<Tags::GaugeOmega>(*box)).data()) {
-    // printf("(%e, %e)\n", real(val), imag(val));
-    // }
-    // printf("done\n");
 
-    // r200_slice.data() = interpolate_to_bondi_r(
-    // get(db::get<tag>(*box)).data(), get(db::get<Tags::R>(*box)).data(),
-    // 200.0, l_max);
 
-    typename db::item_type<tag>::type r200_cauchy_gauge{r200_slice.size()};
-    Spectral::Swsh::filter_swsh_boundary_quantity(make_not_null(&r200_slice),
-                                                  l_max, l_max - 4);
+    // typename db::item_type<tag>::type r200_cauchy_gauge{r200_slice.size()};
+    // Spectral::Swsh::filter_swsh_boundary_quantity(make_not_null(&r200_slice),
+                                                  // l_max, l_max - 4);
     // TEST ensure representability to test coordinate values
     // const auto& collocation = Spectral::Swsh::precomputed_collocation<
       // Spectral::Swsh::ComplexRepresentation::Interleaved>(l_max);
     // for (const auto& collocation_point : collocation) {
 
-    Spectral::Swsh::swsh_interpolate(
-        make_not_null(&r200_cauchy_gauge), make_not_null(&r200_slice),
-        get<0>(db::get<Tags::CauchyAngularCoords>(*box)),
-        get<1>(db::get<Tags::CauchyAngularCoords>(*box)), l_max);
-    Spectral::Swsh::filter_swsh_boundary_quantity(
-        make_not_null(&r200_cauchy_gauge), l_max, l_max - 4);
+    // Spectral::Swsh::swsh_interpolate(
+        // make_not_null(&r200_cauchy_gauge), make_not_null(&r200_slice),
+        // get<0>(db::get<Tags::CauchyAngularCoords>(*box)),
+        // get<1>(db::get<Tags::CauchyAngularCoords>(*box)), l_max);
+    // Spectral::Swsh::filter_swsh_boundary_quantity(
+        // make_not_null(&r200_cauchy_gauge), l_max, l_max - 4);
 
-    auto identity_check = Spectral::Swsh::swsh_interpolate(
-        make_not_null(&r200_cauchy_gauge),
-        get<0>(db::get<Tags::InertialAngularCoords>(*box)),
-        get<1>(db::get<Tags::InertialAngularCoords>(*box)), l_max);
-    printf("Identity Check\n");
-    for (size_t i = 0; i < r200_slice.size(); ++i) {
-      printf("(%e, %e) from (%e, %e)\n",
-             real(r200_slice.data()[i] - identity_check.data()[i]),
-             imag(r200_slice.data()[i] - identity_check.data()[i]),
-             real(r200_slice.data()[i]), imag(r200_slice.data()[i]));
-    }
-    printf("done\n");
+    // auto identity_check = Spectral::Swsh::swsh_interpolate(
+        // make_not_null(&r200_cauchy_gauge),
+        // get<0>(db::get<Tags::InertialAngularCoords>(*box)),
+        // get<1>(db::get<Tags::InertialAngularCoords>(*box)), l_max);
+    // printf("Identity Check\n");
+    // for (size_t i = 0; i < r200_slice.size(); ++i) {
+      // printf("(%e, %e) from (%e, %e)\n",
+             // real(r200_slice.data()[i] - identity_check.data()[i]),
+             // imag(r200_slice.data()[i] - identity_check.data()[i]),
+             // real(r200_slice.data()[i]), imag(r200_slice.data()[i]));
+    // }
+    // printf("done\n");
 
     auto r200_goldberg_modes = Spectral::Swsh::libsharp_to_goldberg_modes(
         Spectral::Swsh::swsh_transform(make_not_null(&r200_slice), l_max),
@@ -695,7 +688,7 @@ void run_trial_regularity_preserving_cce(
 
   ScriPlusInterpolationManager<FlexibleBarycentricInterpolator,
                                ComplexDataVector>
-      interpolation_manager{1, boundary_size};
+      interpolation_manager{3, boundary_size};
 
   db::mutate_apply<InitializeJ<Tags::BoundaryValue>>(make_not_null(&box));
   db::mutate_apply<InitializeGauge>(make_not_null(&box));
@@ -773,14 +766,15 @@ void run_trial_regularity_preserving_cce(
           // });
           // }
 
-          // db::mutate<bondi_tag>(
-          // make_not_null(&box),
-          // [&l_max, &l_filter_start](
-          // const gsl::not_null<db::item_type<bondi_tag>*> bondi_quantity) {
-          // Spectral::Swsh::filter_swsh_volume_quantity(
-          // make_not_null(&get(*bondi_quantity)), l_max, l_filter_start,
-          // 108.0, 8);
-          // });
+          db::mutate<bondi_tag>(
+              make_not_null(&box),
+              [&l_max,
+               &l_filter_start](const gsl::not_null<db::item_type<bondi_tag>*>
+                                    bondi_quantity) {
+                Spectral::Swsh::filter_swsh_volume_quantity(
+                    make_not_null(&get(*bondi_quantity)), l_max, l_filter_start,
+                    108.0, 8);
+              });
         });
     db::mutate_apply<
         CalculateScriPlusValue<Tags::Du<Tags::InertialRetardedTime>>>(
