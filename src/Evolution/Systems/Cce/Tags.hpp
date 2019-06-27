@@ -123,9 +123,24 @@ struct GaugeB : db::SimpleTag {
   static std::string name() noexcept { return "GaugeB"; }
 };
 
+struct GaugeC : db::SimpleTag {
+  using type = Scalar<SpinWeighted<ComplexDataVector, 2>>;
+  static std::string name() noexcept { return "GaugeC"; }
+};
+
+struct GaugeD : db::SimpleTag {
+  using type = Scalar<SpinWeighted<ComplexDataVector, 0>>;
+  static std::string name() noexcept { return "GaugeD"; }
+};
+
 struct GaugeOmega : db::SimpleTag {
   using type = Scalar<SpinWeighted<ComplexDataVector, 0>>;
-  static std::string name() noexcept { return "GaugeB"; }
+  static std::string name() noexcept { return "GaugeOmega"; }
+};
+
+struct GaugeOmegaCD : db::SimpleTag {
+  using type = Scalar<SpinWeighted<ComplexDataVector, 0>>;
+  static std::string name() noexcept { return "GaugeOmegaCD"; }
 };
 
 struct News : db::SimpleTag {
@@ -163,6 +178,16 @@ struct DuCauchyAngularCoords : db::SimpleTag {
   static std::string name() noexcept { return "DuCauchyAngularCoords";}
 };
 
+struct CauchyCartesianCoords : db::SimpleTag {
+  using type = tnsr::i<DataVector, 3>;
+  static std::string name() noexcept { return "CauchyCartesianCoords";}
+};
+
+struct DuCauchyCartesianCoords : db::SimpleTag {
+  using type = tnsr::i<DataVector, 3>;
+  static std::string name() noexcept { return "DuCauchyCartesianCoords"; }
+};
+
 
 struct InertialAngularCoords : db::SimpleTag {
   using type = tnsr::i<DataVector, 2>;
@@ -172,6 +197,16 @@ struct InertialAngularCoords : db::SimpleTag {
 struct DuInertialAngularCoords : db::SimpleTag {
   using type = tnsr::i<DataVector, 2>;
   static std::string name() noexcept { return "DuInertialAngularCoords"; }
+};
+
+struct InertialCartesianCoords : db::SimpleTag {
+  using type = tnsr::i<DataVector, 3>;
+  static std::string name() noexcept { return "InertialCartesianCoords"; }
+};
+
+struct DuInertialCartesianCoords : db::SimpleTag {
+  using type = tnsr::i<DataVector, 3>;
+  static std::string name() noexcept { return "DuInertialCartesianCoords"; }
 };
 
 struct InertialRetardedTime : db::SimpleTag {

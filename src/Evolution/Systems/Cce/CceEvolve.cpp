@@ -135,8 +135,14 @@ void regularity_preserving_hypersurface_computation(
       RadialIntegrateBondi<Tags::EvolutionGaugeBoundaryValue, BondiTag>>(box);
 
   if (cpp17::is_same_v<BondiTag, Tags::U>) {
-    db::mutate_apply<GaugeUpdateDuXtildeOfX>(box);
     db::mutate_apply<GaugeUpdateU>(box);
+    db::mutate_apply<GaugeUpdateDuXtildeOfX>(box);
+    // db::mutate_apply<GaugeUpdateJacobianFromCoords<
+        // Tags::GaugeA, Tags::GaugeB, Tags::CauchyAngularCoords,
+        // Tags::InertialAngularCoords, Tags::DuInertialAngularCoords>>(box);
+    // db::mutate_apply<GaugeUpdateJacobianFromCoords<
+        // Tags::GaugeC, Tags::GaugeD, Tags::InertialAngularCoords,
+        // Tags::CauchyAngularCoords, Tags::DuCauchyAngularCoords>>(box);
     db::mutate_apply<ComputeGaugeAdjustedBoundaryValue<Tags::DuRDividedByR>>(
         box);
     db::mutate_apply<PrecomputeCceDependencies<
@@ -287,9 +293,10 @@ void compare_and_record_r200_values_from_rp(
     using tag = typename decltype(x)::type;
     typename db::item_type<tag>::type r200_slice;
     ComplexDataVector r200_slice_buffer = get(db::get<tag>(*box)).data();
+
     r200_slice.data() = interpolate_to_bondi_r(
-        get(db::get<tag>(*box)).data(), get(db::get<Tags::R>(*box)).data(),
-        200.0 / get(db::get<Tags::GaugeOmega>(*box)).data(), l_max);
+        get(db::get<tag>(*box)).data(),
+        get(db::get<Tags::BoundaryValue<Tags::R>>(*box)).data(), 200.0, l_max);
 
     // for(const auto& val : get(db::get<Tags::GaugeOmega>(*box)).data()) {
     // printf("(%e, %e)\n", real(val), imag(val));
@@ -302,18 +309,23 @@ void compare_and_record_r200_values_from_rp(
 
     typename db::item_type<tag>::type r200_cauchy_gauge{r200_slice.size()};
     Spectral::Swsh::filter_swsh_boundary_quantity(make_not_null(&r200_slice),
-                                                  l_max, l_max - 2);
+                                                  l_max, l_max - 4);
+    // TEST ensure representability to test coordinate values
+    // const auto& collocation = Spectral::Swsh::precomputed_collocation<
+      // Spectral::Swsh::ComplexRepresentation::Interleaved>(l_max);
+    // for (const auto& collocation_point : collocation) {
+
     Spectral::Swsh::swsh_interpolate(
         make_not_null(&r200_cauchy_gauge), make_not_null(&r200_slice),
-        get<0>(db::get<Tags::InertialAngularCoords>(*box)),
-        get<1>(db::get<Tags::InertialAngularCoords>(*box)), l_max);
+        get<0>(db::get<Tags::CauchyAngularCoords>(*box)),
+        get<1>(db::get<Tags::CauchyAngularCoords>(*box)), l_max);
     Spectral::Swsh::filter_swsh_boundary_quantity(
-        make_not_null(&r200_cauchy_gauge), l_max, l_max - 2);
+        make_not_null(&r200_cauchy_gauge), l_max, l_max - 4);
 
     auto identity_check = Spectral::Swsh::swsh_interpolate(
         make_not_null(&r200_cauchy_gauge),
-        get<0>(db::get<Tags::CauchyAngularCoords>(*box)),
-        get<1>(db::get<Tags::CauchyAngularCoords>(*box)), l_max);
+        get<0>(db::get<Tags::InertialAngularCoords>(*box)),
+        get<1>(db::get<Tags::InertialAngularCoords>(*box)), l_max);
     printf("Identity Check\n");
     for (size_t i = 0; i < r200_slice.size(); ++i) {
       printf("(%e, %e) from (%e, %e)\n",
@@ -324,8 +336,7 @@ void compare_and_record_r200_values_from_rp(
     printf("done\n");
 
     auto r200_goldberg_modes = Spectral::Swsh::libsharp_to_goldberg_modes(
-        Spectral::Swsh::swsh_transform(make_not_null(&r200_cauchy_gauge),
-                                       l_max),
+        Spectral::Swsh::swsh_transform(make_not_null(&r200_slice), l_max),
         l_max);
     recorder->append_mode_data("/" + tag::name() + "_r200", time,
                                r200_goldberg_modes.data(), comparison_l_max);
@@ -573,12 +584,14 @@ void run_trial_regularity_preserving_cce(
   TimeSteppers::RungeKutta3 stepper{};
   TimeSteppers::History<ComplexDataVector, ComplexDataVector> j_history{};
   TimeSteppers::History<ComplexDataVector, ComplexDataVector> u_bondi_history{};
-  TimeSteppers::History<DataVector, DataVector> theta_history{};
-  TimeSteppers::History<DataVector, DataVector> phi_history{};
-  TimeSteppers::History<DataVector, DataVector> theta_tilde_history{};
-  TimeSteppers::History<DataVector, DataVector> phi_tilde_history{};
-  TimeSteppers::History<ComplexDataVector, ComplexDataVector> gauge_a_history{};
-  TimeSteppers::History<ComplexDataVector, ComplexDataVector> gauge_b_history{};
+  TimeSteppers::History<DataVector, DataVector> x_history{};
+  TimeSteppers::History<DataVector, DataVector> y_history{};
+  TimeSteppers::History<DataVector, DataVector> z_history{};
+  TimeSteppers::History<DataVector, DataVector> x_tilde_history{};
+  TimeSteppers::History<DataVector, DataVector> y_tilde_history{};
+  TimeSteppers::History<DataVector, DataVector> z_tilde_history{};
+  TimeSteppers::History<ComplexDataVector, ComplexDataVector> gauge_c_history{};
+  TimeSteppers::History<ComplexDataVector, ComplexDataVector> gauge_d_history{};
 
   // NOTE: this interoplator needs to be Cubic whenever comparisons with SpEC
   // are desired with tight agreement. Otherwise, the interpolation error will
@@ -686,9 +699,24 @@ void run_trial_regularity_preserving_cce(
 
   db::mutate_apply<InitializeJ<Tags::BoundaryValue>>(make_not_null(&box));
   db::mutate_apply<InitializeGauge>(make_not_null(&box));
+  db::mutate_apply<GaugeUpdateAngularFromCartesian<
+      Tags::InertialAngularCoords, Tags::InertialCartesianCoords>>(
+      make_not_null(&box));
+  db::mutate_apply<GaugeUpdateAngularFromCartesian<
+      Tags::CauchyAngularCoords, Tags::CauchyCartesianCoords>>(
+      make_not_null(&box));
+
   db::mutate_apply<InitializeXtildeOfX>(make_not_null(&box));
-  db::mutate_apply<GaugeUpdateJacobianFromCoords>(make_not_null(&box));
+  db::mutate_apply<GaugeUpdateJacobianFromCoords<
+      Tags::GaugeA, Tags::GaugeB, Tags::InertialCartesianCoords,
+      Tags::InertialAngularCoords, Tags::DuInertialAngularCoords>>(
+      make_not_null(&box));
+  db::mutate_apply<GaugeUpdateJacobianFromCoords<
+      Tags::GaugeC, Tags::GaugeD, Tags::CauchyCartesianCoords,
+      Tags::CauchyAngularCoords, Tags::DuCauchyAngularCoords>>(
+      make_not_null(&box));
   db::mutate_apply<GaugeUpdateOmega>(make_not_null(&box));
+  db::mutate_apply<GaugeUpdateOmegaCD>(make_not_null(&box));
   db::mutate_apply<GaugeAdjustInitialJ>(make_not_null(&box));
 
   // TESTING
@@ -762,14 +790,18 @@ void run_trial_regularity_preserving_cce(
     j_history.insert(time.time(), get(db::get<Tags::J>(box)).data(),
                      std::move(du_j));
 
-    DataVector du_theta = get<0>(db::get<Tags::DuCauchyAngularCoords>(box));
-    theta_history.insert(time.time(),
-                         get<0>(db::get<Tags::CauchyAngularCoords>(box)),
-                         std::move(du_theta));
-    DataVector du_phi = get<1>(db::get<Tags::DuCauchyAngularCoords>(box));
-    phi_history.insert(time.time(),
-                       get<1>(db::get<Tags::CauchyAngularCoords>(box)),
-                       std::move(du_phi));
+    DataVector du_x = get<0>(db::get<Tags::DuCauchyCartesianCoords>(box));
+    x_history.insert(time.time(),
+                     get<0>(db::get<Tags::CauchyCartesianCoords>(box)),
+                     std::move(du_x));
+    DataVector du_y = get<1>(db::get<Tags::DuCauchyCartesianCoords>(box));
+    y_history.insert(time.time(),
+                     get<1>(db::get<Tags::CauchyCartesianCoords>(box)),
+                     std::move(du_y));
+    DataVector du_z = get<2>(db::get<Tags::DuCauchyCartesianCoords>(box));
+    z_history.insert(time.time(),
+                     get<2>(db::get<Tags::CauchyCartesianCoords>(box)),
+                     std::move(du_z));
 
     ComplexDataVector du_u_bondi =
         get(db::get<Tags::Du<Tags::InertialRetardedTime>>(box)).data();
@@ -777,25 +809,30 @@ void run_trial_regularity_preserving_cce(
                            get(db::get<Tags::InertialRetardedTime>(box)).data(),
                            std::move(du_u_bondi));
 
-    ComplexDataVector du_gauge_a =
-        get(db::get<Tags::Du<Tags::GaugeA>>(box)).data();
-    gauge_a_history.insert(time.time(), get(db::get<Tags::GaugeA>(box)).data(),
-                           std::move(du_gauge_a));
-    ComplexDataVector du_gauge_b =
-        get(db::get<Tags::Du<Tags::GaugeB>>(box)).data();
-    gauge_b_history.insert(time.time(), get(db::get<Tags::GaugeB>(box)).data(),
-                           std::move(du_gauge_b));
+    ComplexDataVector du_gauge_c =
+        get(db::get<Tags::Du<Tags::GaugeC>>(box)).data();
+    gauge_c_history.insert(time.time(), get(db::get<Tags::GaugeC>(box)).data(),
+                           std::move(du_gauge_c));
+    ComplexDataVector du_gauge_d =
+        get(db::get<Tags::Du<Tags::GaugeD>>(box)).data();
+    gauge_d_history.insert(time.time(), get(db::get<Tags::GaugeD>(box)).data(),
+                           std::move(du_gauge_d));
 
-    DataVector du_theta_tilde =
-        get<0>(db::get<Tags::DuInertialAngularCoords>(box));
-    theta_tilde_history.insert(
-        time.time(), get<0>(db::get<Tags::InertialAngularCoords>(box)),
-        std::move(du_theta_tilde));
-    DataVector du_phi_tilde =
-        get<1>(db::get<Tags::DuInertialAngularCoords>(box));
-    phi_tilde_history.insert(time.time(),
-                             get<1>(db::get<Tags::InertialAngularCoords>(box)),
-                             std::move(du_phi_tilde));
+    DataVector du_x_tilde =
+        get<0>(db::get<Tags::DuInertialCartesianCoords>(box));
+    x_tilde_history.insert(time.time(),
+                           get<0>(db::get<Tags::InertialCartesianCoords>(box)),
+                           std::move(du_x_tilde));
+    DataVector du_y_tilde =
+        get<1>(db::get<Tags::DuInertialCartesianCoords>(box));
+    y_tilde_history.insert(time.time(),
+                           get<1>(db::get<Tags::InertialCartesianCoords>(box)),
+                           std::move(du_y_tilde));
+    DataVector du_z_tilde =
+        get<2>(db::get<Tags::DuInertialCartesianCoords>(box));
+    z_tilde_history.insert(time.time(),
+                           get<2>(db::get<Tags::InertialCartesianCoords>(box)),
+                           std::move(du_z_tilde));
 
     // compute the scri+ values in the Cauchy gauge to verify against the SpEC
     // computation that we're actually performing a reliable coordinate
@@ -926,58 +963,78 @@ void run_trial_regularity_preserving_cce(
         // the comparison to be useful.
 
         compare_and_record_r200_values_from_rp<tmpl::list<
-            Tags::CauchyGauge<Tags::J>, Tags::CauchyGauge<Tags::Beta>,
-            Tags::CauchyGauge<Tags::Q>, Tags::CauchyGauge<Tags::U>>>(
+            Tags::CauchyGauge<Tags::J>, Tags::CauchyGauge<Tags::Beta>
+            /*,Tags::CauchyGauge<Tags::Q>, Tags::CauchyGauge<Tags::U>*/>>(
             make_not_null(&box), make_not_null(&recorder),
             comparison_file_prefix, time.step_time().value(), l_max,
             comparison_l_max, number_of_radial_points);
 
-        compare_and_record_r200_values<tmpl::list<Tags::J, Tags::Beta>>(
-            make_not_null(&box), make_not_null(&recorder),
-            comparison_file_prefix, time.step_time().value(), l_max,
-            comparison_l_max, number_of_radial_points);
+        // compare_and_record_r200_values<tmpl::list<Tags::J, Tags::Beta>>(
+            // make_not_null(&box), make_not_null(&recorder),
+            // comparison_file_prefix, time.step_time().value(), l_max,
+            // comparison_l_max, number_of_radial_points);
       }
     }
-    db::mutate<Tags::J, Tags::CauchyAngularCoords, Tags::InertialAngularCoords,
-               Tags::InertialRetardedTime, Tags::GaugeA, Tags::GaugeB>(
+    db::mutate<Tags::J, Tags::CauchyCartesianCoords,
+               Tags::InertialCartesianCoords, Tags::InertialRetardedTime,
+               Tags::GaugeC, Tags::GaugeD>(
         make_not_null(&box),
-        [&stepper, &time_step, &j_history, &theta_history, &phi_history,
-         &theta_tilde_history, &phi_tilde_history, &u_bondi_history,
-         &gauge_a_history, &gauge_b_history](
+        [&stepper, &time_step, &j_history, &x_history, &y_history, &z_history,
+         &x_tilde_history, &y_tilde_history, &z_tilde_history, &u_bondi_history,
+         &gauge_c_history, &gauge_d_history](
             const gsl::not_null<db::item_type<Tags::J>*> j,
-            const gsl::not_null<db::item_type<Tags::CauchyAngularCoords>*>
+            const gsl::not_null<db::item_type<Tags::CauchyCartesianCoords>*>
                 x_of_x_tilde,
-            const gsl::not_null<db::item_type<Tags::InertialAngularCoords>*>
+            const gsl::not_null<db::item_type<Tags::InertialCartesianCoords>*>
                 x_tilde_of_x,
             const gsl::not_null<db::item_type<Tags::InertialRetardedTime>*>
                 u_bondi,
-            const gsl::not_null<db::item_type<Tags::GaugeA>*> gauge_a,
-            const gsl::not_null<db::item_type<Tags::GaugeB>*> gauge_b) {
+            const gsl::not_null<db::item_type<Tags::GaugeC>*> gauge_c,
+            const gsl::not_null<db::item_type<Tags::GaugeD>*> gauge_d) {
           stepper.update_u(make_not_null(&get(*j).data()),
                            make_not_null(&j_history), time_step);
 
           stepper.update_u(make_not_null(&get<0>(*x_of_x_tilde)),
-                           make_not_null(&theta_history), time_step);
+                           make_not_null(&x_history), time_step);
           stepper.update_u(make_not_null(&get<1>(*x_of_x_tilde)),
-                           make_not_null(&phi_history), time_step);
+                           make_not_null(&y_history), time_step);
+          stepper.update_u(make_not_null(&get<2>(*x_of_x_tilde)),
+                           make_not_null(&z_history), time_step);
 
           stepper.update_u(make_not_null(&get<0>(*x_tilde_of_x)),
-                           make_not_null(&theta_tilde_history), time_step);
+                           make_not_null(&x_tilde_history), time_step);
           stepper.update_u(make_not_null(&get<1>(*x_tilde_of_x)),
-                           make_not_null(&phi_tilde_history), time_step);
+                           make_not_null(&y_tilde_history), time_step);
+          stepper.update_u(make_not_null(&get<2>(*x_tilde_of_x)),
+                           make_not_null(&z_tilde_history), time_step);
 
           stepper.update_u(make_not_null(&get(*u_bondi).data()),
                            make_not_null(&u_bondi_history), time_step);
 
-          // stepper.update_u(make_not_null(&get(*gauge_a).data()),
-          // make_not_null(&gauge_a_history), time_step);
-          // stepper.update_u(make_not_null(&get(*gauge_b).data()),
-          // make_not_null(&gauge_b_history), time_step);
+          stepper.update_u(make_not_null(&get(*gauge_c).data()),
+                           make_not_null(&gauge_c_history), time_step);
+          stepper.update_u(make_not_null(&get(*gauge_d).data()),
+                           make_not_null(&gauge_d_history), time_step);
         });
     time = stepper.next_time_id(time, time_step);
     printf("next time: %f\n", time.time().value());
-    db::mutate_apply<GaugeUpdateJacobianFromCoords>(make_not_null(&box));
+    db::mutate_apply<GaugeUpdateAngularFromCartesian<
+        Tags::InertialAngularCoords, Tags::InertialCartesianCoords>>(
+        make_not_null(&box));
+    db::mutate_apply<GaugeUpdateAngularFromCartesian<
+        Tags::CauchyAngularCoords, Tags::CauchyCartesianCoords>>(
+        make_not_null(&box));
+
+    db::mutate_apply<GaugeUpdateJacobianFromCoords<
+        Tags::GaugeA, Tags::GaugeB, Tags::InertialCartesianCoords,
+        Tags::InertialAngularCoords, Tags::DuInertialAngularCoords>>(
+        make_not_null(&box));
+    db::mutate_apply<GaugeUpdateJacobianFromCoords<
+        Tags::GaugeC, Tags::GaugeD, Tags::CauchyCartesianCoords,
+        Tags::CauchyAngularCoords, Tags::DuCauchyAngularCoords>>(
+        make_not_null(&box));
     db::mutate_apply<GaugeUpdateOmega>(make_not_null(&box));
+    db::mutate_apply<GaugeUpdateOmegaCD>(make_not_null(&box));
     // db::mutate<Tags::GaugeOmega>(
     // make_not_null(&box),
     // [&l_max, &l_filter_start](

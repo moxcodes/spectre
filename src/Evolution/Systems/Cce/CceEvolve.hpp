@@ -40,11 +40,15 @@ using gauge_transform_boundary_tags =
                Tags::EvolutionGaugeBoundaryValue<Tags::U>,
                Tags::EvolutionGaugeBoundaryValue<Tags::W>,
                Tags::EvolutionGaugeBoundaryValue<Tags::H>, Tags::GaugeA,
-               Tags::GaugeB, Tags::Du<Tags::GaugeA>, Tags::GaugeOmega,
-               Tags::Du<Tags::GaugeOmega>,
+               Tags::GaugeB, Tags::GaugeC, Tags::GaugeD, Tags::Du<Tags::GaugeA>,
+               Tags::Du<Tags::GaugeB>, Tags::Du<Tags::GaugeC>,
+               Tags::Du<Tags::GaugeD>, Tags::GaugeOmega, Tags::GaugeOmegaCD,
+               Tags::Du<Tags::GaugeOmega>, Tags::Du<Tags::GaugeOmegaCD>,
                Spectral::Swsh::Tags::Derivative<Tags::GaugeOmega,
                                                 Spectral::Swsh::Tags::Eth>,
-               Tags::Du<Tags::GaugeB>, Tags::U0>;
+               Spectral::Swsh::Tags::Derivative<Tags::GaugeOmegaCD,
+                                                Spectral::Swsh::Tags::Eth>,
+               Tags::U0>;
 
 using gauge_confirmation_scri_tags =
     tmpl::list<Tags::CauchyGaugeScriPlus<Tags::Beta>,
@@ -56,9 +60,11 @@ using gauge_confirmation_volume_tags =
 
 using angular_coordinate_tags =
     tmpl::list<Tags::CauchyAngularCoords, Tags::DuCauchyAngularCoords,
+               Tags::CauchyCartesianCoords, Tags::DuCauchyCartesianCoords,
                /* the following only used for gauge transform confirmation
                   routine*/
-               Tags::InertialAngularCoords, Tags::DuInertialAngularCoords>;
+               Tags::InertialAngularCoords, Tags::DuInertialAngularCoords,
+               Tags::InertialCartesianCoords, Tags::DuInertialCartesianCoords>;
 
 using scri_tags = tmpl::list<Tags::News, Tags::InertialRetardedTime,
                              Tags::Du<Tags::InertialRetardedTime>>;

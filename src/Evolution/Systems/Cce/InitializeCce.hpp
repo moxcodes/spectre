@@ -71,9 +71,11 @@ struct InitializeJ {
 };
 
 struct GaugeAdjustInitialJ {
-  using boundary_tags = tmpl::list<Tags::GaugeA, Tags::GaugeB, Tags::GaugeOmega,
-                                   Tags::CauchyAngularCoords,
-                                   Tags::InertialAngularCoords, Tags::LMax>;
+  using boundary_tags =
+      tmpl::list<Tags::GaugeA, Tags::GaugeB, Tags::GaugeC, Tags::GaugeD,
+                 Tags::GaugeOmega, Tags::GaugeOmegaCD,
+                 Tags::CauchyAngularCoords, Tags::InertialAngularCoords,
+                 Tags::LMax>;
   using return_tags = tmpl::list<Tags::J>;
   using argument_tags = tmpl::append<boundary_tags>;
 
@@ -81,10 +83,13 @@ struct GaugeAdjustInitialJ {
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> j,
       const Scalar<SpinWeighted<ComplexDataVector, 2>>& a,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& b,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& c,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& d,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega_cd,
       const tnsr::i<DataVector, 2>& x_of_x_tilde,
       const tnsr::i<DataVector, 2>& x_tilde_of_x, const size_t l_max) noexcept {
-    const size_t number_of_radial_points = get(*j).size() / get(a).size();
+    const size_t number_of_radial_points = get(*j).size() / get(c).size();
 
     const auto& one_minus_y_collocation =
         1.0 - Spectral::collocation_points<Spectral::Basis::Legendre,
@@ -92,33 +97,68 @@ struct GaugeAdjustInitialJ {
                   number_of_radial_points);
 
     for (size_t i = 0; i < number_of_radial_points; i++) {
+      // TODO rewrite
       ComplexDataVector angular_view_j{
-          get(*j).data().data() + get(a).size() * i, get(a).size()};
+          get(*j).data().data() + get(c).size() * i, get(c).size()};
       // TODO it's probably better to use the volume filtering to combine
       // evaluations of the swsh transform
-
-      // note: the jacobian factors a and b are only representable in the cauchy
-      // coordinates, so this transformation must be performed prior to the
-      // interpolation.
-      SpinWeighted<ComplexDataVector, 2> jacobian_transformed_j_view;
-      jacobian_transformed_j_view.data() =
-          0.25 *
-          (square(get(b).data()) * angular_view_j +
-           square(get(a).data()) * conj(angular_view_j) -
-           2.0 * get(a).data() * get(b).data() *
-               sqrt(1.0 + angular_view_j * conj(angular_view_j))) /
-          square(get(omega).data());
-
+      SpinWeighted<ComplexDataVector, 2> j_view;
+      j_view.data() = angular_view_j;
+      Spectral::Swsh::filter_swsh_boundary_quantity(make_not_null(&j_view),
+                                                    l_max, l_max - 4);
       // TODO review all filtering to double-check their necessity
-      Spectral::Swsh::filter_swsh_boundary_quantity(
-          make_not_null(&jacobian_transformed_j_view), l_max, l_max - 2);
+
       SpinWeighted<ComplexDataVector, 2> evolution_coords_j_view =
-          Spectral::Swsh::swsh_interpolate(
-              make_not_null(&jacobian_transformed_j_view), get<0>(x_of_x_tilde),
-              get<1>(x_of_x_tilde), l_max);
+          Spectral::Swsh::swsh_interpolate(make_not_null(&j_view),
+                                           get<0>(x_of_x_tilde),
+                                           get<1>(x_of_x_tilde), l_max);
+      // finish adjusting the gauge in place
+      // ComplexDataVector cd_omega =
+          // 0.5 * sqrt(get(d).data() * conj(get(d).data()) +
+                     // get(c).data() * conj(get(c).data()));
+
+      evolution_coords_j_view =
+          0.25 * (square(conj(get(d).data())) * evolution_coords_j_view.data() +
+                  square(get(c).data()) * conj(evolution_coords_j_view.data()) +
+                  2.0 * conj(get(d).data()) * get(c).data() *
+                      sqrt(1.0 + evolution_coords_j_view.data() *
+                                     conj(evolution_coords_j_view.data())));
       Spectral::Swsh::filter_swsh_boundary_quantity(
-          make_not_null(&evolution_coords_j_view), l_max, l_max - 2);
-      angular_view_j = evolution_coords_j_view.data();
+          make_not_null(&evolution_coords_j_view), l_max, l_max - 4);
+      angular_view_j =
+          evolution_coords_j_view.data() / square(get(omega_cd).data());
+
+      // TEST
+      // SpinWeighted<ComplexDataVector, 2> identity_test_inertial_j;
+      // identity_test_inertial_j.data() = angular_view_j;
+
+      // SpinWeighted<ComplexDataVector, 2> cauchy_coords_j_view =
+          // Spectral::Swsh::swsh_interpolate(
+              // make_not_null(&identity_test_inertial_j), get<0>(x_tilde_of_x),
+              // get<1>(x_tilde_of_x), l_max);
+
+      // SpinWeighted<ComplexDataVector, 2> identity_test_cauchy_j;
+      // identity_test_cauchy_j.data() =
+          // 0.25 *
+          // (square(conj(get(b).data())) * cauchy_coords_j_view.data() +
+           // square(get(a).data()) * conj(cauchy_coords_j_view.data()) +
+           // 2.0 * get(a).data() * conj(get(b).data()) *
+               // sqrt(1.0 + cauchy_coords_j_view.data() *
+                              // conj(cauchy_coords_j_view.data())));
+      // Spectral::Swsh::filter_swsh_boundary_quantity(
+          // make_not_null(&identity_test_cauchy_j), l_max, l_max - 4);
+      // identity_test_cauchy_j.data() /= square(get(omega).data());
+
+      // printf("Identity test: J transformation\n");
+      // for (size_t i = 0; i < identity_test_cauchy_j.size(); ++i) {
+        // printf("(%e, %e) from (%e, %e)\n",
+               // real(identity_test_cauchy_j.data()[i] - j_view.data()[i]),
+               // imag(identity_test_cauchy_j.data()[i] - j_view.data()[i]),
+               // real(identity_test_cauchy_j.data()[i]),
+               // imag(identity_test_cauchy_j.data()[i]));
+      // }
+      // printf("done\n");
+      // TEST
 
       // for(size_t i = 0; i < angular_view_j.size(); ++i) {
       // printf(
@@ -141,6 +181,8 @@ struct GaugeAdjustInitialJ {
       // conj(angular_slice_j.data()))) /
       // square(get(omega).data());
     }
+    Spectral::Swsh::filter_swsh_volume_quantity(make_not_null(&get(*j)), l_max,
+                                                l_max - 4, 0.0, 8);
   }
 };
 
