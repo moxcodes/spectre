@@ -300,9 +300,9 @@ void compare_and_record_r200_values_from_rp(
 
 
 
-    // typename db::item_type<tag>::type r200_cauchy_gauge{r200_slice.size()};
-    // Spectral::Swsh::filter_swsh_boundary_quantity(make_not_null(&r200_slice),
-                                                  // l_max, l_max - 4);
+    typename db::item_type<tag>::type r200_cauchy_gauge{r200_slice.size()};
+    Spectral::Swsh::filter_swsh_boundary_quantity(make_not_null(&r200_slice),
+                                                  l_max, l_max - 4);
     // TEST ensure representability to test coordinate values
     // const auto& collocation = Spectral::Swsh::precomputed_collocation<
       // Spectral::Swsh::ComplexRepresentation::Interleaved>(l_max);
@@ -319,7 +319,7 @@ void compare_and_record_r200_values_from_rp(
         // make_not_null(&r200_cauchy_gauge),
         // get<0>(db::get<Tags::InertialAngularCoords>(*box)),
         // get<1>(db::get<Tags::InertialAngularCoords>(*box)), l_max);
-    // printf("Identity Check\n");
+    // printf("Identity Check : %s\n", tag::name().c_str());
     // for (size_t i = 0; i < r200_slice.size(); ++i) {
       // printf("(%e, %e) from (%e, %e)\n",
              // real(r200_slice.data()[i] - identity_check.data()[i]),
@@ -688,7 +688,7 @@ void run_trial_regularity_preserving_cce(
 
   ScriPlusInterpolationManager<FlexibleBarycentricInterpolator,
                                ComplexDataVector>
-      interpolation_manager{3, boundary_size};
+      interpolation_manager{1, boundary_size};
 
   db::mutate_apply<InitializeJ<Tags::BoundaryValue>>(make_not_null(&box));
   db::mutate_apply<InitializeGauge>(make_not_null(&box));
@@ -702,11 +702,11 @@ void run_trial_regularity_preserving_cce(
   db::mutate_apply<InitializeXtildeOfX>(make_not_null(&box));
   db::mutate_apply<GaugeUpdateJacobianFromCoords<
       Tags::GaugeA, Tags::GaugeB, Tags::InertialCartesianCoords,
-      Tags::InertialAngularCoords, Tags::DuInertialAngularCoords>>(
+      Tags::InertialAngularCoords, Tags::DuInertialCartesianCoords>>(
       make_not_null(&box));
   db::mutate_apply<GaugeUpdateJacobianFromCoords<
       Tags::GaugeC, Tags::GaugeD, Tags::CauchyCartesianCoords,
-      Tags::CauchyAngularCoords, Tags::DuCauchyAngularCoords>>(
+      Tags::CauchyAngularCoords, Tags::DuCauchyCartesianCoords>>(
       make_not_null(&box));
   db::mutate_apply<GaugeUpdateOmega>(make_not_null(&box));
   db::mutate_apply<GaugeUpdateOmegaCD>(make_not_null(&box));
@@ -838,12 +838,6 @@ void run_trial_regularity_preserving_cce(
           make_not_null(&box));
     });
 
-    tmpl::for_each<tmpl::list<Tags::Beta, Tags::J, Tags::Q, Tags::U>>(
-        [&box](auto x) {
-          using tag = typename decltype(x)::type;
-          db::mutate_apply<CalculateCauchyGauge<Tags::CauchyGauge<tag>>>(
-              make_not_null(&box));
-        });
 
     // DEBUG output
     record_scri_output<0>(
@@ -864,6 +858,14 @@ void run_trial_regularity_preserving_cce(
         },
         db::get<Tags::H>(box), db::get<Tags::DuRDividedByR>(box),
         db::get<Tags::OneMinusY>(box), db::get<Tags::Dy<Tags::J>>(box));
+
+    tmpl::for_each<
+        tmpl::list<Tags::Beta, Tags::J, Tags::W, Tags::U, Tags::SpecH>>(
+        [&box](auto x) {
+          using tag = typename decltype(x)::type;
+          db::mutate_apply<CalculateCauchyGauge<Tags::CauchyGauge<tag>>>(
+              make_not_null(&box));
+        });
 
     // DEBUG output
 
@@ -957,7 +959,9 @@ void run_trial_regularity_preserving_cce(
         // the comparison to be useful.
 
         compare_and_record_r200_values_from_rp<tmpl::list<
-            Tags::CauchyGauge<Tags::J>, Tags::CauchyGauge<Tags::Beta>
+            Tags::CauchyGauge<Tags::J>, Tags::CauchyGauge<Tags::Beta>,
+            Tags::CauchyGauge<Tags::W>, Tags::CauchyGauge<Tags::U>,
+            Tags::CauchyGauge<Tags::SpecH>
             /*,Tags::CauchyGauge<Tags::Q>, Tags::CauchyGauge<Tags::U>*/>>(
             make_not_null(&box), make_not_null(&recorder),
             comparison_file_prefix, time.step_time().value(), l_max,
@@ -1021,11 +1025,11 @@ void run_trial_regularity_preserving_cce(
 
     db::mutate_apply<GaugeUpdateJacobianFromCoords<
         Tags::GaugeA, Tags::GaugeB, Tags::InertialCartesianCoords,
-        Tags::InertialAngularCoords, Tags::DuInertialAngularCoords>>(
+        Tags::InertialAngularCoords, Tags::DuInertialCartesianCoords>>(
         make_not_null(&box));
     db::mutate_apply<GaugeUpdateJacobianFromCoords<
         Tags::GaugeC, Tags::GaugeD, Tags::CauchyCartesianCoords,
-        Tags::CauchyAngularCoords, Tags::DuCauchyAngularCoords>>(
+        Tags::CauchyAngularCoords, Tags::DuCauchyCartesianCoords>>(
         make_not_null(&box));
     db::mutate_apply<GaugeUpdateOmega>(make_not_null(&box));
     db::mutate_apply<GaugeUpdateOmegaCD>(make_not_null(&box));

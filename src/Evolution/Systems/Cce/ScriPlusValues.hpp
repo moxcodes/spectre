@@ -408,6 +408,258 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::Beta>> {
 };
 
 template <>
+struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::SpecH>> {
+  using argument_tags =
+      tmpl::list<Tags::GaugeOmega, Tags::GaugeOmegaCD,
+                 Tags::Du<Tags::GaugeOmegaCD>,
+                 Spectral::Swsh::Tags::Derivative<Tags::GaugeOmegaCD,
+                                                  Spectral::Swsh::Tags::Eth>,
+                 Tags::GaugeA, Tags::GaugeB, Tags::BoundaryValue<Tags::SpecH>,
+                 Tags::InertialAngularCoords, Tags::LMax>;
+  using return_tags =
+      tmpl::list<Tags::CauchyGauge<Tags::SpecH>, Tags::SpecH, Tags::W, Tags::U,
+                 Tags::Beta, Tags::J, Tags::CauchyGauge<Tags::J>, Tags::U0,
+                 Tags::Dy<Tags::J>, Tags::EvolutionGaugeBoundaryValue<Tags::R>>;
+
+  static void apply(
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> cauchy_h,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> h,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> w,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> u,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> beta,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> j,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> cauchy_j,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> u_0,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> dy_j,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*>
+          r_tilde_boundary,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega_cd,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& du_omega_cd,
+      const Scalar<SpinWeighted<ComplexDataVector, 1>>& eth_omega_cd,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& a,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& b,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& boundary_h,
+      const tnsr::i<DataVector, 2>& x_tilde_of_x, const size_t l_max) noexcept {
+    // TODO add interpolation first
+    size_t number_of_angular_points =
+        Spectral::Swsh::number_of_swsh_collocation_points(l_max);
+    size_t number_of_radial_points = get(*j).size() / number_of_angular_points;
+
+    const auto& one_minus_y_collocation =
+        1.0 - Spectral::collocation_points<Spectral::Basis::Legendre,
+                                           Spectral::Quadrature::GaussLobatto>(
+                  number_of_radial_points);
+
+    SpinWeighted<ComplexDataVector, 2> interpolated_cauchy_h_slice{
+        number_of_angular_points};
+    SpinWeighted<ComplexDataVector, 2> interpolated_cauchy_j_slice{
+        number_of_angular_points};
+    SpinWeighted<ComplexDataVector, 2> h_slice{number_of_angular_points};
+    for (size_t i = 0; i < number_of_radial_points; ++i) {
+      ComplexDataVector h_view{
+          get(*h).data().data() + i * number_of_angular_points,
+          number_of_angular_points};
+      // printf("debug: h view\n");
+      // for(auto val : h_view){
+      // printf("(%e, %e)\n", real(val), imag(val));
+      // }
+      // printf("done\n");
+      ComplexDataVector u_view{
+          get(*u).data().data() + i * number_of_angular_points,
+          number_of_angular_points};
+      ComplexDataVector beta_view{
+          get(*beta).data().data() + i * number_of_angular_points,
+          number_of_angular_points};
+      SpinWeighted<ComplexDataVector, 2> j_view;
+      j_view.data() = ComplexDataVector{
+          get(*j).data().data() + i * number_of_angular_points,
+          number_of_angular_points};
+      SpinWeighted<ComplexDataVector, 2> dy_j_view;
+      dy_j_view.data() = ComplexDataVector{
+          get(*dy_j).data().data() + i * number_of_angular_points,
+          number_of_angular_points};
+      ComplexDataVector cauchy_h_view{
+          get(*cauchy_h).data().data() + i * number_of_angular_points,
+          number_of_angular_points};
+      // auto one_over_r_tilde =
+      // one_minus_y_collocation[i] / (2.0 * get(*r_tilde_boundary).data());
+
+      auto eth_r_tilde =
+          Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
+              make_not_null(&get(*r_tilde_boundary)), l_max);
+
+      SpinWeighted<ComplexDataVector, 1> u_0_bar_j_tilde =
+          conj(get(*u_0)) * j_view;
+
+      SpinWeighted<ComplexDataVector, 2> u_0_bar_eth_j_tilde =
+          Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
+              make_not_null(&u_0_bar_j_tilde), l_max) -
+          j_view *
+              conj(
+                  Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
+                      make_not_null(&get(*u_0)), l_max)) -
+          conj(get(*u_0)) * eth_r_tilde * square(one_minus_y_collocation[i]) /
+              (2.0 * get(*r_tilde_boundary)) * dy_j_view;
+
+      SpinWeighted<ComplexDataVector, 2> angular_derivative_term =
+          0.5 *
+          (get(*u_0) *
+               Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
+                   make_not_null(&j_view), l_max) -
+           get(*u_0) * conj(eth_r_tilde) * square(one_minus_y_collocation[i]) /
+               (2.0 * get(*r_tilde_boundary)) * dy_j_view +
+           u_0_bar_eth_j_tilde);
+
+      SpinWeighted<ComplexDataVector, 0> cauchy_du_omega_cd =
+          get(du_omega_cd) - 0.5 * (get(*u_0) * conj(get(eth_omega_cd)) +
+                                    conj(get(*u_0)) * get(eth_omega_cd));
+
+      auto eth_u_0 = Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
+          make_not_null(&get(*u_0)), l_max);
+      auto ethbar_u_0 =
+          Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
+              make_not_null(&get(*u_0)), l_max);
+
+      ComplexDataVector k_tilde =
+          sqrt(1.0 + j_view.data() * conj(j_view.data()));
+
+      // the tensor transform of the h we are looking for
+      h_slice.data() = h_view - angular_derivative_term.data() +
+                       one_minus_y_collocation[i] * cauchy_du_omega_cd.data() /
+                           get(omega_cd).data() * dy_j_view.data() -
+                       2.0 * cauchy_du_omega_cd.data() / get(omega_cd).data() *
+                           j_view.data() +
+                       ethbar_u_0.data() * j_view.data() -
+                       eth_u_0.data() * k_tilde;
+      // TEST
+      // h_slice.data() = h_view;
+      Spectral::Swsh::swsh_interpolate(
+          make_not_null(&interpolated_cauchy_h_slice), make_not_null(&h_slice),
+          get<0>(x_tilde_of_x), get<1>(x_tilde_of_x), l_max);
+      Spectral::Swsh::swsh_interpolate(
+          make_not_null(&interpolated_cauchy_j_slice), make_not_null(&j_view),
+          get<0>(x_tilde_of_x), get<1>(x_tilde_of_x), l_max);
+      ComplexDataVector interpolated_k =
+          sqrt(1.0 + interpolated_cauchy_j_slice.data() *
+                         conj(interpolated_cauchy_j_slice.data()));
+      cauchy_h_view =
+          0.25 / square(get(omega).data()) *
+          (square(conj(get(b).data())) * interpolated_cauchy_h_slice.data() +
+           square(get(a).data()) * conj(interpolated_cauchy_h_slice.data()) +
+           get(a).data() * conj(get(b).data()) *
+               (interpolated_cauchy_h_slice.data() *
+                    conj(interpolated_cauchy_j_slice.data()) +
+                interpolated_cauchy_j_slice.data() *
+                    conj(interpolated_cauchy_h_slice.data())) /
+               interpolated_k);
+    }
+    // Spectral::Swsh::filter_swsh_volume_quantity
+    //(make_not_null(&get(*cauchy_w)),
+    // l_max, l_max - 4, 0.0, 8);
+    // printf("verifying boundary h\n");
+    // for (size_t i = 0; i < number_of_angular_points; ++i) {
+    // printf("(%e, %e) from (%e, %e)\n",
+    // real(get(*cauchy_h).data()[i] - get(boundary_h).data()[i]),
+    // imag(get(*cauchy_h).data()[i] - get(boundary_h).data()[i]),
+    // real(get(*cauchy_h).data()[i]), imag(get(*cauchy_h).data()[i]));
+    // }
+    // printf("done\n");
+  }
+};
+
+template <>
+struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::W>> {
+  using argument_tags =
+      tmpl::list<Tags::GaugeOmegaCD, Tags::Du<Tags::GaugeOmegaCD>,
+                 Spectral::Swsh::Tags::Derivative<Tags::GaugeOmegaCD,
+                                                  Spectral::Swsh::Tags::Eth>,
+                 Tags::EvolutionGaugeBoundaryValue<Tags::R>,
+                 Tags::BoundaryValue<Tags::W>, Tags::InertialAngularCoords,
+                 Tags::LMax>;
+  using return_tags = tmpl::list<Tags::CauchyGauge<Tags::W>, Tags::W, Tags::U,
+                                 Tags::Beta, Tags::J>;
+
+  static void apply(
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> cauchy_w,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> w,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> u,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> beta,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> j,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega_cd,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& du_omega_cd,
+      const Scalar<SpinWeighted<ComplexDataVector, 1>>& eth_omega_cd,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& r_tilde_boundary,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& boundary_w,
+      const tnsr::i<DataVector, 2>& x_tilde_of_x, const size_t l_max) noexcept {
+    // TODO add interpolation first
+    size_t number_of_angular_points =
+        Spectral::Swsh::number_of_swsh_collocation_points(l_max);
+    size_t number_of_radial_points = get(*j).size() / number_of_angular_points;
+
+    const auto& one_minus_y_collocation =
+        1.0 - Spectral::collocation_points<Spectral::Basis::Legendre,
+                                           Spectral::Quadrature::GaussLobatto>(
+                  number_of_radial_points);
+
+    SpinWeighted<ComplexDataVector, 0> interpolated_cauchy_w_slice{
+        number_of_angular_points};
+    SpinWeighted<ComplexDataVector, 0> w_slice{number_of_angular_points};
+    for (size_t i = 0; i < number_of_radial_points; ++i) {
+      ComplexDataVector w_view{
+          get(*w).data().data() + i * number_of_angular_points,
+          number_of_angular_points};
+      ComplexDataVector u_view{
+          get(*u).data().data() + i * number_of_angular_points,
+          number_of_angular_points};
+      ComplexDataVector beta_view{
+          get(*beta).data().data() + i * number_of_angular_points,
+          number_of_angular_points};
+      ComplexDataVector j_view{
+          get(*j).data().data() + i * number_of_angular_points,
+          number_of_angular_points};
+      ComplexDataVector cauchy_w_view{
+          get(*cauchy_w).data().data() + i * number_of_angular_points,
+          number_of_angular_points};
+      auto one_over_r_tilde =
+          one_minus_y_collocation[i] / (2.0 * get(r_tilde_boundary).data());
+
+      // TEST
+      w_slice.data() =
+          w_view - 1.0 * one_over_r_tilde * (get(omega_cd).data() - 1.0) +
+          2.0 * get(du_omega_cd).data() / get(omega_cd).data() +
+          (conj(get(eth_omega_cd).data()) * u_view +
+           get(eth_omega_cd).data() * conj(u_view)) /
+              get(omega_cd).data() -
+          exp(2.0 * beta_view) * one_over_r_tilde /
+              (2.0 * square(get(omega_cd).data())) *
+              (square(conj(get(eth_omega_cd).data())) * j_view +
+               square(get(eth_omega_cd).data()) * conj(j_view) -
+               2.0 * get(eth_omega_cd).data() * conj(get(eth_omega_cd).data()) *
+                   sqrt(1.0 + j_view * conj(j_view)));
+      // w_slice.data() = w_view;
+      // TEST
+
+      Spectral::Swsh::swsh_interpolate(
+          make_not_null(&interpolated_cauchy_w_slice), make_not_null(&w_slice),
+          get<0>(x_tilde_of_x), get<1>(x_tilde_of_x), l_max);
+      cauchy_w_view = interpolated_cauchy_w_slice.data();
+    }
+    // Spectral::Swsh::filter_swsh_volume_quantity
+    // (make_not_null(&get(*cauchy_w)),
+    // l_max, l_max - 4, 0.0, 8);
+    // printf("verifying boundary w\n");
+    // for (size_t i = 0; i < number_of_angular_points; ++i) {
+    // printf("(%e, %e) from (%e, %e)\n",
+    // real(get(*cauchy_w).data()[i] - get(boundary_w).data()[i]),
+    // imag(get(*cauchy_w).data()[i] - get(boundary_w).data()[i]),
+    // real(get(*cauchy_w).data()[i]), imag(get(*cauchy_w).data()[i]));
+    // }
+    // printf("done\n");
+  }
+};
+
+template <>
 struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::J>> {
   using argument_tags = tmpl::list<Tags::GaugeA, Tags::GaugeB, Tags::GaugeOmega,
                                    Tags::InertialAngularCoords, Tags::LMax>;
@@ -462,10 +714,11 @@ template <>
 struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::U>> {
   using argument_tags =
       tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::R>, Tags::U0,
-                 Tags::GaugeOmega,
-                 Spectral::Swsh::Tags::Derivative<Tags::GaugeOmega,
+                 Tags::GaugeOmega, Tags::GaugeOmegaCD,
+                 Spectral::Swsh::Tags::Derivative<Tags::GaugeOmegaCD,
                                                   Spectral::Swsh::Tags::Eth>,
-                 Tags::GaugeA, Tags::GaugeB, Tags::LMax>;
+                 Tags::GaugeA, Tags::GaugeB, Tags::BoundaryValue<Tags::U>,
+                 Tags::InertialAngularCoords, Tags::LMax>;
   using return_tags =
       tmpl::list<Tags::CauchyGauge<Tags::U>, Tags::U, Tags::J, Tags::Beta>;
 
@@ -474,13 +727,15 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::U>> {
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> u,
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> j,
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> beta,
-      const Scalar<SpinWeighted<ComplexDataVector, 0>>& r,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& r_tilde_boundary,
       const Scalar<SpinWeighted<ComplexDataVector, 1>>& u_0,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega,
-      const Scalar<SpinWeighted<ComplexDataVector, 1>>& eth_omega,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega_cd,
+      const Scalar<SpinWeighted<ComplexDataVector, 1>>& eth_omega_cd,
       const Scalar<SpinWeighted<ComplexDataVector, 2>>& a,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& b,
-      const size_t l_max) noexcept {
+      const Scalar<SpinWeighted<ComplexDataVector, 1>>& boundary_u,
+      const tnsr::i<DataVector, 2> x_tilde_of_x, const size_t l_max) noexcept {
     size_t number_of_angular_points =
         Spectral::Swsh::number_of_swsh_collocation_points(l_max);
     size_t number_of_radial_points = get(*u).size() / number_of_angular_points;
@@ -490,32 +745,49 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::U>> {
                                            Spectral::Quadrature::GaussLobatto>(
                   number_of_radial_points);
 
+    SpinWeighted<ComplexDataVector, 1> interpolated_cauchy_u_slice{
+        number_of_angular_points};
+    SpinWeighted<ComplexDataVector, 1> u_slice{number_of_angular_points};
     for (size_t i = 0; i < number_of_radial_points; ++i) {
-      ComplexDataVector u_slice{
-          get(*u).data().data() + i * number_of_angular_points,
-          number_of_angular_points};
-      ComplexDataVector cauchy_u_slice{
-          get(*cauchy_u).data().data() + i * number_of_angular_points,
-          number_of_angular_points};
-
-      ComplexDataVector beta_slice{
-          get(*beta).data().data() + i * number_of_angular_points,
-          number_of_angular_points};
-      ComplexDataVector j_tilde_slice{
+      ComplexDataVector j_view{
           get(*j).data().data() + i * number_of_angular_points,
           number_of_angular_points};
+      ComplexDataVector u_view{
+          get(*u).data().data() + i * number_of_angular_points,
+          number_of_angular_points};
+      ComplexDataVector cauchy_u_view{
+          get(*cauchy_u).data().data() + i * number_of_angular_points,
+          number_of_angular_points};
+      ComplexDataVector beta_view{
+          get(*beta).data().data() + i * number_of_angular_points,
+          number_of_angular_points};
+      // u_undertilde
+      u_slice.data() =
+          (u_view + get(u_0).data()) +
+          one_minus_y_collocation[i] * exp(2.0 * beta_view) /
+              (2.0 * get(r_tilde_boundary).data() * get(omega_cd).data()) *
+              (get(eth_omega_cd).data() * sqrt(1.0 + j_view * conj(j_view)) -
+               conj(get(eth_omega_cd).data()) * j_view);
 
-      ComplexDataVector u_undertilde =
-          u_slice + exp(2.0 * beta_slice) * one_minus_y_collocation[i] /
-                        (2.0 * get(r).data() * get(omega).data()) *
-                        (conj(get(eth_omega).data()) * j_tilde_slice -
-                         get(eth_omega).data() *
-                             sqrt(1.0 + j_tilde_slice * conj(j_tilde_slice)));
-      cauchy_u_slice = 0.5 / square(get(omega).data()) *
-                           (conj(get(b).data()) * u_undertilde -
-                            get(a).data() * conj(u_undertilde)) +
-                       get(u_0).data();
+      Spectral::Swsh::swsh_interpolate(
+          make_not_null(&interpolated_cauchy_u_slice), make_not_null(&u_slice),
+          get<0>(x_tilde_of_x), get<1>(x_tilde_of_x), l_max);
+      cauchy_u_view =
+          0.5 *
+          (interpolated_cauchy_u_slice.data() * conj(get(b).data()) -
+           conj(interpolated_cauchy_u_slice.data()) * get(a).data()) /
+          square(get(omega).data());
     }
+    // double-check that the result is consistent with the originally
+    // constructed boundary value
+    // printf("verifying boundary u\n");
+    // for (size_t i = 0; i < number_of_angular_points; ++i) {
+    // printf("(%e, %e) from (%e, %e)\n",
+    // real(get(*cauchy_u).data()[i] - get(boundary_u).data()[i]),
+    // imag(get(*cauchy_u).data()[i] - get(boundary_u).data()[i]),
+    // real(get(*cauchy_u).data()[i]), imag(get(*cauchy_u).data()[i]));
+    // }
+    // printf("done\n");
   }
 };
 

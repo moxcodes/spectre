@@ -56,7 +56,8 @@ using gauge_confirmation_scri_tags =
 
 using gauge_confirmation_volume_tags =
     tmpl::list<Tags::CauchyGauge<Tags::Beta>, Tags::CauchyGauge<Tags::J>,
-               Tags::CauchyGauge<Tags::U>, Tags::CauchyGauge<Tags::Q>>;
+               Tags::CauchyGauge<Tags::U>, Tags::CauchyGauge<Tags::W>,
+               Tags::CauchyGauge<Tags::SpecH>>;
 
 using angular_coordinate_tags =
     tmpl::list<Tags::CauchyAngularCoords, Tags::DuCauchyAngularCoords,
