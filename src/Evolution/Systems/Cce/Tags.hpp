@@ -253,6 +253,11 @@ struct EvolutionGaugeBoundaryValue : db::PrefixTag, db::SimpleTag {
   }
 };
 
+struct RobinsonTrautmanW : db::SimpleTag {
+  using type = Scalar<SpinWeighted<ComplexDataVector, 0>>;
+  static std::string name() noexcept { return "RobinsonTrautmanW"; }
+};
+
 /// A prefix tag representing the coefficient of a pole part of the right-hand
 /// side of a singular differential equation
 template <typename Tag>

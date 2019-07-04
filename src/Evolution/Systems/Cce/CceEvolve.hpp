@@ -22,6 +22,8 @@
 
 namespace Cce{
 
+// TODO rework tags
+
 using boundary_value_tags =
     tmpl::list<Tags::BoundaryValue<Tags::Beta>, Tags::BoundaryValue<Tags::J>,
                Tags::BoundaryValue<Tags::Dr<Tags::J>>,
@@ -48,7 +50,8 @@ using gauge_transform_boundary_tags =
                                                 Spectral::Swsh::Tags::Eth>,
                Spectral::Swsh::Tags::Derivative<Tags::GaugeOmegaCD,
                                                 Spectral::Swsh::Tags::Eth>,
-               Tags::U0>;
+               Tags::U0, Tags::RobinsonTrautmanW,
+               Tags::Du<Tags::RobinsonTrautmanW>>;
 
 using gauge_confirmation_scri_tags =
     tmpl::list<Tags::CauchyGaugeScriPlus<Tags::Beta>,

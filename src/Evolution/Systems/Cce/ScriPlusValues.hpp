@@ -856,4 +856,61 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::Q>> {
   }
 };
 
+template <typename Tag>
+struct CalculateInertialModes;
+
+template <>
+struct CalculateInertialModes<Tags::J> {
+  template <typename DataBoxType>
+  static ComplexModalVector compute(
+      const gsl::not_null<DataBoxType*> box,
+      const ComplexModalVector& goldberg_cauchy_modes,
+      const ComplexDataVector& view_y) noexcept {
+    const size_t l_max = db::get<Tags::LMax>(*box);
+    SpinWeighted<ComplexModalVector, 2> libsharp_modes{
+        2 * Spectral::Swsh::number_of_swsh_coefficients(l_max)};
+
+    const auto& coefficients = Spectral::Swsh::precomputed_coefficients(l_max);
+
+    for (auto coefficient_iter = coefficients.begin();
+         coefficient_iter != coefficients.end(); ++coefficient_iter) {
+      // if(plus_m_index < goldberg_cauchy_modes.size()) {
+      Spectral::Swsh::set_libsharp_modes_from_goldberg_modes(
+          coefficient_iter, make_not_null(&libsharp_modes), 0,
+          goldberg_cauchy_modes[square((*coefficient_iter).l) +
+                                (*coefficient_iter).l + (*coefficient_iter).m],
+          goldberg_cauchy_modes[square((*coefficient_iter).l) +
+                                (*coefficient_iter).l - (*coefficient_iter).m]);
+      // } else {
+        // Spectral::Swsh::set_libsharp_modes_from_goldberg_modes(
+            // coefficient_iter, make_not_null(&libsharp_modes), 0, 0.0, 0.0);
+      // }
+    }
+    Scalar<SpinWeighted<ComplexDataVector, 2>> cauchy_j;
+    get(cauchy_j) = Spectral::Swsh::inverse_swsh_transform(
+        make_not_null(&libsharp_modes), l_max);
+    return compute(box, cauchy_j, view_y);
+  }
+  template <typename DataBoxType>
+  static ComplexModalVector compute(
+      const gsl::not_null<DataBoxType*> box,
+      const SpinWeighted<ComplexDataVector, 2>& cauchy_j,
+      const ComplexDataVector& /*view_y*/) noexcept {
+    const size_t l_max = db::get<Tags::LMax>(*box);
+
+    Scalar<SpinWeighted<ComplexDataVector, 2>> inertial_j;
+    ComputeGaugeAdjustedBoundaryValue<Tags::J>::apply(
+        make_not_null(&inertial_j), make_not_null(&cauchy_j),
+        db::get<Tags::GaugeC>(*box), db::get<Tags::GaugeD>(*box),
+        db::get<Tags::GaugeOmegaCD>(*box),
+        db::get<Tags::CauchyAngularCoords>(*box), l_max);
+    return Spectral::Swsh::libsharp_to_goldberg_modes(
+               Spectral::Swsh::swsh_transform(make_not_null(&get(inertial_j)),
+                                              l_max),
+               l_max)
+        .data();
+  }
+
+};
+
 }  // namespace Cce

@@ -79,6 +79,34 @@ struct ModeComparisonManager {
 
   double get_time() noexcept { return time_; }
 
+  ComplexModalVector get_comparison_modes(const double time) noexcept {
+    auto& mode00_data =
+        mode_data_file_.get<h5::Dat>(dataset_name_for_mode(0, 0));
+
+    Matrix time_set = mode00_data.get_data_subset(
+        std::vector<size_t>{0}, 0, mode00_data.get_dimensions()[0]);
+    // TODO binary search
+    size_t closest_time = 0;
+    for(size_t i = 0; i < time_set.rows(); ++i) {
+      if (abs(time_set(i, 0) - time) < abs(time - time_set(closest_time, 0))) {
+        closest_time = i;
+      }
+    }
+    auto modes_at_time = ComplexModalVector{square(l_max_ + 1), 0.0};
+    for (int l = 0; l <= static_cast<int>(l_max_); ++l) {
+      for (int m = -l; m <= l; ++m) {
+        auto& mode_data = mode_data_file_.get<h5::Dat>(
+            dataset_name_for_mode(static_cast<size_t>(l), m));
+        Matrix data_matrix = mode_data.get_data_subset(
+            std::vector<size_t>{1, 2}, closest_time, 1);
+        modes_at_time[static_cast<size_t>(static_cast<int>(square(l) + l) +
+                                          m)] =
+            std::complex<double>(data_matrix(0, 0), data_matrix(0, 1));
+      }
+    }
+    return modes_at_time;
+  }
+
  private:
   size_t l_max_;
   double time_;
