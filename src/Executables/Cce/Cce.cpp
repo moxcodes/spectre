@@ -47,7 +47,10 @@ int main(int argc, char** argv) {
       "suffix for output filename. The full output filename will be the "
       "concatenation of the input filename followed by the specified suffix")(
       "regularity-preserving",
-      "run using regularity preserving algorithm (experimental)");
+      "run using regularity preserving algorithm (experimental)")(
+      "robinson-trautman-test",
+      "run a test against semi-analytic Robinson-Trautman solution, outputting "
+      "l2 norm of mode differences in J over radial slices");
 
   boost::program_options::variables_map vars;
   // boost::program_options::store(
@@ -71,8 +74,11 @@ int main(int argc, char** argv) {
   if(vars["filter_l"].as<int>() !=  -1) {
     l_filter = static_cast<size_t>(vars["filter_l"].as<int>());
   }
-  if (not vars.count("regularity-preserving")) {
-    Cce::run_trial_cce(
+  if(vars.count("regularity-preserving")) {
+    printf("=========================================\n");
+    printf("Regularity preserving CCE is experimental\n");
+    printf("=========================================\n");
+    Cce::run_trial_regularity_preserving_cce(
         vars["input_file"].as<std::string>(),
         vars["comparison_file_prefix"].as<std::string>(),
         vars["l_max"].as<size_t>(), vars["output_l_max"].as<size_t>(),
@@ -80,7 +86,17 @@ int main(int argc, char** argv) {
         vars["timestep_numerator"].as<size_t>(),
         vars["timestep_denominator"].as<size_t>(), vars["psi4"].as<bool>(),
         l_filter, vars["start_t"].as<double>(), vars["end_t"].as<double>());
-  } else {
+  }
+  if(vars.count("robinson-trautman-test")) {
+    Cce::test_regularity_preserving_cce_rt(
+        vars["input_file"].as<std::string>(), vars["l_max"].as<size_t>(),
+        vars["output_l_max"].as<size_t>(), vars["rres"].as<size_t>(),
+        vars["output_suffix"].as<std::string>(),
+        vars["timestep_numerator"].as<size_t>(),
+        vars["timestep_denominator"].as<size_t>(), vars["end_t"].as<double>());
+  }
+  if (not vars.count("regularity-preserving") and
+      not vars.count("robinson-trautman-test")) {
     printf("=========================================\n");
     printf("Regularity preserving CCE is experimental\n");
     printf("=========================================\n");

@@ -292,8 +292,8 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::Beta>> {
     }
 
     // SpinWeighted<ComplexDataVector, 0> test_beta_cauchy{get(d).size()};
-    // const auto& collocation = Spectral::Swsh::precomputed_collocation<
-    //     Spectral::Swsh::ComplexRepresentation::Interleaved>(l_max);
+    const auto& collocation = Spectral::Swsh::precomputed_collocation<
+        Spectral::Swsh::ComplexRepresentation::Interleaved>(l_max);
     // for (const auto& collocation_point : collocation) {
     //   test_beta_cauchy.data()[collocation_point.offset] =
     //       sin(collocation_point.theta) * sin(collocation_point.phi);
@@ -343,11 +343,11 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::Beta>> {
 
     // SpinWeighted<ComplexDataVector, 0> test_beta{get(d).size()};
     // for (const auto& collocation_point : collocation) {
-    //   test_beta.data()[collocation_point.offset] =
-    //       sin(collocation_point.theta) * sin(collocation_point.phi);
+    // test_beta.data()[collocation_point.offset] =
+    // sin(collocation_point.theta) * sin(collocation_point.phi);
     // }
     // // Note: using the beta 'nice' values in both coordinate systems,
-    // subverting
+    // // subverting
     // // their true meaning in order to make a more desirable test
     // SpinWeighted<ComplexDataVector, -1> ethbar_beta =
     //     Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
@@ -369,39 +369,39 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::Beta>> {
     //            get(c) * ethbar_beta_interpolated_to_inertial);
 
     // auto beta_interpolated_to_inertial = Spectral::Swsh::swsh_interpolate(
-    //     make_not_null(&test_beta), get<0>(x_of_x_tilde),
-    //     get<1>(x_of_x_tilde), l_max);
+    // make_not_null(&test_beta), get<0>(x_of_x_tilde), get<1>(x_of_x_tilde),
+    // l_max);
     // SpinWeighted<ComplexDataVector, 1> eth_tilde_beta_inertial =
-    //     Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
-    //         make_not_null(&beta_interpolated_to_inertial), l_max);
+    // Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
+    // make_not_null(&beta_interpolated_to_inertial), l_max);
 
     // Spectral::Swsh::filter_swsh_volume_quantity(
     //     make_not_null(&identity_test_eth_tilde_beta), l_max, l_max - 2, 0.0,
     //     8);
     // printf("Identity test: Jacobian vs x_of_x_tilde\n");
     // for (size_t i = 0; i < identity_test_eth_tilde_beta.size(); ++i) {
-    //   printf("(%e, %e) from (%e, %e)\n",
-    //          real(identity_test_eth_tilde_beta.data()[i] -
-    //               eth_tilde_beta_inertial.data()[i]),
-    //          imag(identity_test_eth_tilde_beta.data()[i] -
-    //               eth_tilde_beta_inertial.data()[i]),
-    //          real(identity_test_eth_tilde_beta.data()[i]),
-    //          imag(identity_test_eth_tilde_beta.data()[i]));
+    // printf("(%e, %e) from (%e, %e)\n",
+    // real(identity_test_eth_tilde_beta.data()[i] -
+    // eth_tilde_beta_inertial.data()[i]),
+    // imag(identity_test_eth_tilde_beta.data()[i] -
+    // eth_tilde_beta_inertial.data()[i]),
+    // real(identity_test_eth_tilde_beta.data()[i]),
+    // imag(identity_test_eth_tilde_beta.data()[i]));
     // }
     // printf("done\n");
 
     // SpinWeighted<ComplexDataVector, 0> beta_interpolated_back_to_cauchy =
-    //     Spectral::Swsh::swsh_interpolate(
-    //         make_not_null(&beta_interpolated_to_inertial),
-    //         get<0>(x_tilde_of_x), get<1>(x_tilde_of_x), l_max);
+    // Spectral::Swsh::swsh_interpolate(
+    // make_not_null(&beta_interpolated_to_inertial),
+    // get<0>(x_tilde_of_x), get<1>(x_tilde_of_x), l_max);
     // printf("Identity test: Inverse transformation\n");
-    // for (size_t i = 0; i < identity_test_eth_tilde_beta.size(); ++i) {
-    //   printf("(%e, %e) from (%e, %e)\n",
-    //          real(test_beta.data()[i] -
-    //               beta_interpolated_back_to_cauchy.data()[i]),
-    //          imag(test_beta.data()[i] -
-    //               beta_interpolated_back_to_cauchy.data()[i]),
-    //          real(test_beta.data()[i]), imag(test_beta.data()[i]));
+    // for (size_t i = 0; i < test_beta.size(); ++i) {
+    // printf("(%e, %e) from (%e, %e)\n",
+    // real(test_beta.data()[i] -
+    // beta_interpolated_back_to_cauchy.data()[i]),
+    // imag(test_beta.data()[i] -
+    // beta_interpolated_back_to_cauchy.data()[i]),
+    // real(test_beta.data()[i]), imag(test_beta.data()[i]));
     // }
     // printf("done\n");
   }
@@ -882,35 +882,37 @@ struct CalculateInertialModes<Tags::J> {
           goldberg_cauchy_modes[square((*coefficient_iter).l) +
                                 (*coefficient_iter).l - (*coefficient_iter).m]);
       // } else {
-        // Spectral::Swsh::set_libsharp_modes_from_goldberg_modes(
-            // coefficient_iter, make_not_null(&libsharp_modes), 0, 0.0, 0.0);
+      // Spectral::Swsh::set_libsharp_modes_from_goldberg_modes(
+      // coefficient_iter, make_not_null(&libsharp_modes), 0, 0.0, 0.0);
       // }
     }
     Scalar<SpinWeighted<ComplexDataVector, 2>> cauchy_j;
     get(cauchy_j) = Spectral::Swsh::inverse_swsh_transform(
         make_not_null(&libsharp_modes), l_max);
-    return compute(box, cauchy_j, view_y);
+    return CalculateInertialModes<Tags::J>::compute(
+        box, make_not_null(&cauchy_j), view_y);
   }
   template <typename DataBoxType>
   static ComplexModalVector compute(
       const gsl::not_null<DataBoxType*> box,
-      const SpinWeighted<ComplexDataVector, 2>& cauchy_j,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> cauchy_j,
       const ComplexDataVector& /*view_y*/) noexcept {
     const size_t l_max = db::get<Tags::LMax>(*box);
 
     Scalar<SpinWeighted<ComplexDataVector, 2>> inertial_j;
     ComputeGaugeAdjustedBoundaryValue<Tags::J>::apply(
-        make_not_null(&inertial_j), make_not_null(&cauchy_j),
-        db::get<Tags::GaugeC>(*box), db::get<Tags::GaugeD>(*box),
-        db::get<Tags::GaugeOmegaCD>(*box),
+        make_not_null(&inertial_j), cauchy_j, db::get<Tags::GaugeC>(*box),
+        db::get<Tags::GaugeD>(*box), db::get<Tags::GaugeOmegaCD>(*box),
         db::get<Tags::CauchyAngularCoords>(*box), l_max);
-    return Spectral::Swsh::libsharp_to_goldberg_modes(
-               Spectral::Swsh::swsh_transform(make_not_null(&get(inertial_j)),
-                                              l_max),
-               l_max)
-        .data();
+    auto goldberg_modes = Spectral::Swsh::libsharp_to_goldberg_modes(
+        Spectral::Swsh::swsh_transform(make_not_null(&get(inertial_j)), l_max),
+        l_max);
+    // TEST
+    // auto goldberg_modes = Spectral::Swsh::libsharp_to_goldberg_modes(
+    // Spectral::Swsh::swsh_transform(make_not_null(&get(*cauchy_j)), l_max),
+    // l_max);
+    return goldberg_modes.data();
   }
-
 };
 
 }  // namespace Cce

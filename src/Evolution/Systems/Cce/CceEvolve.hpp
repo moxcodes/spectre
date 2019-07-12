@@ -59,8 +59,9 @@ using gauge_confirmation_scri_tags =
 
 using gauge_confirmation_volume_tags =
     tmpl::list<Tags::CauchyGauge<Tags::Beta>, Tags::CauchyGauge<Tags::J>,
-               Tags::CauchyGauge<Tags::U>, Tags::CauchyGauge<Tags::W>,
-               Tags::CauchyGauge<Tags::SpecH>>;
+               Tags::CauchyGauge<Tags::U>, Tags::CauchyGauge<Tags::Q>,
+               Tags::CauchyGauge<Tags::W>, Tags::CauchyGauge<Tags::SpecH>,
+               Tags::CauchyGauge<Tags::H>>;
 
 using angular_coordinate_tags =
     tmpl::list<Tags::CauchyAngularCoords, Tags::DuCauchyAngularCoords,
@@ -118,4 +119,10 @@ void run_trial_regularity_preserving_cce(
     size_t rational_timestep_numerator, size_t rational_timestep_denominator,
     bool calculate_psi4_diagnostic, size_t l_filter_start,
     double start_time = 0.0, double end_time = -1.0) noexcept;
+
+void test_regularity_preserving_cce_rt(
+    std::string input_filename, size_t simulation_l_max,
+    size_t comparison_l_max, size_t number_of_radial_points,
+    std::string output_file_suffix, size_t rational_timestep_numerator,
+    size_t rational_timestep_denominator, double end_time) noexcept;
 }  // namespace Cce
