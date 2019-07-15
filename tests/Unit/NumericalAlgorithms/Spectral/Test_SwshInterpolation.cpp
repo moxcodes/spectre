@@ -80,19 +80,113 @@ void test_interpolation(const gsl::not_null<Generator*> generator) noexcept {
 
   ComplexDataVector expected{number_of_target_points, 0.0};
   ComplexDataVector another_expected{number_of_target_points, 0.0};
+  auto interpolator = SwshInterpolator{target_theta, target_phi, spin, l_max};
+
   for(int l = 0; l <= l_max; ++l) {
     for(int m = -l; m <= l; ++m) {
+      auto sYlm =
+          SpinWeightedSphericalHarmonic{spin, static_cast<size_t>(l), m};
+      if (l == std::max(abs(m), abs(spin))) {
+        ComplexDataVector harmonic_test;
+        interpolator.direct_evaluation_swsh_at_l_min(
+            make_not_null(&harmonic_test), l, m);
+        for(size_t i = 0; i < number_of_target_points; ++i) {
+          CHECK_ITERABLE_APPROX(sYlm.evaluate(target_theta[i], target_phi[i]),
+                                harmonic_test[i]);
+        }
+      }
+      if (l == std::max(abs(m), abs(spin)) + 1) {
+        ComplexDataVector harmonic_test_l_min;
+        interpolator.direct_evaluation_swsh_at_l_min(
+            make_not_null(&harmonic_test_l_min), l - 1, m);
+
+        ComplexDataVector harmonic_test_l_min_plus_one;
+        interpolator.evaluate_swsh_at_l_min_plus_one(
+            make_not_null(&harmonic_test_l_min_plus_one), harmonic_test_l_min,
+            l - 1, m);
+
+        for(size_t i = 0; i < number_of_target_points; ++i) {
+          CHECK_ITERABLE_APPROX(sYlm.evaluate(target_theta[i], target_phi[i]),
+                                harmonic_test_l_min_plus_one[i]);
+        }
+      }
+      if (l == std::max(abs(m), abs(spin)) and abs(m) > abs(spin)) {
+        if(m > 0) {
+          ComplexDataVector harmonic_test;
+          interpolator.direct_evaluation_swsh_at_l_min(
+              make_not_null(&harmonic_test), l - 1, m - 1);
+          interpolator.evaluate_swsh_m_recurrence_at_l_min(
+              make_not_null(&harmonic_test), l, m);
+          INFO("checking l=" << l <<" m=" << m);
+          for(size_t i = 0; i < number_of_target_points; ++i) {
+            CHECK_ITERABLE_APPROX(sYlm.evaluate(target_theta[i], target_phi[i]),
+                                  harmonic_test[i]);
+          }
+        } else {
+          ComplexDataVector harmonic_test;
+          interpolator.direct_evaluation_swsh_at_l_min(
+              make_not_null(&harmonic_test), l - 1, m + 1);
+          interpolator.evaluate_swsh_m_recurrence_at_l_min(
+              make_not_null(&harmonic_test), l, m);
+          INFO("checking l=" << l <<" m=" << m);
+          for(size_t i = 0; i < number_of_target_points; ++i) {
+            CHECK_ITERABLE_APPROX(sYlm.evaluate(target_theta[i], target_phi[i]),
+                                  harmonic_test[i]);
+          }
+        }
+      }
       for(size_t i = 0; i < number_of_target_points; ++i) {
         expected[i] +=
             goldberg_modes.data()[static_cast<size_t>(square(l) + l + m)] *
             TestHelpers::spin_weighted_spherical_harmonic(
                 spin, l, m, target_theta[i], target_phi[i]);
-        auto sYlm =
-            SpinWeightedSphericalHarmonic{spin, static_cast<size_t>(l), m};
         another_expected[i] +=
             goldberg_modes.data()[static_cast<size_t>(square(l) + l + m)] *
             sYlm.evaluate(target_theta[i], target_phi[i]);
       }
+    }
+  }
+
+  Approx factorial_approx =
+      Approx::custom()
+      .epsilon(std::numeric_limits<double>::epsilon() * 1.0e6)
+      .scale(1.0);
+
+  // direct test Clenshaw sums
+  for(int m = -static_cast<int>(l_max); m <= static_cast<int>(l_max); ++m) {
+    ComplexDataVector expected_clenshaw_sum{number_of_target_points, 0.0};
+    for (int l = std::max(abs(m), abs(spin)); l <= static_cast<int>(l_max);
+         ++l) {
+      auto sYlm =
+          SpinWeightedSphericalHarmonic{spin, static_cast<size_t>(l), m};
+      for(size_t i = 0; i < number_of_target_points; ++i) {
+        expected_clenshaw_sum[i] +=
+            goldberg_modes.data()[static_cast<size_t>(square(l) + l + m)] *
+            sYlm.evaluate(target_theta[i], target_phi[i]);
+      }
+    }
+    ComplexDataVector clenshaw{number_of_target_points, 0.0};
+
+    ComplexDataVector harmonic_test_l_min;
+    interpolator.direct_evaluation_swsh_at_l_min(
+        make_not_null(&harmonic_test_l_min), std::max(abs(spin), abs(m)), m);
+
+    ComplexDataVector harmonic_test_l_min_plus_one;
+    interpolator.evaluate_swsh_at_l_min_plus_one(
+        make_not_null(&harmonic_test_l_min_plus_one), harmonic_test_l_min,
+        std::max(abs(spin), abs(m)), m);
+
+    interpolator.clenshaw_sum(
+        make_not_null(&clenshaw), harmonic_test_l_min,
+        harmonic_test_l_min_plus_one,
+        libsharp_to_goldberg_modes(
+            swsh_transform(make_not_null(&generated_collocation), l_max), l_max)
+            .data(),
+        m);
+    INFO("checking clenshaw sum for m=" << m);
+    for(size_t i = 0; i < number_of_target_points; ++i) {
+      CHECK_ITERABLE_CUSTOM_APPROX(clenshaw[i], expected_clenshaw_sum[i],
+                                   factorial_approx);
     }
   }
   auto pfaffian_interp =
@@ -101,16 +195,20 @@ void test_interpolation(const gsl::not_null<Generator*> generator) noexcept {
   auto standard_interp = swsh_interpolate(make_not_null(&generated_collocation),
                                           target_theta, target_phi, l_max);
 
-  Approx factorial_approx =
-      Approx::custom()
-      .epsilon(std::numeric_limits<double>::epsilon() * 1.0e6)
-      .scale(1.0);
+  ComplexDataVector clenshaw_interpolation;
+  interpolator.interpolate(
+      make_not_null(&clenshaw_interpolation),
+      libsharp_to_goldberg_modes(
+          swsh_transform(make_not_null(&generated_collocation), l_max), l_max)
+          .data());
 
   CHECK_ITERABLE_CUSTOM_APPROX(expected, another_expected, factorial_approx);
 
   CHECK_ITERABLE_CUSTOM_APPROX(pfaffian_interp.data(), expected,
                                factorial_approx);
   CHECK_ITERABLE_CUSTOM_APPROX(standard_interp.data(), expected,
+                               factorial_approx);
+  CHECK_ITERABLE_CUSTOM_APPROX(clenshaw_interpolation, expected,
                                factorial_approx);
 }
 

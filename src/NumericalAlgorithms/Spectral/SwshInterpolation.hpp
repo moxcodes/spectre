@@ -75,20 +75,6 @@ class SpinWeightedSphericalHarmonic {
     }
   }
 
-  // TEST to see if blaze causes power problems
-  DataVector power(const DataVector& arg, const int exponent) {
-    DataVector result{arg.size(), 1.0};
-    if (exponent > 0) {
-      for (size_t i = 0; i < static_cast<int>(exponent); ++i) {
-        result *= arg;
-      }
-    } else {
-      for (size_t i = 0; i < static_cast<int>(-exponent); ++i) {
-        result /= arg;
-      }
-    }
-  }
-
   void evaluate(const gsl::not_null<ComplexDataVector*> result,
                 const DataVector& theta, const DataVector& phi,
                 const DataVector& sin_theta_over_2,
@@ -171,45 +157,52 @@ class SwshInterpolator {
  public:
   SwshInterpolator(const DataVector& theta, const DataVector& phi,
                    const int spin, const size_t l_max) noexcept
-      : spin_{spin}, l_max_{l_max} {
+      : spin_{spin}, l_max_{l_max}, phi_{phi} {
     cos_theta_ = cos(theta);
     cos_theta_over_two_ = cos(theta / 2.0);
-    sin_theta_over_two = sin(theta / 2.0);
+    sin_theta_over_two_ = sin(theta / 2.0);
     exp_i_phi_ = std::complex<double>(1.0, 0.0) * cos(phi) +
                  std::complex<double>(0.0, 1.0) * sin(phi);
-    double k_plus_l;
+    double l_plus_k;
     double a;
     double b;
     DataVector alpha;
     double beta;
-
     for (int m = -static_cast<int>(l_max); m <= static_cast<int>(l_max); ++m) {
       alpha_table.push_back(std::vector<DataVector>{});
       beta_table.push_back(std::vector<double>{});
       lambda_table.push_back(std::vector<int>{});
-      for (int l = min(abs(m), abs(spin)); l <= l_max; ++l) {
-        a = static_cast<double>(abs(spin + m));
-        b = static_cast<double>(abs(spin - m));
-        k_plus_l = static_cast<double>(-(a + b) / 2 + l);
+      for (int l = std::max(abs(m), abs(spin)); l <= static_cast<int>(l_max_);
+           ++l) {
+        // start caching at 2 greater than the l_min for a given m. Those are
+        // the last terms needed by Clenshaw.
+        if (l > std::max(abs(m), abs(spin)) + 1) {
+          a = static_cast<double>(abs(spin + m));
+          b = static_cast<double>(abs(spin - m));
+          l_plus_k = static_cast<double>(l) - (a + b) / 2.0;
+          alpha = 0.5 * (2.0 * l_plus_k + b + a - 1) *
+                  sqrt((2.0 * static_cast<double>(l) + 1.0) /
+                       ((2.0 * static_cast<double>(l) - 1.0) * l_plus_k *
+                        (l_plus_k + a + b) * (l_plus_k + a) * (l_plus_k + b))) *
+                  ((2.0 * l_plus_k + a + b) * cos_theta_ +
+                   (square(a) - square(b)) / (2.0 * l_plus_k + a + b - 2.0));
 
-        alpha = (2.0 * l_plus_k + b + a - 1) *
-                sqrt((2.0 * static_cast<double>(l) + 1.0) /
-                     ((2.0 * static_cast<double>(l) - 1.0) * l_plus_k *
-                      (l_plus_k + a + b) * (l_plus_k + a) * (l_plus_k + b))) *
-                ((2.0 * l_plus_k + a + b) * cos_theta_ +
-                 (square(a) - square(b)) / (2.0 * l_plus_k + a + b - 2.0));
-        alpha_table[m + static_cast<int>(l_max)].push_back(alpha);
+          alpha_table[static_cast<size_t>(m + static_cast<int>(l_max))]
+              .push_back(alpha);
 
-        beta = -sqrt((2.0 * static_cast<double>(l) + 1.0) *
-                     (l_plus_k + a - 1.0) * (l_plus_k + b - 1.0) *
-                     (l_plus_k - 1.0) * (l_plus_k + a + b - 1.0) /
-                     ((2.0 * static_cast<double>(l) - 3.0) * l_plus_k *
-                      (l_plus_k + a + b) * (l_plus_k + a) * (l_plus_k + b))) *
-               (2.0 * l_plus_k + a + b) / (2.0 * l_plus_k + a + b - 2.0);
-        beta_table[m + static_cast<int>(l_max)].push_back(beta);
-
-        lambda_table[m + static_cast<int>(l_max)].push_back(s >= -m ? 0
-                                                                    : s + m);
+          beta = -sqrt((2.0 * static_cast<double>(l) + 1.0) *
+                       (l_plus_k + a - 1.0) * (l_plus_k + b - 1.0) *
+                       (l_plus_k - 1.0) * (l_plus_k + a + b - 1.0) /
+                       ((2.0 * static_cast<double>(l) - 3.0) * l_plus_k *
+                        (l_plus_k + a + b) * (l_plus_k + a) * (l_plus_k + b))) *
+                 (2.0 * l_plus_k + a + b) / (2.0 * l_plus_k + a + b - 2.0);
+          beta_table[static_cast<size_t>(m + static_cast<int>(l_max))]
+              .push_back(beta);
+        }
+        // TODO this doesn't need to be a two-dimensional table, lambda doesn't
+        // depend on l
+        lambda_table[static_cast<size_t>(m + static_cast<int>(l_max))]
+            .push_back(spin_ >= -m ? 0 : spin_ + m);
       }
     }
   }
@@ -221,84 +214,94 @@ class SwshInterpolator {
 
     // used only if s=0;
     ComplexDataVector cached_base_harmonic;
-    int cached_base_harmonic_m;
-    int cached_base_harmonic_l;
 
     // used during both recurrence legs
     ComplexDataVector current_cached_harmonic;
     ComplexDataVector current_cached_harmonic_l_plus_one;
 
     // perform the Clenshaw sums over positive m >= 0.
-    for (int m = 0; m <= static_cast<int>(l_max); ++m) {
-      if (abs(s) >= abs(m)) {
+    for (int m = 0; m <= static_cast<int>(l_max_); ++m) {
+      if (abs(spin_) >= abs(m)) {
         direct_evaluation_swsh_at_l_min(make_not_null(&current_cached_harmonic),
-                                        abs(s), m);
+                                        abs(spin_), m);
         evaluate_swsh_at_l_min_plus_one(
-            make_not_null(&current_cached_harmonic_l_plus_one), abs(s), m);
+            make_not_null(&current_cached_harmonic_l_plus_one),
+            current_cached_harmonic, abs(spin_), m);
       } else {
         evaluate_swsh_m_recurrence_at_l_min(
             make_not_null(&current_cached_harmonic), abs(m), m);
         evaluate_swsh_at_l_min_plus_one(
-            make_not_null(&current_cached_harmonic_l_plus_one), abs(m), m);
+            make_not_null(&current_cached_harmonic_l_plus_one),
+            current_cached_harmonic, abs(m), m);
       }
-      if (s == 0 and m == 0) {
+      if (spin_ == 0 and m == 0) {
         cached_base_harmonic = current_cached_harmonic;
       }
       clenshaw_sum(interpolated, current_cached_harmonic,
-                   current_cahced_harmonic_l_plus_one, goldberg_modes);
+                   current_cached_harmonic_l_plus_one, goldberg_modes, m);
     }
     // perform the Clenshaw sums over m < 0.
-    for (int m = -1; m > -static_cast<int>(l_max); --m) {
-      if (m == -1 and s == 0) {
-        current_cached_harmonic = cached_base_harmonic
+    for (int m = -1; m >= -static_cast<int>(l_max_); --m) {
+      if (m == -1 and spin_ == 0) {
+        current_cached_harmonic = cached_base_harmonic;
       }
-      if (abs(s) >= abs(m)) {
+      if (abs(spin_) >= abs(m)) {
         direct_evaluation_swsh_at_l_min(make_not_null(&current_cached_harmonic),
-                                        abs(s), m);
+                                        abs(spin_), m);
         evaluate_swsh_at_l_min_plus_one(
             make_not_null(&current_cached_harmonic_l_plus_one),
-            current_cached_harmonic, abs(s), m);
+            current_cached_harmonic, abs(spin_), m);
       } else {
         evaluate_swsh_m_recurrence_at_l_min(
             make_not_null(&current_cached_harmonic), abs(m), m);
         evaluate_swsh_at_l_min_plus_one(
-            make_not_null(&current_cached_harmonic_l_plus_one), abs(m), m);
+            make_not_null(&current_cached_harmonic_l_plus_one),
+            current_cached_harmonic, abs(m), m);
       }
       clenshaw_sum(interpolated, current_cached_harmonic,
-                   current_cahced_harmonic_l_plus_one, goldberg_modes);
+                   current_cached_harmonic_l_plus_one, goldberg_modes, m);
     }
   }
 
- private:
+ // private:
+  // debugging: this function checks out on its own
   void direct_evaluation_swsh_at_l_min(
       const gsl::not_null<ComplexDataVector*> harmonic, const int l,
       const int m) noexcept {
     double prefactor = 1.0;
-    double a = static_cast<double>(abs(spin_ + m));
-    int b = abs(spin - m);
-    double l_plus_k = static_cast<double>(-(abs(spin_ + m) + b) / 2 + l);
-    for (int i = 0; factor <= b; ++i) {
-      prefactor *= (l_plus_k + a + static_cast<double>(i)) /
-                   (l_plus_k + static_cast<double>(i));
+    int a = abs(spin_ + m);
+    int b = abs(spin_ - m);
+    int l_plus_k = -(abs(spin_ + m) + b) / 2 + l;
+    for (int i = 1; i <= b; ++i) {
+      if ((l_plus_k + a + i) > 0) {
+        prefactor *= static_cast<double>(l_plus_k + a + i);
+          }
+      if((l_plus_k + i) > 0) {
+        prefactor /= static_cast<double>(l_plus_k + i);
+      }
     }
-    prefactor = sqrt(prefactor) prefactor *=
-        ((m + lambda_table[m + static_cast<int>(l_max_)]
-                          [l - min(abs(spin_), abs(m))]) %
+    prefactor = sqrt(prefactor * static_cast<double>(2 * l + 1) / (4.0 * M_PI));
+    prefactor *=
+        ((m + gsl::at(gsl::at(lambda_table, m + static_cast<int>(l_max_)),
+                      l - std::max(abs(spin_), abs(m)))) %
          2) == 0
             ? 1.0
             : -1.0;
     // note: Jacobi Polynomial contribution is just 1 for l_min.
     *harmonic = prefactor *
-                pow(sin_theta_over_two, static_cast<size_t>(abs(spin_ + m))) *
-                pow(cos_theta_over_two, static_cast<size_t>(abs(spin_ - m)));
+                (std::complex<double>(1.0, 0.0) * cos(m * phi_) +
+                 std::complex<double>(0.0, 1.0) * sin(m * phi_)) *
+                pow(sin_theta_over_two_, static_cast<size_t>(abs(spin_ + m))) *
+                pow(cos_theta_over_two_, static_cast<size_t>(abs(spin_ - m)));
   }
 
+  // debugging: this function checks out on its own
   void evaluate_swsh_at_l_min_plus_one(
       const gsl::not_null<ComplexDataVector*> harmonic,
       const ComplexDataVector& harmonic_at_l_min, const int l_min,
       const int m) noexcept {
     double a = static_cast<double>(abs(spin_ + m));
-    double b = static_cast<double>(abs(spin - m));
+    double b = static_cast<double>(abs(spin_ - m));
     double l_min_plus_k =
         static_cast<double>(-(abs(spin_ + m) + b) / 2 + l_min);
     double prefactor =
@@ -306,15 +309,16 @@ class SwshInterpolator {
              (l_min_plus_k + a + b + 1.0) /
              ((2.0 * static_cast<double>(l_min) + 1.0) *
               (l_min_plus_k + a + 1.0) * (l_min_plus_k + b + 1.0)));
-    harmonic = prefactor * harmonic_at_l_min *
-               (a + 1.0 + 0.5 * (a + b + 2.0) * (cos_theta_ - 1.0));
+    *harmonic = prefactor * harmonic_at_l_min *
+                (a + 1.0 + 0.5 * (a + b + 2.0) * (cos_theta_ - 1.0));
   }
 
+  // debugging: this function checks out on its own
   void evaluate_swsh_m_recurrence_at_l_min(
       const gsl::not_null<ComplexDataVector*> harmonic, const int l_min,
       const int m) noexcept {
     double a = static_cast<double>(abs(spin_ + m));
-    double b = static_cast<double>(abs(spin - m));
+    double b = static_cast<double>(abs(spin_ - m));
     double l_min_plus_k =
         static_cast<double>(-(abs(spin_ + m) + b) / 2 + l_min);
 
@@ -323,17 +327,26 @@ class SwshInterpolator {
              (l_min_plus_k + a + b - 1.0) * (l_min_plus_k + a + b) /
              ((2.0 * static_cast<double>(abs(m)) - 1.0) * (l_min_plus_k + a) *
               (l_min_plus_k + b)));
-    int lambda_difference = lambda_table[m + static_cast<int>(l_max_)][0];
+    int lambda_difference =
+        gsl::at(gsl::at(lambda_table, m + static_cast<int>(l_max_)), 0) + 1;
     if (m > 0) {
-      lambda_difference -= lambda_table[m - 1 + static_cast<int>(l_max_)][0];
+      lambda_difference -=
+          gsl::at(gsl::at(lambda_table, m - 1 + static_cast<int>(l_max_)), 0);
     } else {
-      lambda_difference -= lambda_table[m + 1 + static_cast<int>(l_max_)][0];
+      lambda_difference -=
+          gsl::at(gsl::at(lambda_table, m + 1 + static_cast<int>(l_max_)), 0);
     }
     prefactor *= lambda_difference % 2 == 0 ? 1.0 : -1.0;
-    *harmonic = prefactor * sin_theta_over_two_ * cos_theta_over_two_ *
-                exp_i_phi_ * *harmonic;
+    *harmonic =
+        prefactor * sin_theta_over_two_ * cos_theta_over_two_ * *harmonic;
+    if (m > 0) {
+      *harmonic *= exp_i_phi_;
+    } else {
+      *harmonic /= exp_i_phi_;
+    }
   }
 
+  // debugging: this or the coefficients is broken.
   void clenshaw_sum(const gsl::not_null<ComplexDataVector*> interpolation,
                     const ComplexDataVector& l_min_harmonic,
                     const ComplexDataVector& l_min_plus_one_harmonic,
@@ -343,29 +356,44 @@ class SwshInterpolator {
     std::array<ComplexDataVector, 3> recurrence_cache;
     recurrence_cache[2] = ComplexDataVector{interpolation->size(), 0.0};
     recurrence_cache[1] = ComplexDataVector{interpolation->size(), 0.0};
-    for (int l = static_cast<int>(l_max_); l > min(abs(spin_), abs(m)); l--) {
-      int cache_offset = (l - static_cast<int>(l_max));
-      recurrence_cache[(cache_offset) % 3] = goldberg_modes[square(l) + l + m];
+    recurrence_cache[0] = ComplexDataVector{interpolation->size(), 0.0};
+    for (int l = static_cast<int>(l_max_); l > std::max(abs(spin_), abs(m));
+         l--) {
+      // int cache_offset = (l - static_cast<int>(l_max_));
+      // we want to cycle 'backwards' through the cache for the intuition that
+      // we start with high values and go to low ones. However, the modular
+      // arithmetic demands that we have positive offsets, so we exchange l -
+      // l_max for l + 2 l_max
+      int cache_offset = (l + 2 * static_cast<int>(l_max_));
+      recurrence_cache[(cache_offset) % 3] =
+          goldberg_modes[static_cast<size_t>(square(l) + l + m)];
       if (l < static_cast<int>(l_max_)) {
         recurrence_cache[(cache_offset) % 3] +=
-            alpha_table[m + static_cast<int>(l_max_)]
-                       [l - min(abs(spin_), abs(m)) + 1] *
+            gsl::at(gsl::at(alpha_table, m + static_cast<int>(l_max_)),
+                    l - std::max(abs(spin_), abs(m)) - 1) *
             recurrence_cache[(cache_offset + 1) % 3];
       }
       if (l < static_cast<int>(l_max_) - 1) {
         recurrence_cache[(cache_offset) % 3] +=
-            beta_table[m + static_cast<int>(l_max_)]
-                      [l - min(abs(spin_), abs(m)) + 2] *
+            gsl::at(gsl::at(beta_table, m + static_cast<int>(l_max_)),
+                    l - std::max(abs(spin_), abs(m))) *
             recurrence_cache[(cache_offset + 2) % 3];
       }
     }
-    int l_min = min(abs(spin_), abs(m));
-    int cache_offset = (l_min - static_cast<int>(l_max));
-    *interpolation +=
-        l_min_harmonic * goldberg_modes[square(l_min) + l_min + m] +
-        l_min_plus_one_harmonic * recurrence_cache[(cache_offset + 1) % 3] +
-        l_min_harmonic * recurrence_cache[(cache_offset + 2) % 3] *
-            beta_table[m + static_cast(l_max_)][2];
+    int l_min = std::max(abs(spin_), abs(m));
+    int cache_offset = (l_min + 2 * static_cast<int>(l_max_));
+
+    if(gsl::at(beta_table, m + static_cast<int>(l_max_)).size() > 0) {
+      *interpolation +=
+          l_min_harmonic * goldberg_modes[square(l_min) + l_min + m] +
+          l_min_plus_one_harmonic * recurrence_cache[(cache_offset + 1) % 3] +
+          l_min_harmonic * recurrence_cache[(cache_offset + 2) % 3] *
+              gsl::at(gsl::at(beta_table, m + static_cast<int>(l_max_)), 0);
+    } else {
+      *interpolation +=
+          l_min_harmonic * goldberg_modes[square(l_min) + l_min + m] +
+          l_min_plus_one_harmonic * recurrence_cache[(cache_offset + 1) % 3];
+    }
   }
 
   int spin_;
@@ -373,6 +401,7 @@ class SwshInterpolator {
   DataVector cos_theta_;
   DataVector cos_theta_over_two_;
   DataVector sin_theta_over_two_;
+  DataVector phi_;
   ComplexDataVector exp_i_phi_;
   // Tables are stored in a triangular m-varies-fastest manner. The first
   // element for each m is for l = min(|m|, |s|), which is the first needed in

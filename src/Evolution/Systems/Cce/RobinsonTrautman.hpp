@@ -29,7 +29,7 @@ struct InitializeRobinsonTrautman {
              Spectral::Swsh::ComplexRepresentation::Interleaved>(l_max)) {
       // needs to be strictly positive.
       get(*rt_w).data()[collocation_point.offset] =
-          std::complex<double>(0.0, 0.0) *
+          std::complex<double>(0.01, 0.0) *
               real(swsh.evaluate(collocation_point.theta,
                                  collocation_point.phi)) +
           1.0;

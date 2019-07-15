@@ -149,14 +149,15 @@ struct CalculateScriPlusValue<Tags::CauchyGaugeScriPlus<Tags::Beta>> {
             (number_of_radial_points - 1) * number_of_angular_points,
         number_of_angular_points};
     beta_buffer.data() = beta_scri_view - 0.5 * log(get(omega).data());
-    Spectral::Swsh::swsh_interpolate(
-        make_not_null(&get(*cauchy_gauge_beta)), make_not_null(&beta_buffer),
-        get<0>(x_tilde_of_x), get<1>(x_tilde_of_x), l_max);
 
-    SpinWeighted<ComplexDataVector, 0> identity_test =
-        Spectral::Swsh::swsh_interpolate(
-            make_not_null(&get(*cauchy_gauge_beta)), get<0>(x_of_x_tilde),
-            get<1>(x_of_x_tilde), l_max);
+    Spectral::Swsh::SwshInterpolator interpolator{
+      get<0>(x_tilde_of_x), get<1>(x_tilde_of_x), 0, l_max};
+    interpolator.interpolate(
+        make_not_null(&get(*cauchy_gauge_beta).data()),
+        Spectral::Swsh::libsharp_to_goldberg_modes(
+            Spectral::Swsh::swsh_transform(make_not_null(&beta_buffer), l_max),
+            l_max)
+            .data());
   }
 };
 
@@ -200,9 +201,15 @@ struct CalculateScriPlusValue<Tags::CauchyGaugeScriPlus<Tags::U0>> {
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega_cd,
       const tnsr::i<DataVector, 2>& x_tilde_of_x,
       const tnsr::i<DataVector, 2>& x_of_x_tilde, const size_t l_max) noexcept {
-    Spectral::Swsh::swsh_interpolate(
-        make_not_null(&get(*cauchy_gauge_u0)), make_not_null(&get(*u0)),
-        get<0>(x_tilde_of_x), get<1>(x_tilde_of_x), l_max);
+    Spectral::Swsh::SwshInterpolator interpolator{
+      get<0>(x_tilde_of_x), get<1>(x_tilde_of_x), 1, l_max};
+    interpolator.interpolate(
+        make_not_null(&get(*cauchy_gauge_u0).data()),
+        Spectral::Swsh::libsharp_to_goldberg_modes(
+            Spectral::Swsh::swsh_transform(make_not_null(&get(*u0)), l_max),
+            l_max)
+            .data());
+
     get(*cauchy_gauge_u0) = 0.5 / square(get(omega)) *
                             (conj(get(b)) * get(*cauchy_gauge_u0) -
                              get(a) * conj(get(*cauchy_gauge_u0)));
@@ -280,10 +287,16 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::Beta>> {
       ComplexDataVector beta_view{
           get(*beta).data().data() + i * number_of_angular_points,
           number_of_angular_points};
-      Spectral::Swsh::swsh_interpolate(
-          make_not_null(&interpolated_cauchy_beta_slice),
-          make_not_null(&beta_slice), get<0>(x_tilde_of_x),
-          get<1>(x_tilde_of_x), l_max);
+
+      Spectral::Swsh::SwshInterpolator interpolator{
+        get<0>(x_tilde_of_x), get<1>(x_tilde_of_x), 0, l_max};
+      interpolator.interpolate(
+          make_not_null(&interpolated_cauchy_beta_slice.data()),
+          Spectral::Swsh::libsharp_to_goldberg_modes(
+              Spectral::Swsh::swsh_transform(make_not_null(&beta_slice), l_max),
+              l_max)
+              .data());
+
       ComplexDataVector cauchy_beta_slice{
           get(*cauchy_beta).data().data() + i * number_of_angular_points,
           number_of_angular_points};
@@ -534,12 +547,21 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::SpecH>> {
                        eth_u_0.data() * k_tilde;
       // TEST
       // h_slice.data() = h_view;
-      Spectral::Swsh::swsh_interpolate(
-          make_not_null(&interpolated_cauchy_h_slice), make_not_null(&h_slice),
-          get<0>(x_tilde_of_x), get<1>(x_tilde_of_x), l_max);
-      Spectral::Swsh::swsh_interpolate(
-          make_not_null(&interpolated_cauchy_j_slice), make_not_null(&j_view),
-          get<0>(x_tilde_of_x), get<1>(x_tilde_of_x), l_max);
+      Spectral::Swsh::SwshInterpolator interpolator{
+        get<0>(x_tilde_of_x), get<1>(x_tilde_of_x), 2, l_max};
+      interpolator.interpolate(
+          make_not_null(&interpolated_cauchy_h_slice.data()),
+          Spectral::Swsh::libsharp_to_goldberg_modes(
+              Spectral::Swsh::swsh_transform(make_not_null(&h_slice), l_max),
+              l_max)
+              .data());
+      interpolator.interpolate(
+          make_not_null(&interpolated_cauchy_j_slice.data()),
+          Spectral::Swsh::libsharp_to_goldberg_modes(
+              Spectral::Swsh::swsh_transform(make_not_null(&j_view), l_max),
+              l_max)
+              .data());
+
       ComplexDataVector interpolated_k =
           sqrt(1.0 + interpolated_cauchy_j_slice.data() *
                          conj(interpolated_cauchy_j_slice.data()));
@@ -640,9 +662,15 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::W>> {
       // w_slice.data() = w_view;
       // TEST
 
-      Spectral::Swsh::swsh_interpolate(
-          make_not_null(&interpolated_cauchy_w_slice), make_not_null(&w_slice),
-          get<0>(x_tilde_of_x), get<1>(x_tilde_of_x), l_max);
+      Spectral::Swsh::SwshInterpolator interpolator{
+          get<0>(x_tilde_of_x), get<1>(x_tilde_of_x), 0, l_max};
+      interpolator.interpolate(
+          make_not_null(&interpolated_cauchy_w_slice.data()),
+          Spectral::Swsh::libsharp_to_goldberg_modes(
+              Spectral::Swsh::swsh_transform(make_not_null(&w_slice), l_max),
+              l_max)
+              .data());
+
       cauchy_w_view = interpolated_cauchy_w_slice.data();
     }
     // Spectral::Swsh::filter_swsh_volume_quantity
@@ -687,9 +715,16 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::J>> {
           get(*j).data().data() + i * number_of_angular_points,
           number_of_angular_points};
       j_slice.data() = j_view;
-      Spectral::Swsh::swsh_interpolate(
-          make_not_null(&interpolated_cauchy_j_slice), make_not_null(&j_slice),
-          get<0>(x_tilde_of_x), get<1>(x_tilde_of_x), l_max);
+
+      Spectral::Swsh::SwshInterpolator interpolator{
+        get<0>(x_tilde_of_x), get<1>(x_tilde_of_x), 2, l_max};
+      interpolator.interpolate(
+          make_not_null(&interpolated_cauchy_j_slice.data()),
+          Spectral::Swsh::libsharp_to_goldberg_modes(
+              Spectral::Swsh::swsh_transform(make_not_null(&j_slice), l_max),
+              l_max)
+              .data());
+
       ComplexDataVector cauchy_j_view{
           get(*cauchy_j).data().data() + i * number_of_angular_points,
           number_of_angular_points};
@@ -769,9 +804,15 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::U>> {
               (get(eth_omega_cd).data() * sqrt(1.0 + j_view * conj(j_view)) -
                conj(get(eth_omega_cd).data()) * j_view);
 
-      Spectral::Swsh::swsh_interpolate(
-          make_not_null(&interpolated_cauchy_u_slice), make_not_null(&u_slice),
-          get<0>(x_tilde_of_x), get<1>(x_tilde_of_x), l_max);
+      Spectral::Swsh::SwshInterpolator interpolator{
+          get<0>(x_tilde_of_x), get<1>(x_tilde_of_x), 1, l_max};
+      interpolator.interpolate(
+          make_not_null(&interpolated_cauchy_u_slice.data()),
+          Spectral::Swsh::libsharp_to_goldberg_modes(
+              Spectral::Swsh::swsh_transform(make_not_null(&u_slice), l_max),
+              l_max)
+              .data());
+
       cauchy_u_view =
           0.5 *
           (interpolated_cauchy_u_slice.data() * conj(get(b).data()) -

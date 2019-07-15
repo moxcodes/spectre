@@ -42,9 +42,14 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::R> {
     // Spectral::Swsh::filter_swsh_boundary_quantity(make_not_null(&get(*r)),
     // l_max, l_max - 2);
     // SpinWeighted<ComplexDataVector, 0> r_over_omega = get(*r) / get(omega);
-    Spectral::Swsh::swsh_interpolate(
-        make_not_null(&get(*evolution_gauge_r)), make_not_null(&get(*r)),
-        get<0>(x_of_x_tilde), get<1>(x_of_x_tilde), l_max);
+    Spectral::Swsh::SwshInterpolator interpolator{
+        get<0>(x_of_x_tilde), get<1>(x_of_x_tilde), 0, l_max};
+    interpolator.interpolate(
+        make_not_null(&get(*evolution_gauge_r).data()),
+        Spectral::Swsh::libsharp_to_goldberg_modes(
+            Spectral::Swsh::swsh_transform(make_not_null(&get(*r)), l_max),
+            l_max)
+            .data());
 
     get(*evolution_gauge_r) = get(*evolution_gauge_r) * get(omega_cd);
 
@@ -78,10 +83,15 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::DuRDividedByR> {
     // Spectral::Swsh::filter_swsh_boundary_quantity(
     // make_not_null(&get(*du_r_divided_by_r)), l_max, l_max - 2);
 
-    Spectral::Swsh::swsh_interpolate(
-        make_not_null(&get(*evolution_gauge_du_r_divided_by_r)),
-        make_not_null(&get(*du_r_divided_by_r)), get<0>(x_of_x_tilde),
-        get<1>(x_of_x_tilde), l_max);
+    Spectral::Swsh::SwshInterpolator interpolator{
+      get<0>(x_of_x_tilde), get<1>(x_of_x_tilde), 0, l_max};
+    interpolator.interpolate(
+        make_not_null(&get(*evolution_gauge_du_r_divided_by_r).data()),
+        Spectral::Swsh::libsharp_to_goldberg_modes(
+            Spectral::Swsh::swsh_transform(
+                make_not_null(&get(*du_r_divided_by_r)), l_max),
+            l_max)
+            .data());
 
     // taking this as argument saves an interpolation, which is significantly
     // more expensive than the extra multiplication.
@@ -113,9 +123,14 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::J> {
     // Spectral::Swsh::filter_swsh_boundary_quantity(make_not_null(&get(*j)),
     // l_max, l_max - 2);
 
-    Spectral::Swsh::swsh_interpolate(
-        make_not_null(&get(*evolution_gauge_j)), make_not_null(&get(*j)),
-        get<0>(x_of_x_tilde), get<1>(x_of_x_tilde), l_max);
+    Spectral::Swsh::SwshInterpolator interpolator{
+      get<0>(x_of_x_tilde), get<1>(x_of_x_tilde), 2, l_max};
+    interpolator.interpolate(
+        make_not_null(&get(*evolution_gauge_j).data()),
+        Spectral::Swsh::libsharp_to_goldberg_modes(
+            Spectral::Swsh::swsh_transform(make_not_null(&get(*j)), l_max),
+            l_max)
+            .data());
 
     // NOTE this might require a filter between the jacobian factor and the
     // conformal factor to maximize precision.
@@ -154,9 +169,14 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::Dr<Tags::J>> {
     // Spectral::Swsh::filter_swsh_boundary_quantity(make_not_null(&get(*dr_j)),
     // l_max, l_max - 2);
 
-    Spectral::Swsh::swsh_interpolate(
-        make_not_null(&get(*evolution_gauge_dr_j)), make_not_null(&get(*dr_j)),
-        get<0>(x_of_x_tilde), get<1>(x_of_x_tilde), l_max);
+    Spectral::Swsh::SwshInterpolator interpolator{
+      get<0>(x_of_x_tilde), get<1>(x_of_x_tilde), 2, l_max};
+    interpolator.interpolate(
+        make_not_null(&get(*evolution_gauge_dr_j).data()),
+        Spectral::Swsh::libsharp_to_goldberg_modes(
+            Spectral::Swsh::swsh_transform(make_not_null(&get(*dr_j)), l_max),
+            l_max)
+        .data());
 
     // NOTE this might require a filter between the jacobian factor and the
     // conformal factor to maximize precision.
@@ -195,9 +215,16 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::Beta> {
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega_cd,
       const tnsr::i<DataVector, 2>& x_of_x_tilde,
       const tnsr::i<DataVector, 2>& x_tilde_of_x, const size_t l_max) noexcept {
-    Spectral::Swsh::swsh_interpolate(
-        make_not_null(&get(*evolution_gauge_beta)), make_not_null(&get(*beta)),
-        get<0>(x_of_x_tilde), get<1>(x_of_x_tilde), l_max);
+
+    Spectral::Swsh::SwshInterpolator interpolator{
+      get<0>(x_of_x_tilde), get<1>(x_of_x_tilde), 0, l_max};
+    interpolator.interpolate(
+        make_not_null(&get(*evolution_gauge_beta).data()),
+        Spectral::Swsh::libsharp_to_goldberg_modes(
+            Spectral::Swsh::swsh_transform(make_not_null(&get(*beta)), l_max),
+            l_max)
+            .data());
+
     get(*evolution_gauge_beta).data() -= 0.5 * log(get(omega_cd).data());
     // Spectral::Swsh::filter_swsh_boundary_quantity(
     // make_not_null(&get(*evolution_gauge_beta)), l_max, l_max - 2);
@@ -256,9 +283,14 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::Q> {
       const tnsr::i<DataVector, 2>& x_of_x_tilde, const size_t l_max) noexcept {
     // TODO fix transforms for representability concerns
 
-    SpinWeighted<ComplexDataVector, 1> evolution_coords_dr_u =
-        Spectral::Swsh::swsh_interpolate(dr_u, get<0>(x_of_x_tilde),
-                                         get<1>(x_of_x_tilde), l_max);
+    SpinWeighted<ComplexDataVector, 1> evolution_coords_dr_u{dr_u->size()};
+    Spectral::Swsh::SwshInterpolator interpolator{
+        get<0>(x_of_x_tilde), get<1>(x_of_x_tilde), 1, l_max};
+    interpolator.interpolate(
+        make_not_null(&evolution_coords_dr_u.data()),
+        Spectral::Swsh::libsharp_to_goldberg_modes(
+            Spectral::Swsh::swsh_transform(dr_u, l_max), l_max)
+            .data());
 
     SpinWeighted<ComplexDataVector, 2> boundary_j_tilde;
     boundary_j_tilde.data() = ComplexDataVector{
@@ -341,11 +373,15 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::U> {
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega_cd,
       const Scalar<SpinWeighted<ComplexDataVector, 1>>& eth_omega_cd,
       const tnsr::i<DataVector, 2>& x_of_x_tilde, const size_t l_max) noexcept {
-    // TODO
-    SpinWeighted<ComplexDataVector, 1> evolution_coords_u =
-        Spectral::Swsh::swsh_interpolate(make_not_null(&get(*u)),
-                                         get<0>(x_of_x_tilde),
-                                         get<1>(x_of_x_tilde), l_max);
+    Spectral::Swsh::SwshInterpolator interpolator{
+        get<0>(x_of_x_tilde), get<1>(x_of_x_tilde), 1, l_max};
+    SpinWeighted<ComplexDataVector, 1> evolution_coords_u{get(*u).size()};
+    interpolator.interpolate(
+        make_not_null(&evolution_coords_u.data()),
+        Spectral::Swsh::libsharp_to_goldberg_modes(
+            Spectral::Swsh::swsh_transform(make_not_null(&get(*u)), l_max),
+            l_max)
+            .data());
 
     SpinWeighted<ComplexDataVector, 2> boundary_j_tilde;
     boundary_j_tilde = ComplexDataVector{
@@ -437,18 +473,23 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::W> {
       const SpinWeighted<ComplexDataVector, 0>& d,
       const SpinWeighted<ComplexDataVector, 2>& c,
       const tnsr::i<DataVector, 2>& x_of_x_tilde, const size_t l_max) noexcept {
-    // Spectral::Swsh::filter_swsh_boundary_quantity(w, l_max, l_max - 2);
-    Spectral::Swsh::swsh_interpolate(evolution_gauge_w, w, get<0>(x_of_x_tilde),
-                                     get<1>(x_of_x_tilde), l_max);
+    Spectral::Swsh::SwshInterpolator w_interpolator{
+        get<0>(x_of_x_tilde), get<1>(x_of_x_tilde), 0, l_max};
+    w_interpolator.interpolate(
+        make_not_null(&evolution_gauge_w->data()),
+        Spectral::Swsh::libsharp_to_goldberg_modes(
+            Spectral::Swsh::swsh_transform(w, l_max), l_max)
+        .data());
 
-    SpinWeighted<ComplexDataVector, 1> boundary_u_of_x_tilde{};
-
-    // Spectral::Swsh::filter_swsh_boundary_quantity(boundary_u, l_max, l_max -
-    // 2);
-
-    Spectral::Swsh::swsh_interpolate(make_not_null(&boundary_u_of_x_tilde),
-                                     boundary_u, get<0>(x_of_x_tilde),
-                                     get<1>(x_of_x_tilde), l_max);
+    SpinWeighted<ComplexDataVector, 1> boundary_u_of_x_tilde{
+        boundary_u->size()};
+    Spectral::Swsh::SwshInterpolator u_interpolator{
+        get<0>(x_of_x_tilde), get<1>(x_of_x_tilde), 1, l_max};
+    u_interpolator.interpolate(
+        make_not_null(&boundary_u_of_x_tilde.data()),
+        Spectral::Swsh::libsharp_to_goldberg_modes(
+            Spectral::Swsh::swsh_transform(boundary_u, l_max), l_max)
+            .data());
 
     SpinWeighted<ComplexDataVector, 2> boundary_j_tilde;
     boundary_j_tilde = ComplexDataVector{
@@ -643,9 +684,14 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::H> {
                                                                       l_max);
 
     // Spectral::Swsh::filter_swsh_boundary_quantity(spec_h, l_max, l_max - 2);
-    SpinWeighted<ComplexDataVector, 2> h_of_x_tilde =
-        Spectral::Swsh::swsh_interpolate(spec_h, get<0>(x_of_x_tilde),
-                                         get<1>(x_of_x_tilde), l_max);
+    SpinWeighted<ComplexDataVector, 2> h_of_x_tilde{spec_h->size()};
+    Spectral::Swsh::SwshInterpolator h_interpolator{
+      get<0>(x_of_x_tilde), get<1>(x_of_x_tilde), 2, l_max};
+    h_interpolator.interpolate(
+        make_not_null(&h_of_x_tilde.data()),
+        Spectral::Swsh::libsharp_to_goldberg_modes(
+            Spectral::Swsh::swsh_transform(spec_h, l_max), l_max)
+            .data());
 
     *h_tilde =
         angular_derivative_term -
@@ -717,8 +763,8 @@ struct GaugeUpdateU {
         Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
 
     // RT test
-    get(*u_0).data() = 0.0;
-    // get(*u_0).data() = u_scri_slice;
+    // get(*u_0).data() = 0.0;
+    get(*u_0).data() = u_scri_slice;
 
     // printf("debug: u at scri\n");
     // for(auto val : u_scri_slice) {
@@ -799,30 +845,6 @@ struct GaugeUpdateU {
     // Unfortunately, this is the best way I can think of to guarantee that
     // these derivatives are correctly evaluated, and the derivatives are needed
     // for the evolution equations below.
-    auto cauchy_coords_u_0 = Spectral::Swsh::swsh_interpolate(
-        make_not_null(&get(*u_0)), get<0>(x_tilde_of_x), get<1>(x_tilde_of_x),
-        l_max);
-    cauchy_coords_u_0 =
-        0.5 / square(get(omega)) *
-        (conj(get(b)) * cauchy_coords_u_0 - get(a) * conj(cauchy_coords_u_0));
-
-    auto ethbar_u_0 =
-        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
-            make_not_null(&cauchy_coords_u_0), l_max);
-    auto eth_u_0 = Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
-        make_not_null(&cauchy_coords_u_0), l_max);
-
-    // Spectral::Swsh::filter_swsh_boundary_quantity(make_not_null(&ethbar_u_0),
-    // l_max, l_max - 4);
-    // Spectral::Swsh::filter_swsh_boundary_quantity(make_not_null(&eth_u_0),
-    // l_max, l_max - 4);
-
-    auto inertial_coords_ethbar_u_0 = Spectral::Swsh::swsh_interpolate(
-        make_not_null(&ethbar_u_0), get<0>(x_of_x_tilde), get<1>(x_of_x_tilde),
-        l_max);
-    auto inertial_coords_eth_u_0 = Spectral::Swsh::swsh_interpolate(
-        make_not_null(&eth_u_0), get<0>(x_of_x_tilde), get<1>(x_of_x_tilde),
-        l_max);
 
     auto inertial_ethbar_u_0 =
         Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
@@ -992,10 +1014,15 @@ struct GaugeUpdateDuXtildeOfX {
     //(&get(*u_0_hat)),
     // l_max, l_max - 2);
 
-    SpinWeighted<ComplexDataVector, 1> u_0_hat_of_x =
-        Spectral::Swsh::swsh_interpolate(make_not_null(&get(*u_0_hat)),
-                                         get<0>(x_tilde_of_x),
-                                         get<1>(x_tilde_of_x), l_max);
+    SpinWeighted<ComplexDataVector, 2> u_0_hat_of_x{get(*u_0_hat).size()};
+    Spectral::Swsh::SwshInterpolator interpolator{
+        get<0>(x_tilde_of_x), get<1>(x_tilde_of_x), 1, l_max};
+    interpolator.interpolate(make_not_null(&u_0_hat_of_x.data()),
+                             Spectral::Swsh::libsharp_to_goldberg_modes(
+                                 Spectral::Swsh::swsh_transform(
+                                     make_not_null(&get(*u_0_hat)), l_max),
+                                 l_max)
+                                 .data());
 
     get<0>(*du_x_tilde_of_x) =
         real(((-cos(get<0>(x_tilde_of_x)) * cos(get<1>(x_tilde_of_x))) -
