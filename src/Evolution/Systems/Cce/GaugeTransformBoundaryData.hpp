@@ -881,6 +881,98 @@ struct GaugeUpdateU {
   }
 };
 
+// This takes the u_0 from the databox, assuming it has already been set
+// separately.
+struct GaugeUpdateUManualTransform {
+  using argument_tags =
+      tmpl::list<Tags::GaugeA, Tags::GaugeB, Tags::CauchyAngularCoords,
+                 Tags::CauchyCartesianCoords, Tags::InertialAngularCoords,
+                 Tags::GaugeOmegaCD, Tags::GaugeOmega,
+                 Spectral::Swsh::Tags::Derivative<Tags::GaugeOmegaCD,
+                                                  Spectral::Swsh::Tags::Eth>,
+                 Tags::Exp2Beta, Tags::LMax>;
+  using return_tags =
+      tmpl::list<Tags::DuCauchyCartesianCoords, Tags::Du<Tags::GaugeC>,
+                 Tags::Du<Tags::GaugeD>, Tags::U0, Tags::U,
+                 Tags::Du<Tags::GaugeOmegaCD>, Tags::GaugeC, Tags::GaugeD>;
+
+  static void apply(
+      const gsl::not_null<tnsr::i<DataVector, 3>*> du_x,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> du_c,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> du_d,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> u_0,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> u,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*>
+          du_omega_cd,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> c,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> d,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& a,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& b,
+      const tnsr::i<DataVector, 2> x_of_x_tilde,
+      const tnsr::i<DataVector, 3> cartesian_x_of_x_tilde,
+      const tnsr::i<DataVector, 2> x_tilde_of_x,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega_cd,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega,
+      const Scalar<SpinWeighted<ComplexDataVector, 1>>& eth_omega_cd,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& exp2beta,
+      const size_t l_max) noexcept {
+    size_t number_of_radial_points =
+        get(*u).size() /
+        Spectral::Swsh::number_of_swsh_collocation_points(l_max);
+    // u_hat_0
+    ComplexDataVector u_scri_slice{
+        get(*u).data().data() +
+            (number_of_radial_points - 1) *
+                Spectral::Swsh::number_of_swsh_collocation_points(l_max),
+        Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
+
+
+    // subtract u_hat_0 from u
+    for (size_t i = 0; i < number_of_radial_points; ++i) {
+      ComplexDataVector angular_view{
+          get(*u).data().data() +
+              i * Spectral::Swsh::number_of_swsh_collocation_points(l_max),
+          Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
+      angular_view -= get(*u_0).data();
+    }
+
+    SpinWeighted<ComplexDataVector, 0> x;
+    x.data() = std::complex<double>(1.0, 0.0) * get<0>(cartesian_x_of_x_tilde);
+    SpinWeighted<ComplexDataVector, 0> y;
+    y.data() = std::complex<double>(1.0, 0.0) * get<1>(cartesian_x_of_x_tilde);
+    SpinWeighted<ComplexDataVector, 0> z;
+    z.data() = std::complex<double>(1.0, 0.0) * get<2>(cartesian_x_of_x_tilde);
+
+    auto eth_x = Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
+        make_not_null(&x), l_max);
+    auto eth_y = Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
+        make_not_null(&y), l_max);
+    auto eth_z = Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
+        make_not_null(&z), l_max);
+    get<0>(*du_x) = real(conj(get(*u_0).data()) * eth_x.data());
+    get<1>(*du_x) = real(conj(get(*u_0).data()) * eth_y.data());
+    get<2>(*du_x) = real(conj(get(*u_0).data()) * eth_z.data());
+
+    // Unfortunately, this is the best way I can think of to guarantee that
+    // these derivatives are correctly evaluated, and the derivatives are needed
+    // for the evolution equations below.
+
+    auto inertial_ethbar_u_0 =
+        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
+            make_not_null(&get(*u_0)), l_max);
+    auto inertial_eth_u_0 =
+        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
+            make_not_null(&get(*u_0)), l_max);
+
+    get(*du_omega_cd) = 0.25 *
+                            (inertial_ethbar_u_0 + conj(inertial_ethbar_u_0)) *
+                            get(omega_cd) +
+                        0.5 * (get(*u_0) * conj(get(eth_omega_cd)) +
+                               conj(get(*u_0)) * get(eth_omega_cd));
+  }
+};
+
+
 template <typename AngularTag, typename CartesianTag>
 struct GaugeUpdateAngularFromCartesian {
   using argument_tags = tmpl::list<Tags::LMax>;

@@ -156,6 +156,68 @@ void regularity_preserving_hypersurface_computation(
   }
 }
 
+template <typename BondiTag, typename SwshVariablesTag,
+          typename SwshBufferVariablesTag, typename PreSwshVariablesTag,
+          typename DataBoxType>
+void regularity_preserving_robinson_trautman_hypersurface_computation(
+    const gsl::not_null<DataBoxType*> box) noexcept {
+  // printf("boundary computation\n");
+  db::mutate_apply<ComputeGaugeAdjustedBoundaryValue<BondiTag>>(box);
+
+  // printf("pre swsh derivatives\n");
+  mutate_all_pre_swsh_derivatives_for_tag<BondiTag>(box);
+
+  // printf("swsh derivatives\n");
+  mutate_all_swsh_derivatives_for_tag<
+      BondiTag, SwshVariablesTag, SwshBufferVariablesTag, PreSwshVariablesTag>(
+      box);
+
+  // printf("integrand terms\n");
+  tmpl::for_each<integrand_terms_to_compute_for_bondi_variable<BondiTag>>(
+      [&box](auto x) {
+        using bondi_integrand_tag = typename decltype(x)::type;
+        db::mutate_apply<ComputeBondiIntegrand<bondi_integrand_tag>>(box);
+      });
+
+  // printf("integral\n");
+  db::mutate_apply<
+      RadialIntegrateBondi<Tags::EvolutionGaugeBoundaryValue, BondiTag>>(box);
+
+  if (cpp17::is_same_v<BondiTag, Tags::U>) {
+    db::mutate<Tags::U0>(
+        box,
+        [](const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> u_0,
+           const size_t l_max) {
+          DataVector theta{
+              Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
+          DataVector phi{
+              Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
+          const auto& collocation = Spectral::Swsh::precomputed_collocation<
+              Spectral::Swsh::ComplexRepresentation::Interleaved>(l_max);
+          for (const auto& collocation_point : collocation) {
+            theta[collocation_point.offset] = collocation_point.theta;
+            phi[collocation_point.offset] = collocation_point.phi;
+          }
+          get(*u_0) =
+              1.0e-3 * std::complex<double>(1.0, 0.0) * cos(theta) * sin(theta);
+        },
+        db::get<Tags::LMax>(*box));
+
+    db::mutate_apply<GaugeUpdateUManualTransform>(box);
+    db::mutate_apply<GaugeUpdateDuXtildeOfX>(box);
+    // db::mutate_apply<GaugeUpdateJacobianFromCoords<
+    // Tags::GaugeA, Tags::GaugeB, Tags::CauchyAngularCoords,
+    // Tags::InertialAngularCoords, Tags::DuInertialAngularCoords>>(box);
+    // db::mutate_apply<GaugeUpdateJacobianFromCoords<
+    // Tags::GaugeC, Tags::GaugeD, Tags::InertialAngularCoords,
+    // Tags::CauchyAngularCoords, Tags::DuCauchyAngularCoords>>(box);
+    db::mutate_apply<ComputeGaugeAdjustedBoundaryValue<Tags::DuRDividedByR>>(
+        box);
+    db::mutate_apply<PrecomputeCceDependencies<
+        Tags::EvolutionGaugeBoundaryValue, Tags::DuRDividedByR>>(box);
+  }
+}
+
 template <template <typename> class BoundaryPrefix, typename TagList,
           typename DataBoxType>
 void record_boundary_values(const gsl::not_null<DataBoxType*> box,
@@ -1273,7 +1335,7 @@ void test_regularity_preserving_cce_rt(
         [&box, &l_max, &l_filter_start](auto x) {
           using bondi_tag = typename decltype(x)::type;
           // printf("before computation for : %s\n", bondi_tag::name().c_str());
-          regularity_preserving_hypersurface_computation<
+          regularity_preserving_robinson_trautman_hypersurface_computation<
               bondi_tag, swsh_derivatives_variables_tag,
               transform_buffer_variables_tag,
               pre_swsh_derivatives_variables_tag>(make_not_null(&box));

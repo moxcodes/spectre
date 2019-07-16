@@ -412,11 +412,11 @@ struct CalculateRobinsonTrautman<Tags::Du<Tags::RobinsonTrautmanW>> {
             make_not_null(&rt_k), l_max);
     get(*du_rt_w) = -pow<3>(get(*rt_w).data()) * eth_ethbar_rt_k.data() / 12.0;
 
-    printf("debug: rt w\n");
-    for(auto val : get(*rt_w).data()) {
-      printf("%e, %e\n", real(val), imag(val));
-    }
-    printf("done\n");
+    // printf("debug: rt w\n");
+    // for(auto val : get(*rt_w).data()) {
+      // printf("%e, %e\n", real(val), imag(val));
+    // }
+    // printf("done\n");
     // alternative derivation
     Spectral::Swsh::filter_swsh_boundary_quantity(make_not_null(&get(*rt_w)),
                                                   l_max, l_max - 4);
