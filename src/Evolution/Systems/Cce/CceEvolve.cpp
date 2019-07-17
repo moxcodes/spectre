@@ -408,13 +408,17 @@ void compare_and_record_r200_value_inertial(
   recorder->append_mode_data("/" + Tag::name() + "_r200", time,
                              r200_goldberg_modes.data(), comparison_l_max);
 
-  ModeComparisonManager mode_compare(comparison_file_prefix + file_name, l_max);
-  auto inertial_modes_from_file = CalculateInertialModes<Tag>::compute(
-      box, mode_compare.get_comparison_modes(time),
-      2.0 * get(db::get<Tags::R>(*box)).data() / 200.0);
-  recorder->append_mode_data(
-      "/" + Tag::name() + "_r200_difference", time,
-      r200_goldberg_modes.data() - inertial_modes_from_file, comparison_l_max);
+  if (comparison_file_prefix != "") {
+    ModeComparisonManager mode_compare(comparison_file_prefix + file_name,
+                                       l_max);
+    auto inertial_modes_from_file = CalculateInertialModes<Tag>::compute(
+        box, mode_compare.get_comparison_modes(time),
+        2.0 * get(db::get<Tags::R>(*box)).data() / 200.0);
+    recorder->append_mode_data(
+        "/" + Tag::name() + "_r200_difference", time,
+        r200_goldberg_modes.data() - inertial_modes_from_file,
+        comparison_l_max);
+  }
 }
 
 void run_trial_cce(std::string input_filename,
@@ -760,7 +764,7 @@ void run_trial_regularity_preserving_cce(
 
   ScriPlusInterpolationManager<FlexibleBarycentricInterpolator,
                                ComplexDataVector>
-      interpolation_manager{1, boundary_size};
+      interpolation_manager{5, boundary_size};
 
   db::mutate_apply<InitializeJ<Tags::BoundaryValue>>(make_not_null(&box));
   db::mutate_apply<InitializeGauge>(make_not_null(&box));
@@ -799,7 +803,6 @@ void run_trial_regularity_preserving_cce(
 
   // main loop
   while (data_still_available and time.time().value() < end_time) {
-    step_counter++;
 
     tmpl::for_each<compute_gauge_adjustments_setup_tags>([&box](auto x) {
       using tag = typename decltype(x)::type;
@@ -1518,6 +1521,7 @@ void test_regularity_preserving_cce_rt(
           using tag = typename decltype(x)::type;
           db::mutate_apply<CalculateRobinsonTrautman<tag>>(make_not_null(&box));
         });
+    step_counter++;
   }
 }
 }  // namespace Cce
