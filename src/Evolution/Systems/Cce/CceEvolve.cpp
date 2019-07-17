@@ -624,7 +624,7 @@ void run_trial_cce(std::string input_filename,
                                            make_not_null(&history), time_step);
                         });
     time = stepper.next_time_id(time, time_step);
-    printf("next time: %f\n", time.time().value());
+    // printf("next time: %f\n", time.time().value());
     // get the worldtube data for the next time step.
     db::mutate<boundary_variables_tag>(
         make_not_null(&box),
@@ -1078,7 +1078,7 @@ void run_trial_regularity_preserving_cce(
                            make_not_null(&gauge_d_history), time_step);
         });
     time = stepper.next_time_id(time, time_step);
-    printf("next time: %f\n", time.time().value());
+    // printf("next time: %f\n", time.time().value());
     db::mutate_apply<GaugeUpdateAngularFromCartesian<
         Tags::InertialAngularCoords, Tags::InertialCartesianCoords>>(
         make_not_null(&box));
@@ -1322,7 +1322,7 @@ void test_regularity_preserving_cce_rt(
   // main loop
   while (time.time().value() < end_time) {
     step_counter++;
-    printf("starting step %zu\n", step_counter);
+    // printf("starting step %zu\n", step_counter);
     tmpl::for_each<compute_gauge_adjustments_setup_tags>([&box](auto x) {
       using tag = typename decltype(x)::type;
       db::mutate_apply<ComputeGaugeAdjustedBoundaryValue<tag>>(
@@ -1410,7 +1410,7 @@ void test_regularity_preserving_cce_rt(
     // make_not_null(&box));
     // });
 
-    printf("recording output\n");
+    // printf("recording output\n");
     if (time.substep() == 0) {
       // perform a comparison of boundary values and scri+ values on each new
       // time advancement
@@ -1448,7 +1448,7 @@ void test_regularity_preserving_cce_rt(
           number_of_radial_points);
       // }
     }
-    printf("stepping\n");
+    // printf("stepping\n");
     db::mutate<Tags::J, Tags::CauchyCartesianCoords, Tags::RobinsonTrautmanW,
                Tags::GaugeOmegaCD>(
         make_not_null(&box),
@@ -1480,7 +1480,7 @@ void test_regularity_preserving_cce_rt(
                            make_not_null(&rt_w_history), time_step);
         });
     time = stepper.next_time_id(time, time_step);
-    printf("next time: %f\n", time.time().value());
+    // printf("next time: %f\n", time.time().value());
     db::mutate_apply<GaugeUpdateAngularFromCartesian<
         Tags::InertialAngularCoords, Tags::InertialCartesianCoords>>(
         make_not_null(&box));

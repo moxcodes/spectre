@@ -26,7 +26,7 @@ struct ScriPlusInterpolationManager {
     u_bondi_values_.push_back(u_bondi);
     to_interpolate_values_.push_back(to_interpolate);
     u_bondi_ranges_.push_back(std::make_pair(min(u_bondi), max(u_bondi)));
-    printf("range inserted : %f, %f\n", min(u_bondi), max(u_bondi));
+    // printf("range inserted : %f, %f\n", min(u_bondi), max(u_bondi));
   }
 
   // for optimization, we assume that these are inserted in ascending order.
@@ -48,7 +48,7 @@ struct ScriPlusInterpolationManager {
         ++maxes_below;
       }
     }
-    printf("%f, %zu %zu\n", target_times_.front(), maxes_below, mins_above);
+    // printf("%f, %zu %zu\n", target_times_.front(), maxes_below, mins_above);
     // we might ask for a time that's too close to the end or the beginning of
     // our data, in which case we will settle for at least one point below and
     // above and a sufficient number of total points.

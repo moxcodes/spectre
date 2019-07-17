@@ -85,7 +85,8 @@ void execute_libsharp_transform_set(
                         number_of_arrays_per_transform *
                             max_libsharp_transforms * transform_block,
                     collocation_metadata->get_sharp_geom_info(), alm_info,
-                    max_libsharp_transforms, SHARP_DP, nullptr, nullptr);
+                    max_libsharp_transforms, SHARP_DP | SHARP_NO_OPENMP,
+                    nullptr, nullptr);
     } else {
       // clang-tidy cppcoreguidelines-pro-bounds-pointer-arithmetic
       sharp_execute(jobtype, abs(spin),
@@ -96,8 +97,8 @@ void execute_libsharp_transform_set(
                         number_of_arrays_per_transform *
                             max_libsharp_transforms * transform_block,
                     collocation_metadata->get_sharp_geom_info(), alm_info,
-                    num_transforms % max_libsharp_transforms, SHARP_DP, nullptr,
-                    nullptr);
+                    num_transforms % max_libsharp_transforms,
+                    SHARP_DP | SHARP_NO_OPENMP, nullptr, nullptr);
     }
   }
 }
