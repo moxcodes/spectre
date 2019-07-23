@@ -13,6 +13,9 @@
 namespace Cce {
 
 namespace detail {
+using bondi_hypersurface_step_tags =
+    tmpl::list<Tags::Beta, Tags::Q, Tags::U, Tags::W, Tags::H>;
+
 template <typename Tag>
 struct TagsToComputeForImpl {
   using pre_swsh_derivative_tags = tmpl::list<>;

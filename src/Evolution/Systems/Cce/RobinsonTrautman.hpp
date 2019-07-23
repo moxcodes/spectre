@@ -136,7 +136,7 @@ struct CalculateRobinsonTrautman<Tags::BoundaryValue<Tags::SpecH>> {
 
   static void apply(
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*>
-      boundary_cauchy_h) noexcept {
+          boundary_cauchy_h) noexcept {
     // For the RT solution, J is just 0.
     get(*boundary_cauchy_h).data() = 0.0;
   }
@@ -149,12 +149,11 @@ struct CalculateRobinsonTrautman<Tags::CauchyGauge<Tags::SpecH>> {
 
   static void apply(
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*>
-      cauchy_h) noexcept {
+          cauchy_h) noexcept {
     // For the RT solution, J is just 0.
     get(*cauchy_h).data() = 0.0;
   }
 };
-
 
 template <>
 struct CalculateRobinsonTrautman<Tags::BoundaryValue<Tags::Beta>> {
@@ -238,7 +237,7 @@ struct CalculateRobinsonTrautman<Tags::BoundaryValue<Tags::Dr<Tags::U>>> {
 
   static void apply(
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*>
-      boundary_cauchy_dr_u,
+          boundary_cauchy_dr_u,
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> rt_w,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& boundary_r,
       const size_t l_max) noexcept {
@@ -272,8 +271,7 @@ template <>
 struct CalculateRobinsonTrautman<Tags::CauchyGauge<Tags::U>> {
   using return_tags =
       tmpl::list<Tags::CauchyGauge<Tags::U>, Tags::RobinsonTrautmanW>;
-  using argument_tags =
-      tmpl::list<Tags::BoundaryValue<Tags::R>, Tags::LMax>;
+  using argument_tags = tmpl::list<Tags::BoundaryValue<Tags::R>, Tags::LMax>;
 
   static void apply(
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> cauchy_u,
@@ -351,9 +349,9 @@ struct CalculateRobinsonTrautman<Tags::CauchyGauge<Tags::W>> {
     ComplexDataVector one_minus_y_collocation =
         1.0 -
         std::complex<double>(1.0, 0.0) *
-        Spectral::collocation_points<Spectral::Basis::Legendre,
-                                     Spectral::Quadrature::GaussLobatto>(
-                                         number_of_radial_points);
+            Spectral::collocation_points<Spectral::Basis::Legendre,
+                                         Spectral::Quadrature::GaussLobatto>(
+                number_of_radial_points);
     ComplexDataVector one_minus_y =
         outer(ComplexDataVector{number_of_angular_points, 1.0},
               one_minus_y_collocation);
@@ -379,6 +377,29 @@ struct CalculateRobinsonTrautman<Tags::CauchyGauge<Tags::W>> {
 };
 
 template <>
+struct CalculateRobinsonTrautman<Tags::CauchyGauge<Tags::News>> {
+  using return_tags =
+      tmpl::list<Tags::CauchyGauge<Tags::News>, Tags::RobinsonTrautmanW>;
+  using argument_tags = tmpl::list<Tags::LMax>;
+
+  static void apply(
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*>
+          cauchy_news,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> rt_w,
+      const size_t l_max) noexcept {
+    size_t number_of_angular_points =
+        Spectral::Swsh::number_of_swsh_collocation_points(l_max);
+    size_t number_of_radial_points =
+        get(*cauchy_w).size() / number_of_angular_points;
+    auto eth_eth_rt_w =
+        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::EthEth>(
+            make_not_null(&get(*rt_w)), l_max);
+
+    get(*cauchy_news) = 0.5 * eth_eth_rt_w / get(*rt_w);
+  }
+};
+
+template <>
 struct CalculateRobinsonTrautman<Tags::Du<Tags::RobinsonTrautmanW>> {
   using return_tags =
       tmpl::list<Tags::Du<Tags::RobinsonTrautmanW>, Tags::RobinsonTrautmanW>;
@@ -388,10 +409,9 @@ struct CalculateRobinsonTrautman<Tags::Du<Tags::RobinsonTrautmanW>> {
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> du_rt_w,
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> rt_w,
       const size_t l_max) noexcept {
-
     // printf("rt_w\n");
     // for (auto val : get(*rt_w).data()) {
-      // printf("%e %e\n", real(val), imag(val));
+    // printf("%e %e\n", real(val), imag(val));
     // }
     // printf("done\n");
 
@@ -414,7 +434,7 @@ struct CalculateRobinsonTrautman<Tags::Du<Tags::RobinsonTrautmanW>> {
 
     // printf("debug: rt w\n");
     // for(auto val : get(*rt_w).data()) {
-      // printf("%e, %e\n", real(val), imag(val));
+    // printf("%e, %e\n", real(val), imag(val));
     // }
     // printf("done\n");
     // alternative derivation

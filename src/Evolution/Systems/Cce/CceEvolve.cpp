@@ -1396,7 +1396,10 @@ void test_regularity_preserving_cce_rt(
     // computation that we're actually performing a reliable coordinate
     // transformation as we hope.
 
-    db::mutate_apply<CalculateScriPlusValue<Tags::News>>(make_not_null(&box));
+    db::mutate_apply<CalculateRobinsonTrautman<Tags::CauchyGauge<Tags::News>>>(
+        make_not_null(&box));
+    db::mutate_apply<CalculateRobinsonTrautman<Tags::News>>(
+        make_not_null(&box));
 
     tmpl::for_each<
         tmpl::list<Tags::CauchyGauge<Tags::J>, Tags::CauchyGauge<Tags::Beta>,
@@ -1429,7 +1432,8 @@ void test_regularity_preserving_cce_rt(
 
       // printf("recording scri values\n");
       compare_and_record_scri_values<
-          tmpl::list<Tags::J, Tags::Beta, Tags::Q, Tags::U, Tags::W, Tags::H>>(
+          tmpl::list<Tags::J, Tags::Beta, Tags::Q, Tags::U, Tags::W, Tags::H,
+                     Tags::CauchyGauge<Tags::News>, Tags::News>>(
           make_not_null(&box), make_not_null(&recorder), "",
           time.step_time().value(), l_max, comparison_l_max,
           number_of_radial_points);

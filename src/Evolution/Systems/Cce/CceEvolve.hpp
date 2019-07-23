@@ -71,7 +71,8 @@ using angular_coordinate_tags =
                Tags::InertialAngularCoords, Tags::DuInertialAngularCoords,
                Tags::InertialCartesianCoords, Tags::DuInertialCartesianCoords>;
 
-using scri_tags = tmpl::list<Tags::News, Tags::InertialRetardedTime,
+using scri_tags = tmpl::list<Tags::CauchyGauge<Tags::News>, Tags::News,
+                             Tags::InertialRetardedTime,
                              Tags::Du<Tags::InertialRetardedTime>>;
 
 using all_boundary_tags =
