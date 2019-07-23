@@ -11,6 +11,7 @@
 #include "DataStructures/DataBox/Prefixes.hpp"
 #include "Time/Tags.hpp"
 #include "Utilities/Gsl.hpp"
+#include "Utilities/NoSuchtype.hpp"
 #include "Utilities/TaggedTuple.hpp"
 
 // IWYU pragma: no_include "Time/Time.hpp" // for Time
@@ -46,6 +47,7 @@ namespace Actions {
 /// - Modifies:
 ///   - dt_variables_tag,
 ///   - Tags::HistoryEvolvedVariables<variables_tag, dt_variables_tag>
+template <typename VariablesTag = NoSuchType>
 struct RecordTimeStepperData {
   template <typename DbTags, typename... InboxTags, typename Metavariables,
             typename ArrayIndex, typename ActionList,
@@ -55,7 +57,10 @@ struct RecordTimeStepperData {
       const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
       const ArrayIndex& /*array_index*/, ActionList /*meta*/,
       const ParallelComponent* const /*meta*/) noexcept {  // NOLINT const
-    using variables_tag = typename Metavariables::system::variables_tag;
+    using variables_tag =
+        tmpl::conditional_t<cpp17::is_same_v<VariablesTag, NoSuchType>,
+                            typename Metavariables::system::variables_tag,
+                            VariablesTag>;
     using dt_variables_tag = db::add_tag_prefix<Tags::dt, variables_tag>;
     using history_tag =
         Tags::HistoryEvolvedVariables<variables_tag, dt_variables_tag>;
