@@ -785,13 +785,13 @@ void run_trial_regularity_preserving_cce(
       make_not_null(&box));
 
   db::mutate_apply<InitializeXtildeOfX>(make_not_null(&box));
-  db::mutate_apply<GaugeUpdateJacobianFromCoords<
-      Tags::GaugeA, Tags::GaugeB, Tags::InertialCartesianCoords,
-      Tags::InertialAngularCoords, Tags::DuInertialCartesianCoords>>(
+  db::mutate_apply<GaugeUpdateJacobianFromCoords<Tags::GaugeA, Tags::GaugeB,
+                                                 Tags::InertialCartesianCoords,
+                                                 Tags::InertialAngularCoords>>(
       make_not_null(&box));
-  db::mutate_apply<GaugeUpdateJacobianFromCoords<
-      Tags::GaugeC, Tags::GaugeD, Tags::CauchyCartesianCoords,
-      Tags::CauchyAngularCoords, Tags::DuCauchyCartesianCoords>>(
+  db::mutate_apply<GaugeUpdateJacobianFromCoords<Tags::GaugeC, Tags::GaugeD,
+                                                 Tags::CauchyCartesianCoords,
+                                                 Tags::CauchyAngularCoords>>(
       make_not_null(&box));
   db::mutate_apply<GaugeUpdateOmega>(make_not_null(&box));
   db::mutate_apply<GaugeUpdateOmegaCD>(make_not_null(&box));
@@ -1197,11 +1197,10 @@ void run_trial_regularity_preserving_cce(
 
     db::mutate_apply<GaugeUpdateJacobianFromCoords<
         Tags::GaugeA, Tags::GaugeB, Tags::InertialCartesianCoords,
-        Tags::InertialAngularCoords, Tags::DuInertialCartesianCoords>>(
-        make_not_null(&box));
-    db::mutate_apply<GaugeUpdateJacobianFromCoords<
-        Tags::GaugeC, Tags::GaugeD, Tags::CauchyCartesianCoords,
-        Tags::CauchyAngularCoords, Tags::DuCauchyCartesianCoords>>(
+        Tags::InertialAngularCoords>>(make_not_null(&box));
+    db::mutate_apply<GaugeUpdateJacobianFromCoords<Tags::GaugeC, Tags::GaugeD,
+                                                   Tags::CauchyCartesianCoords,
+                                                   Tags::CauchyAngularCoords>>(
         make_not_null(&box));
     db::mutate_apply<GaugeUpdateOmega>(make_not_null(&box));
     db::mutate_apply<GaugeUpdateOmegaCD>(make_not_null(&box));
@@ -1419,13 +1418,13 @@ void test_regularity_preserving_cce_rt(
       make_not_null(&box));
 
   db::mutate_apply<InitializeXtildeOfX>(make_not_null(&box));
-  db::mutate_apply<GaugeUpdateJacobianFromCoords<
-      Tags::GaugeA, Tags::GaugeB, Tags::InertialCartesianCoords,
-      Tags::InertialAngularCoords, Tags::DuInertialCartesianCoords>>(
+  db::mutate_apply<GaugeUpdateJacobianFromCoords<Tags::GaugeA, Tags::GaugeB,
+                                                 Tags::InertialCartesianCoords,
+                                                 Tags::InertialAngularCoords>>(
       make_not_null(&box));
-  db::mutate_apply<GaugeUpdateJacobianFromCoords<
-      Tags::GaugeC, Tags::GaugeD, Tags::CauchyCartesianCoords,
-      Tags::CauchyAngularCoords, Tags::DuCauchyCartesianCoords>>(
+  db::mutate_apply<GaugeUpdateJacobianFromCoords<Tags::GaugeC, Tags::GaugeD,
+                                                 Tags::CauchyCartesianCoords,
+                                                 Tags::CauchyAngularCoords>>(
       make_not_null(&box));
   db::mutate_apply<GaugeUpdateOmega>(make_not_null(&box));
   db::mutate_apply<GaugeUpdateOmegaCD>(make_not_null(&box));
@@ -1681,11 +1680,10 @@ void test_regularity_preserving_cce_rt(
 
     db::mutate_apply<GaugeUpdateJacobianFromCoords<
         Tags::GaugeA, Tags::GaugeB, Tags::InertialCartesianCoords,
-        Tags::InertialAngularCoords, Tags::DuInertialCartesianCoords>>(
-        make_not_null(&box));
-    db::mutate_apply<GaugeUpdateJacobianFromCoords<
-        Tags::GaugeC, Tags::GaugeD, Tags::CauchyCartesianCoords,
-        Tags::CauchyAngularCoords, Tags::DuCauchyCartesianCoords>>(
+        Tags::InertialAngularCoords>>(make_not_null(&box));
+    db::mutate_apply<GaugeUpdateJacobianFromCoords<Tags::GaugeC, Tags::GaugeD,
+                                                   Tags::CauchyCartesianCoords,
+                                                   Tags::CauchyAngularCoords>>(
         make_not_null(&box));
     db::mutate_apply<GaugeUpdateOmega>(make_not_null(&box));
     db::mutate_apply<GaugeUpdateOmegaCD>(make_not_null(&box));

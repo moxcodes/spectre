@@ -14,7 +14,8 @@
 
 struct EvolutionMetavars {
   // TODO consider making these system tags?
-  using evolved_swsh_variables_tag = Tags::Variables<Cce::Tags::J>;
+  using evolved_swsh_tag = Tags::J;
+  using evolved_swsh_dt_tag = Tags::H;
   using evolved_coordinates_variables_tag =
       Tags::Variables<Cce::Tags::CauchyCartesianCoords,
                       Cce::Tags::InertialRetardedTime>;
@@ -40,9 +41,9 @@ struct EvolutionMetavars {
   }
 };
 
-
 static const std::vector<void (*)()> charm_init_node_funcs{
-  &setup_error_handling};
+    &setup_error_handling,
+    &Parallel::register_derived_classes_with_charm<TimeStepper>};
 
 static const std::vector<void (*)()> charm_init_proc_funcs{
   &enable_floating_point_exceptions};

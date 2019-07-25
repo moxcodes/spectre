@@ -12,11 +12,12 @@
 
 namespace Cce {
 
-namespace detail {
+// TODO dox
 using bondi_hypersurface_step_tags =
     tmpl::list<Tags::BondiBeta, Tags::BondiQ, Tags::BondiU, Tags::BondiW,
                Tags::BondiH>;
 
+namespace detail {
 template <typename Tag>
 struct TagsToComputeForImpl {
   using pre_swsh_derivative_tags = tmpl::list<>;

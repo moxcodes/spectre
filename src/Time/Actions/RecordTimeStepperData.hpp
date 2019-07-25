@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <boost/iterator/zip_iterator.hpp>
+#include <boost/tuple/tuple.hpp>
 #include <tuple>
 #include <utility>  // IWYU pragma: keep // for std::move
 
@@ -11,7 +13,7 @@
 #include "DataStructures/DataBox/Prefixes.hpp"
 #include "Time/Tags.hpp"
 #include "Utilities/Gsl.hpp"
-#include "Utilities/NoSuchtype.hpp"
+#include "Utilities/NoSuchType.hpp"
 #include "Utilities/TaggedTuple.hpp"
 
 // IWYU pragma: no_include "Time/Time.hpp" // for Time
@@ -78,4 +80,42 @@ struct RecordTimeStepperData {
     return std::forward_as_tuple(std::move(box));
   }
 };
+
+template < typename TensorTag, typename DtTensorTag>
+struct RecordTimeStepperDataSingleTensor {
+  template <typename DbTags, typename... InboxTags, typename Metavariables,
+            typename ArrayIndex, typename ActionList,
+            typename ParallelComponent>
+  static std::tuple<db::DataBox<DbTags>&&> apply(
+      db::DataBox<DbTags>& box, tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
+      const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
+      const ArrayIndex& /*array_index*/, const ActionList /*meta*/,
+      const ParallelComponent* const /*meta*/) noexcept {
+    using tensor_tag = TensorTag;
+    using dt_tensor_tag = DtTensorTag;
+    using history_tag = Tags::HistoryEvolvedTensor<TensorTag, DtTensorTag>;
+
+    db::mutate<tensor_tag, history_tag>(
+        make_not_null(&box),
+        [](const gsl::not_null<db::item_type<dt_tensor_tag>*> dt_tensor,
+           const gsl::not_null<db::item_type<history_tag>*> histories,
+           const db::item_type<tensor_tag>& tensor,
+           const db::item_type<Tags::Time>& time) noexcept {
+          std::for_each(
+              boost::make_zip_iterator(boost::make_tuple(
+                  tensor.begin(), dt_tensor->begin(), histories->begin())),
+              boost::make_zip_iterator(boost::make_tuple(
+                  tensor.end(), dt_tensor->end(), histories->end())),
+              [&time](auto& component_and_history) {
+                component_and_history.template get<2>().insert(
+                    time, component_and_history.template get<0>(),
+                    component_and_history.template get<1>());
+              });
+        },
+        db::get<tensor_tag>(box), db::get<Tags::Time>(box));
+
+    return std::forward_as_tuple(std::move(box));
+  }
+};
+
 }  // namespace Actions

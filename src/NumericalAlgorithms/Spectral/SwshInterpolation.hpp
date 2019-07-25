@@ -385,13 +385,15 @@ class SwshInterpolator {
 
     if(gsl::at(beta_table, m + static_cast<int>(l_max_)).size() > 0) {
       *interpolation +=
-          l_min_harmonic * goldberg_modes[square(l_min) + l_min + m] +
+          l_min_harmonic *
+              goldberg_modes[static_cast<size_t>(square(l_min) + l_min + m)] +
           l_min_plus_one_harmonic * recurrence_cache[(cache_offset + 1) % 3] +
           l_min_harmonic * recurrence_cache[(cache_offset + 2) % 3] *
               gsl::at(gsl::at(beta_table, m + static_cast<int>(l_max_)), 0);
     } else {
       *interpolation +=
-          l_min_harmonic * goldberg_modes[square(l_min) + l_min + m] +
+          l_min_harmonic *
+              goldberg_modes[static_cast<size_t>(square(l_min) + l_min + m)] +
           l_min_plus_one_harmonic * recurrence_cache[(cache_offset + 1) % 3];
     }
   }

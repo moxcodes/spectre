@@ -66,6 +66,26 @@ struct HistoryEvolvedVariables : db::PrefixTag, db::SimpleTag {
   using type = TimeSteppers::History<db::item_type<Tag>, db::item_type<DtTag>>;
 };
 
+
+/// \ingroup DataBoxTagsGroup
+/// \ingroup TimeGroup
+/// \brief Prefix for TimeStepper history of a single Tensor
+///
+/// \tparam Tag tag for the Tensor
+/// \tparam DtTag tag for the time derivative of the Tensor
+template <typename Tag, typename DtTag>
+struct HistoryEvolvedTensor : db::PrefixTag, db::SimpleTag {
+  static_assert(db::item_type<Tag>::size() == db::item_type<DtTag>::size(),
+                "The evolved tensor must be the same size as its time "
+                "derivative");
+  static std::string name() noexcept { return "HistoryEvolvedTensor"; }
+  using tag = Tag;
+  using type =
+      std::array<TimeSteppers::History<typename db::item_type<Tag>::type,
+                                       typename db::item_type<DtTag>>,
+                 db::item_type<Tag>::size()>;
+};
+
 /// \ingroup DataBoxTagsGroup
 /// \ingroup TimeGroup
 /// Tag for TimeStepper boundary history

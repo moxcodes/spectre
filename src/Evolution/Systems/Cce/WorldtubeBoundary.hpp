@@ -14,7 +14,6 @@ struct WorltubeBoundary {
   using chare_type = Parallel::Algorithms::Singleton;
   using const_global_cache_tag_list = tmpl::list<>;
   using metavariables = Metavariables;
-  using add_options_to_databox = Parallel::AddNoOptionsToDataBox;
   using worldtube_boundary_computation_steps =
       tmpl::list<BoundaryTrigonometricValues>;
 

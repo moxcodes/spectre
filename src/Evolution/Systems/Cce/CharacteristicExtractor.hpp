@@ -3,37 +3,47 @@
 
 #pragma once
 
+#include "DataStructures/DataBox/Actions/MutateApply.hpp"
+#include "Evolution/Systems/Cce/ComputePreSwshDerivatives.hpp"
+#include "Evolution/Systems/Cce/ComputeSwshDerivatives.hpp"
+#include "Evolution/Systems/Cce/Equations.hpp"
+#include "Evolution/Systems/Cce/GaugeTransformBoundaryData.hpp"
+#include "Evolution/Systems/Cce/InitializeCharacteristic.hpp"
+#include "Evolution/Systems/Cce/IntegrandInputSteps.hpp"
+#include "Evolution/Systems/Cce/LinearSolve.hpp"
+#include "Evolution/Systems/Cce/PrecomputeCceDependencies.hpp"
 #include "Parallel/Info.hpp"
-#include "Evolution/Systems/Cce/Boundary.hpp"
+#include "Time/Actions/RecordTimeStepperData.hpp"
+#include "Time/Actions/UpdateU.hpp"
 
 namespace Cce {
 
 // simple action
 template <typename BondiTag>
-struct CalculatePreSwshDerivativesForTag {
-
-};
+struct CalculatePreSwshDerivativesForTag {};
 
 // simple action
 template <typename BondiTag>
-struct CalculateSwshDerivativesForTag {
+struct CalculateSwshDerivativesForTag {};
 
-};
+template <typename BondiTag>
+struct FilterSwshVolumeQuantity {};
 
+struct CalculateAndInterpolateNews {};
+
+struct RecoomputeAngularCoordinateFunctions {};
 
 template <class Metavariables>
 struct CharacteristicExtractor {
   using chare_type = Parallel::Algorithms::Singleton;
   using const_global_cache_tag_list = tmpl::list<>;
   using metavariables = Metavariables;
-  using add_options_to_databox = Parallel::AddNoOptionsToDataBox;
 
   using initial_databox =
       db::compute_databox_type<typename InitializeCharacteristic::
                                    template return_tag_list<Metavariables>>;
 
-  using initialize_action_list =
-      tmpl::list<InitializeCharacteristic, Parallel::Actions::TerminatePhase>;
+  using initialize_action_list = tmpl::list<InitializeCharacteristic>;
 
   template <typename BondiTag>
   using hypersurface_computation = tmpl::list<
@@ -44,18 +54,20 @@ struct CharacteristicExtractor {
       tmpl::transform<integrand_terms_to_compute_for_bondi_variable<BondiTag>,
                       tmpl::bind<db::Actions::MutateApply,
                                  ComputeBondiIntegrand<tmpl::_1>>>,
-      db::Actions::MutateApply<RadialIntegrateBondi<BondiTag>>,
+      db::Actions::MutateApply<
+          RadialIntegrateBondi<Tags::EvolutionGaugeBoundaryValue, BondiTag>>,
       /*TODO we need to do something about options for this*/
       FilterSwshVolumeQuantity<BondiTag>,
       /*Once we finish the U computation, we need to update all the
         time-dependent gauge stuff*/
       tmpl::conditional_t<
           cpp17::is_same_v<BondiTag, Tags::U>,
-          db::Actions::MutateApply<GaugeUpdateU>,
-          db::Actions::MutateApply<
-              ComputeGaugeAdjustedBoundaryValue<Tags::DuRDividedByR>>,
-          db::Actions::MutateApply<PrecomputeCceDependencies<
-              Tags::EvolutionGaugeBoundaryValue, Tags::DuRDividedByR>>,
+          tmpl::list<
+              db::Actions::MutateApply<GaugeUpdateU>,
+              db::Actions::MutateApply<
+                  ComputeGaugeAdjustedBoundaryValue<Tags::DuRDividedByR>>,
+              db::Actions::MutateApply<PrecomputeCceDependencies<
+                  Tags::EvolutionGaugeBoundaryValue, Tags::DuRDividedByR>>>,
           tmpl::list<>>>;
 
   using extract_action_list = tmpl::list<
@@ -63,24 +75,29 @@ struct CharacteristicExtractor {
                       tmpl::bind<hypersurface_computation, tmpl::_1>>,
       CalculateAndInterpolateNews,
       /*TODO observers...*/
-      RecordTimeStepperData<Metavariables::evolved_swsh_variables_tag>,
-      RecordTimeStepperData<Metavariables::evolved_coordinates_variables_tag>,
+      Actions::RecordTimeStepperDataSingleTensor<
+          typename Metavariables::evolved_swsh_tag,
+          typename Metavariables::evolved_swsh_dt_tag>,
+      Actions::RecordTimeStepperData<
+          typename Metavariables::evolved_coordinates_variables_tag>,
       // update J
-      UpdateU<Metavariables::evolved_swsh_variables_tag>,
+      Actions::UpdateUSingleTensor<typename Metavariables::evolved_swsh_tag,
+                                   typename Metavariables::evolved_swsh_dt_tag>,
       // update coordinate maps
-      UpdateU<Metavariables::evolved_coordinates_variables_tag>,
+      Actions::UpdateU<
+          typename Metavariables::evolved_coordinates_variables_tag>,
       RecomputeAngularCoordinateFunctions, Actions::AdvanceTime>;
 
   using phase_dependent_action_list =
       tmpl::list<Parallel::PhaseActions<typename Metavariables::Phase,
                                         Metavariables::Phase::Initialize,
                                         initialize_action_list>,
-                 Parallel::PhaseActions<typename Metavariables::Phase,
-                                        Metavariables::Phase::Extract,
-                                        extract_action_list>>;
+                 Parallel::PhaseActions<
+                     typename Metavariables::Phase,
+                     Metavariables::Phase::Extract /*,extract_action_list*/>>;
 
-  // TODO options changes in progress, put real options in when procedure is
-  // well-established
+  // TODO options changes in progress, decide what to do with the options
+  // type alias when determined
   using options = tmpl::list<>;
 
   static void initialize(Parallel::CProxy_ConstGlobalCache<
@@ -89,9 +106,9 @@ struct CharacteristicExtractor {
   static void execute_next_phase(
       const typename Metavariables::Phase next_phase,
       const Parallel::CProxy_ConstGlobalCache<Metavariables>&
-      global_cache) noexcept {
+          global_cache) noexcept {
     auto& local_cache = *(global_cache.ckLocalBranch());
-    if(next_phase == Metavariables::Phase::Extraction) {
+    if (next_phase == Metavariables::Phase::Extraction) {
       Parallel::get_parallel_component<CharacteristicExtractor>(local_cache)
           .perform_algorithm();
     }
