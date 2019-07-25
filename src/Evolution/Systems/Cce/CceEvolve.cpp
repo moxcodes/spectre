@@ -117,10 +117,12 @@ template <typename BondiTag, typename SwshVariablesTag,
           typename SwshBufferVariablesTag, typename PreSwshVariablesTag,
           typename DataBoxType>
 void regularity_preserving_hypersurface_computation(
-    const gsl::not_null<DataBoxType*> box) noexcept {
+    const gsl::not_null<DataBoxType*> box,
+    bool regularity_preserving = true) noexcept {
   // printf("boundary computation\n");
-  db::mutate_apply<ComputeGaugeAdjustedBoundaryValue<BondiTag>>(box);
-
+  if (regularity_preserving) {
+    db::mutate_apply<ComputeGaugeAdjustedBoundaryValue<BondiTag>>(box);
+  }
   // printf("pre swsh derivatives\n");
   mutate_all_pre_swsh_derivatives_for_tag<BondiTag>(box);
 
@@ -137,22 +139,23 @@ void regularity_preserving_hypersurface_computation(
       });
 
   // printf("integral\n");
-  db::mutate_apply<
-      RadialIntegrateBondi<Tags::EvolutionGaugeBoundaryValue, BondiTag>>(box);
+  if (regularity_preserving) {
+    db::mutate_apply<
+        RadialIntegrateBondi<Tags::EvolutionGaugeBoundaryValue, BondiTag>>(box);
+  } else {
+    db::mutate_apply<RadialIntegrateBondi<Tags::BoundaryValue, BondiTag>>(box);
+  }
 
   if (cpp17::is_same_v<BondiTag, Tags::U>) {
-    db::mutate_apply<GaugeUpdateU>(box);
+    db::mutate_apply<GaugeUpdateU>(box, regularity_preserving);
     db::mutate_apply<GaugeUpdateDuXtildeOfX>(box);
-    // db::mutate_apply<GaugeUpdateJacobianFromCoords<
-    // Tags::GaugeA, Tags::GaugeB, Tags::CauchyAngularCoords,
-    // Tags::InertialAngularCoords, Tags::DuInertialAngularCoords>>(box);
-    // db::mutate_apply<GaugeUpdateJacobianFromCoords<
-    // Tags::GaugeC, Tags::GaugeD, Tags::InertialAngularCoords,
-    // Tags::CauchyAngularCoords, Tags::DuCauchyAngularCoords>>(box);
-    db::mutate_apply<ComputeGaugeAdjustedBoundaryValue<Tags::DuRDividedByR>>(
-        box);
-    db::mutate_apply<PrecomputeCceDependencies<
-        Tags::EvolutionGaugeBoundaryValue, Tags::DuRDividedByR>>(box);
+
+    if (regularity_preserving) {
+      db::mutate_apply<ComputeGaugeAdjustedBoundaryValue<Tags::DuRDividedByR>>(
+          box);
+      db::mutate_apply<PrecomputeCceDependencies<
+          Tags::EvolutionGaugeBoundaryValue, Tags::DuRDividedByR>>(box);
+    }
   }
 }
 
@@ -160,10 +163,9 @@ template <typename BondiTag, typename SwshVariablesTag,
           typename SwshBufferVariablesTag, typename PreSwshVariablesTag,
           typename DataBoxType>
 void regularity_preserving_robinson_trautman_hypersurface_computation(
-    const gsl::not_null<DataBoxType*> box) noexcept {
+    const gsl::not_null<DataBoxType*> box, double time) noexcept {
   // printf("boundary computation\n");
   db::mutate_apply<ComputeGaugeAdjustedBoundaryValue<BondiTag>>(box);
-
   // printf("pre swsh derivatives\n");
   mutate_all_pre_swsh_derivatives_for_tag<BondiTag>(box);
 
@@ -186,20 +188,18 @@ void regularity_preserving_robinson_trautman_hypersurface_computation(
   if (cpp17::is_same_v<BondiTag, Tags::U>) {
     db::mutate<Tags::U0>(
         box,
-        [](const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> u_0,
-           const size_t l_max) {
-          DataVector theta{
-              Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
-          DataVector phi{
-              Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
-          const auto& collocation = Spectral::Swsh::precomputed_collocation<
-              Spectral::Swsh::ComplexRepresentation::Interleaved>(l_max);
-          for (const auto& collocation_point : collocation) {
-            theta[collocation_point.offset] = collocation_point.theta;
-            phi[collocation_point.offset] = collocation_point.phi;
+        [&time](const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*>
+                    u_0,
+                const size_t l_max) {
+          Spectral::Swsh::SpinWeightedSphericalHarmonic swsh{1, 2, 2};
+          for (const auto& collocation_point :
+               Spectral::Swsh::precomputed_collocation<
+                   Spectral::Swsh::ComplexRepresentation::Interleaved>(l_max)) {
+            // needs to be strictly positive.
+            get(*u_0).data()[collocation_point.offset] =
+                sin(5.0 * time) * 1.0e-3 *
+                swsh.evaluate(collocation_point.theta, collocation_point.phi);
           }
-          get(*u_0) =
-              1.0e-3 * std::complex<double>(1.0, 0.0) * cos(theta) * sin(theta);
         },
         db::get<Tags::LMax>(*box));
 
@@ -649,7 +649,7 @@ void run_trial_regularity_preserving_cce(
     size_t number_of_radial_points, std::string output_file_suffix,
     size_t rational_timestep_numerator, size_t rational_timestep_denominator,
     bool /*calculate_psi4_diagnostic*/, size_t l_filter_start,
-    double start_time, double end_time) noexcept {
+    double start_time, double end_time, bool regularity_preserving) noexcept {
   TimeSteppers::RungeKutta3 stepper{};
   TimeSteppers::History<ComplexDataVector, ComplexDataVector> j_history{};
   TimeSteppers::History<ComplexDataVector, ComplexDataVector> u_bondi_history{};
@@ -744,6 +744,7 @@ void run_trial_regularity_preserving_cce(
         data_manager
             .get_time_buffer()[data_manager.get_time_buffer().size() - 1];
   }
+  printf("time span: %f, %f\n", start_time, end_time);
   // in order to use the time architecture, we need to make a slab
   Slab only_slab{start_time, end_time};
   TimeDelta time_step{
@@ -800,25 +801,56 @@ void run_trial_regularity_preserving_cce(
       make_not_null(&box), start_time);
 
   size_t step_counter = 0;
-
+  printf("beginning loop\n");
   // main loop
   while (data_still_available and time.time().value() < end_time) {
-
+    printf("time : %f\n", time.time().value());
     tmpl::for_each<compute_gauge_adjustments_setup_tags>([&box](auto x) {
       using tag = typename decltype(x)::type;
       db::mutate_apply<ComputeGaugeAdjustedBoundaryValue<tag>>(
           make_not_null(&box));
     });
-    mutate_all_precompute_cce_dependencies<Tags::EvolutionGaugeBoundaryValue>(
-        make_not_null(&box));
+    if (regularity_preserving) {
+      mutate_all_precompute_cce_dependencies<Tags::EvolutionGaugeBoundaryValue>(
+          make_not_null(&box));
+    } else {
+      mutate_all_precompute_cce_dependencies<Tags::BoundaryValue>(
+          make_not_null(&box));
+
+      db::mutate_apply<ComputePreSwshDerivatives<Tags::Dy<Tags::J>>>(
+          make_not_null(&box));
+      db::mutate<Tags::BoundaryValue<Tags::H>,
+                 Tags::BoundaryValue<Tags::DuRDividedByR>, Tags::Dy<Tags::J>>(
+          make_not_null(&box),
+          [&l_max](
+              const gsl::not_null<db::item_type<Tags::BoundaryValue<Tags::H>>*>
+                  boundary_h,
+              const gsl::not_null<
+                  db::item_type<Tags::BoundaryValue<Tags::DuRDividedByR>>*>
+                  du_r_divided_by_r,
+              const gsl::not_null<db::item_type<Tags::Dy<Tags::J>>*> dy_j,
+              const db::item_type<Tags::BoundaryValue<Tags::SpecH>>& spec_h) {
+            ComplexDataVector boundary_dy_j{
+                get(*dy_j).data().data(),
+                Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
+            ComplexDataVector boundary_du_r_divided_by_r{
+                get(*du_r_divided_by_r).data().data(),
+                Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
+            get(*boundary_h).data() =
+                get(spec_h).data() +
+                2.0 * boundary_du_r_divided_by_r * boundary_dy_j;
+          },
+          db::get<Tags::BoundaryValue<Tags::SpecH>>(box));
+    }
 
     tmpl::for_each<tmpl::list<Tags::Beta, Tags::Q, Tags::U, Tags::W, Tags::H>>(
-        [&box, &l_max, &l_filter_start](auto x) {
+        [&box, &l_max, &l_filter_start, &regularity_preserving](auto x) {
           using bondi_tag = typename decltype(x)::type;
           regularity_preserving_hypersurface_computation<
               bondi_tag, swsh_derivatives_variables_tag,
               transform_buffer_variables_tag,
-              pre_swsh_derivatives_variables_tag>(make_not_null(&box));
+              pre_swsh_derivatives_variables_tag>(make_not_null(&box),
+                                                  regularity_preserving);
 
           // this isn't super elegant. consider alternatives
           // if (cpp17::is_same_v<bondi_tag, Tags::U>) {
@@ -842,14 +874,15 @@ void run_trial_regularity_preserving_cce(
           // }
 
           // db::mutate<bondi_tag>(
-          // make_not_null(&box),
-          // [&l_max,
-          // &l_filter_start](const gsl::not_null<db::item_type<bondi_tag>*>
-          // bondi_quantity) {
-          // Spectral::Swsh::filter_swsh_volume_quantity(
-          // make_not_null(&get(*bondi_quantity)), l_max, l_filter_start,
-          // 108.0, 8);
-          // });
+          //     make_not_null(&box),
+          //     [&l_max,
+          //      &l_filter_start](const
+          //      gsl::not_null<db::item_type<bondi_tag>*>
+          //                           bondi_quantity) {
+          //       Spectral::Swsh::filter_swsh_volume_quantity(
+          //           make_not_null(&get(*bondi_quantity)), l_max,
+          //           l_filter_start, 108.0, 8);
+          //     });
         });
     db::mutate_apply<
         CalculateScriPlusValue<Tags::Du<Tags::InertialRetardedTime>>>(
@@ -944,13 +977,53 @@ void run_trial_regularity_preserving_cce(
     // DEBUG output
 
     db::mutate_apply<CalculateScriPlusValue<Tags::News>>(make_not_null(&box));
+    printf("computing news\n");
+    if (regularity_preserving) {
+      tnsr::i<DataVector, 2> x_of_x_tilde_identity{
+          Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
+      const auto& collocation = Spectral::Swsh::precomputed_collocation<
+          Spectral::Swsh::ComplexRepresentation::Interleaved>(l_max);
+      for (const auto& collocation_point : collocation) {
+        get<0>(x_of_x_tilde_identity)[collocation_point.offset] =
+            collocation_point.theta;
+        get<1>(x_of_x_tilde_identity)[collocation_point.offset] =
+            collocation_point.phi;
+      }
+      Scalar<SpinWeighted<ComplexDataVector, 2>> gauge_c_identity;
+      get(gauge_c_identity).data() = ComplexDataVector{
+          Spectral::Swsh::number_of_swsh_collocation_points(l_max), 0.0};
+      Scalar<SpinWeighted<ComplexDataVector, 0>> gauge_d_identity;
+      get(gauge_d_identity).data() = ComplexDataVector{
+          Spectral::Swsh::number_of_swsh_collocation_points(l_max), 2.0};
+      Scalar<SpinWeighted<ComplexDataVector, 0>> gauge_omega_identity;
+      get(gauge_omega_identity).data() = ComplexDataVector{
+          Spectral::Swsh::number_of_swsh_collocation_points(l_max), 1.0};
+      Scalar<SpinWeighted<ComplexDataVector, 1>> eth_gauge_omega_identity;
+      get(eth_gauge_omega_identity).data() = ComplexDataVector{
+          Spectral::Swsh::number_of_swsh_collocation_points(l_max), 0.0};
+      Scalar<SpinWeighted<ComplexDataVector, 0>> du_gauge_omega_identity;
+      get(du_gauge_omega_identity).data() = ComplexDataVector{
+          Spectral::Swsh::number_of_swsh_collocation_points(l_max), 0.0};
 
-    // DEBUG output
-    // record_scri_output<2>(make_not_null(&recorder),
-    // std::make_pair(get(db::get<Tags::News>(box)).data(),
-    // time.time().value()),
-    // "News", l_max, comparison_l_max);
-    // DEBUG output
+      db::mutate<Tags::NonInertialNews, Tags::J, Tags::Beta, Tags::SpecH,
+                 Tags::EvolutionGaugeBoundaryValue<Tags::R>, Tags::U>(
+          make_not_null(&box), calculate_non_inertial_news, gauge_c_identity,
+          gauge_d_identity, gauge_omega_identity, du_gauge_omega_identity,
+          eth_gauge_omega_identity, x_of_x_tilde_identity,
+          x_of_x_tilde_identity, l_max, false);
+    } else {
+      db::mutate<Tags::NonInertialNews, Tags::J, Tags::Beta, Tags::SpecH,
+                 Tags::BoundaryValue<Tags::R>, Tags::U>(
+          make_not_null(&box), calculate_non_inertial_news,
+          db::get<Tags::GaugeC>(box), db::get<Tags::GaugeD>(box),
+          db::get<Tags::GaugeOmegaCD>(box),
+          db::get<Tags::Du<Tags::GaugeOmegaCD>>(box),
+          db::get<Spectral::Swsh::Tags::Derivative<Tags::GaugeOmegaCD,
+                                                   Spectral::Swsh::Tags::Eth>>(
+              box),
+          db::get<Tags::CauchyAngularCoords>(box),
+          db::get<Tags::InertialAngularCoords>(box), l_max, false);
+    }
 
     if (time.substep() == 0) {
       auto news = db::get<Tags::News>(box);
@@ -1009,6 +1082,24 @@ void run_trial_regularity_preserving_cce(
             make_not_null(&box), make_not_null(&recorder),
             comparison_file_prefix, time.step_time().value(), l_max,
             comparison_l_max, 1);
+
+        compare_and_record_scri_values<tmpl::list<Tags::NonInertialNews>>(
+            make_not_null(&box), make_not_null(&recorder), "",
+            time.step_time().value(), l_max, comparison_l_max, 1);
+
+        if (regularity_preserving) {
+          SpinWeighted<ComplexDataVector, 2> news_difference =
+              get(db::get<Tags::NonInertialNews>(box)) -
+              get(db::get<Tags::News>(box));
+          recorder.append_mode_data(
+              "/News_vs_NonInertial", time.step_time().value(),
+              Spectral::Swsh::libsharp_to_goldberg_modes(
+                  Spectral::Swsh::swsh_transform(
+                      make_not_null(&news_difference), l_max),
+                  l_max)
+                  .data(),
+              comparison_l_max);
+        }
 
         compare_and_record_scri_values<tmpl::list<Tags::J, Tags::Beta, Tags::Q,
                                                   Tags::U, Tags::W, Tags::H>>(
@@ -1176,7 +1267,8 @@ void record_l2_error_with_cauchy_gauge(
     // }
     SpinWeighted<ComplexModalVector, Tag::type::type::spin> mode_difference;
     mode_difference.data() = inertial_modes.data() - transformed_cauchy_modes;
-    // printf("mode differences\n");
+
+    // printf("mode differences %zu\n", i);
     // for (size_t j = 0; j < mode_difference.size(); ++j) {
     // printf("(%e, %e)\n", real(mode_difference.data()[j]),
     // imag(mode_difference.data()[j]));
@@ -1212,6 +1304,10 @@ void test_regularity_preserving_cce_rt(
   TimeSteppers::History<DataVector, DataVector> x_history{};
   TimeSteppers::History<DataVector, DataVector> y_history{};
   TimeSteppers::History<DataVector, DataVector> z_history{};
+
+  TimeSteppers::History<DataVector, DataVector> x_tilde_history{};
+  TimeSteppers::History<DataVector, DataVector> y_tilde_history{};
+  TimeSteppers::History<DataVector, DataVector> z_tilde_history{};
 
   using boundary_variables_tag = ::Tags::Variables<all_boundary_tags>;
   using gauge_transform_boundary_variables_tag =
@@ -1325,7 +1421,7 @@ void test_regularity_preserving_cce_rt(
   // main loop
   while (time.time().value() < end_time) {
     step_counter++;
-    // printf("starting step %zu\n", step_counter);
+    printf("starting step %zu\n", step_counter);
     tmpl::for_each<compute_gauge_adjustments_setup_tags>([&box](auto x) {
       using tag = typename decltype(x)::type;
       db::mutate_apply<ComputeGaugeAdjustedBoundaryValue<tag>>(
@@ -1335,13 +1431,14 @@ void test_regularity_preserving_cce_rt(
         make_not_null(&box));
 
     tmpl::for_each<tmpl::list<Tags::Beta, Tags::Q, Tags::U, Tags::W, Tags::H>>(
-        [&box, &l_max, &l_filter_start](auto x) {
+        [&box, &l_max, &l_filter_start, &time](auto x) {
           using bondi_tag = typename decltype(x)::type;
           // printf("before computation for : %s\n", bondi_tag::name().c_str());
           regularity_preserving_robinson_trautman_hypersurface_computation<
               bondi_tag, swsh_derivatives_variables_tag,
               transform_buffer_variables_tag,
-              pre_swsh_derivatives_variables_tag>(make_not_null(&box));
+              pre_swsh_derivatives_variables_tag>(make_not_null(&box),
+                                                  time.time().value());
 
           // db::mutate<bondi_tag>(
           // make_not_null(&box),
@@ -1392,14 +1489,55 @@ void test_regularity_preserving_cce_rt(
                      get<2>(db::get<Tags::CauchyCartesianCoords>(box)),
                      std::move(du_z));
 
+    DataVector du_x_tilde =
+        get<0>(db::get<Tags::DuInertialCartesianCoords>(box));
+    x_tilde_history.insert(time.time(),
+                           get<0>(db::get<Tags::InertialCartesianCoords>(box)),
+                           std::move(du_x_tilde));
+    DataVector du_y_tilde =
+        get<1>(db::get<Tags::DuInertialCartesianCoords>(box));
+    y_tilde_history.insert(time.time(),
+                           get<1>(db::get<Tags::InertialCartesianCoords>(box)),
+                           std::move(du_y_tilde));
+    DataVector du_z_tilde =
+        get<2>(db::get<Tags::DuInertialCartesianCoords>(box));
+    z_tilde_history.insert(time.time(),
+                           get<2>(db::get<Tags::InertialCartesianCoords>(box)),
+                           std::move(du_z_tilde));
+
     // compute the scri+ values in the Cauchy gauge to verify against the SpEC
     // computation that we're actually performing a reliable coordinate
     // transformation as we hope.
+    db::mutate<Tags::SpecH>(
+        make_not_null(&box),
+        [](const gsl::not_null<db::item_type<Tags::SpecH>*> spec_h,
+           const db::item_type<Tags::H>& h,
+           const db::item_type<Tags::DuRDividedByR>& du_r_divided_by_r,
+           const db::item_type<Tags::OneMinusY>& one_minus_y,
+           const db::item_type<Tags::Dy<Tags::J>>& dy_j) {
+          get(*spec_h) =
+              get(h) - get(du_r_divided_by_r) * get(one_minus_y) * get(dy_j);
+        },
+        db::get<Tags::H>(box), db::get<Tags::DuRDividedByR>(box),
+        db::get<Tags::OneMinusY>(box), db::get<Tags::Dy<Tags::J>>(box));
 
     db::mutate_apply<CalculateRobinsonTrautman<Tags::CauchyGauge<Tags::News>>>(
         make_not_null(&box));
-    db::mutate_apply<CalculateRobinsonTrautman<Tags::News>>(
-        make_not_null(&box));
+
+    // note gauge arguments are 'backwards', because the 'cauchy' gauge for RT
+    // is actually the inertial gauge, and we deliberately warp it for the
+    // evolution
+    db::mutate<Tags::News, Tags::J, Tags::Beta, Tags::SpecH,
+               Tags::EvolutionGaugeBoundaryValue<Tags::R>, Tags::U>(
+        make_not_null(&box), calculate_non_inertial_news,
+        db::get<Tags::GaugeA>(box), db::get<Tags::GaugeB>(box),
+        db::get<Tags::GaugeOmega>(box),
+        db::get<Tags::Du<Tags::GaugeOmega>>(box),
+        db::get<Spectral::Swsh::Tags::Derivative<Tags::GaugeOmega,
+                                                 Spectral::Swsh::Tags::Eth>>(
+            box),
+        db::get<Tags::InertialAngularCoords>(box),
+        db::get<Tags::CauchyAngularCoords>(box), l_max, false);
 
     tmpl::for_each<
         tmpl::list<Tags::CauchyGauge<Tags::J>, Tags::CauchyGauge<Tags::Beta>,
@@ -1432,14 +1570,27 @@ void test_regularity_preserving_cce_rt(
 
       // printf("recording scri values\n");
       compare_and_record_scri_values<
-          tmpl::list<Tags::J, Tags::Beta, Tags::Q, Tags::U, Tags::W, Tags::H,
-                     Tags::CauchyGauge<Tags::News>, Tags::News>>(
+          tmpl::list<Tags::J, Tags::Beta, Tags::Q, Tags::U, Tags::W, Tags::H>>(
           make_not_null(&box), make_not_null(&recorder), "",
           time.step_time().value(), l_max, comparison_l_max,
           number_of_radial_points);
 
-      // note: SpecH is available, but needs to be computed on its own for
-      // the comparison to be useful.
+      // record the news difference as its own special output.
+      SpinWeighted<ComplexDataVector, 2> news_difference =
+          get(db::get<Tags::CauchyGauge<Tags::News>>(box)) -
+          get(db::get<Tags::News>(box));
+      recorder.append_mode_data("/News_vs_RT", time.step_time().value(),
+                                Spectral::Swsh::libsharp_to_goldberg_modes(
+                                    Spectral::Swsh::swsh_transform(
+                                        make_not_null(&news_difference), l_max),
+                                    l_max)
+                                    .data(),
+                                comparison_l_max);
+
+      compare_and_record_scri_values<
+          tmpl::list<Tags::News, Tags::CauchyGauge<Tags::News>>>(
+          make_not_null(&box), make_not_null(&recorder), "",
+          time.step_time().value(), l_max, comparison_l_max, 1);
 
       // printf("recording l2 error with cauchy gauge values\n");
       record_l2_error_with_cauchy_gauge<Tags::J>(
@@ -1456,15 +1607,19 @@ void test_regularity_preserving_cce_rt(
       // }
     }
     // printf("stepping\n");
-    db::mutate<Tags::J, Tags::CauchyCartesianCoords, Tags::RobinsonTrautmanW,
+    db::mutate<Tags::J, Tags::CauchyCartesianCoords,
+               Tags::InertialCartesianCoords, Tags::RobinsonTrautmanW,
                Tags::GaugeOmegaCD>(
         make_not_null(&box),
         [
           &stepper, &time_step, &j_history, &rt_w_history, &x_history,
-          &y_history, &z_history, &omega_history
+          &y_history, &z_history, &x_tilde_history, &y_tilde_history,
+          &z_tilde_history, &omega_history
         ](const gsl::not_null<db::item_type<Tags::J>*> j,
           const gsl::not_null<db::item_type<Tags::CauchyCartesianCoords>*>
               x_of_x_tilde,
+          const gsl::not_null<db::item_type<Tags::InertialCartesianCoords>*>
+              x_tilde_of_x,
           const gsl::not_null<db::item_type<Tags::RobinsonTrautmanW>*> rt_w,
           const gsl::not_null<db::item_type<Tags::GaugeOmegaCD>*>
               omega_cd) noexcept {
@@ -1479,6 +1634,13 @@ void test_regularity_preserving_cce_rt(
                            make_not_null(&y_history), time_step);
           stepper.update_u(make_not_null(&get<2>(*x_of_x_tilde)),
                            make_not_null(&z_history), time_step);
+
+          stepper.update_u(make_not_null(&get<0>(*x_tilde_of_x)),
+                           make_not_null(&x_tilde_history), time_step);
+          stepper.update_u(make_not_null(&get<1>(*x_tilde_of_x)),
+                           make_not_null(&y_tilde_history), time_step);
+          stepper.update_u(make_not_null(&get<2>(*x_tilde_of_x)),
+                           make_not_null(&z_tilde_history), time_step);
 
           // stepper.update_u(make_not_null(&get(*omega_cd).data()),
           // make_not_null(&omega_history), time_step);

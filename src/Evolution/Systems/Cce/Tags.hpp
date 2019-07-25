@@ -148,6 +148,11 @@ struct News : db::SimpleTag {
   static std::string name() noexcept { return "News"; }
 };
 
+struct NonInertialNews : db::SimpleTag {
+  using type = Scalar<SpinWeighted<ComplexDataVector, 2>>;
+  static std::string name() noexcept { return "NonInertialNews"; }
+};
+
 template <typename Tag>
 struct CauchyGaugeScriPlus : db::PrefixTag, db::SimpleTag {
   using type = db::item_type<Tag>;
@@ -210,7 +215,7 @@ struct DuInertialCartesianCoords : db::SimpleTag {
 };
 
 struct InertialRetardedTime : db::SimpleTag {
-  using type = Scalar<DataVector>;
+  using type = Scalar<SpinWeighted<ComplexDataVector, 0>>;
   static std::string name() noexcept { return "InertialRetardedTime"; }
 };
 

@@ -72,7 +72,7 @@ using angular_coordinate_tags =
                Tags::InertialCartesianCoords, Tags::DuInertialCartesianCoords>;
 
 using scri_tags = tmpl::list<Tags::CauchyGauge<Tags::News>, Tags::News,
-                             Tags::InertialRetardedTime,
+                             Tags::NonInertialNews, Tags::InertialRetardedTime,
                              Tags::Du<Tags::InertialRetardedTime>>;
 
 using all_boundary_tags =
@@ -113,13 +113,15 @@ void run_trial_cce(std::string input_filename,
                    size_t l_filter_start, double start_time = 0.0,
                    double end_time = -1.0) noexcept;
 
+
 void run_trial_regularity_preserving_cce(
     std::string input_filename, std::string comparison_file_prefix,
     size_t simulation_l_max, size_t comparison_l_max,
     size_t number_of_radial_points, std::string output_file_suffix,
     size_t rational_timestep_numerator, size_t rational_timestep_denominator,
-    bool calculate_psi4_diagnostic, size_t l_filter_start,
-    double start_time = 0.0, double end_time = -1.0) noexcept;
+    bool /*calculate_psi4_diagnostic*/, size_t l_filter_start,
+    double start_time = 0.0, double end_time = -1.0,
+    bool regularity_preserving = true) noexcept;
 
 void test_regularity_preserving_cce_rt(
     std::string input_filename, size_t simulation_l_max,

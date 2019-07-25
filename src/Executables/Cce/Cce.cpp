@@ -54,7 +54,7 @@ int main(int argc, char** argv) {
 
   boost::program_options::variables_map vars;
   // boost::program_options::store(
-      // boost::program_options::parse_command_line(argc, argv, desc), vars);
+  // boost::program_options::parse_command_line(argc, argv, desc), vars);
 
   // boost::program_options::variables_map positional_vars;
   boost::program_options::store(
@@ -64,17 +64,17 @@ int main(int argc, char** argv) {
           .run(),
       vars);
 
-  if(vars.count("help")) {
+  if (vars.count("help")) {
     printf("Usage: cce_extract [options] input_file output_suffix\n");
     desc.print(std::cout);
     return 1;
   }
 
   size_t l_filter = vars["l_max"].as<size_t>() - 1;
-  if(vars["filter_l"].as<int>() !=  -1) {
+  if (vars["filter_l"].as<int>() != -1) {
     l_filter = static_cast<size_t>(vars["filter_l"].as<int>());
   }
-  if(vars.count("regularity-preserving")) {
+  if (vars.count("regularity-preserving")) {
     printf("=========================================\n");
     printf("Regularity preserving CCE is experimental\n");
     printf("=========================================\n");
@@ -87,7 +87,7 @@ int main(int argc, char** argv) {
         vars["timestep_denominator"].as<size_t>(), vars["psi4"].as<bool>(),
         l_filter, vars["start_t"].as<double>(), vars["end_t"].as<double>());
   }
-  if(vars.count("robinson-trautman-test")) {
+  if (vars.count("robinson-trautman-test")) {
     Cce::test_regularity_preserving_cce_rt(
         vars["input_file"].as<std::string>(), vars["l_max"].as<size_t>(),
         vars["output_l_max"].as<size_t>(), vars["rres"].as<size_t>(),
@@ -107,6 +107,7 @@ int main(int argc, char** argv) {
         vars["rres"].as<size_t>(), vars["output_suffix"].as<std::string>(),
         vars["timestep_numerator"].as<size_t>(),
         vars["timestep_denominator"].as<size_t>(), vars["psi4"].as<bool>(),
-        l_filter, vars["start_t"].as<double>(), vars["end_t"].as<double>());
+        l_filter, vars["start_t"].as<double>(), vars["end_t"].as<double>(),
+        false);
   }
 }

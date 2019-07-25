@@ -23,7 +23,7 @@ struct InitializeRobinsonTrautman {
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> rt_w,
       const size_t l_max) noexcept {
     // 2, 1 trial starting data
-    Spectral::Swsh::SpinWeightedSphericalHarmonic swsh{0, 1, 0};
+    Spectral::Swsh::SpinWeightedSphericalHarmonic swsh{0, 2, 2};
     for (const auto& collocation_point :
          Spectral::Swsh::precomputed_collocation<
              Spectral::Swsh::ComplexRepresentation::Interleaved>(l_max)) {
@@ -48,7 +48,7 @@ struct CalculateRobinsonTrautman<Tags::BoundaryValue<Tags::R>> {
   static void apply(
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*>
           boundary_cauchy_r) noexcept {
-    get(*boundary_cauchy_r).data() = 100.0;
+    get(*boundary_cauchy_r).data() = 10.0;
   }
 };
 
@@ -389,15 +389,17 @@ struct CalculateRobinsonTrautman<Tags::CauchyGauge<Tags::News>> {
       const size_t l_max) noexcept {
     size_t number_of_angular_points =
         Spectral::Swsh::number_of_swsh_collocation_points(l_max);
-    size_t number_of_radial_points =
-        get(*cauchy_w).size() / number_of_angular_points;
+
     auto eth_eth_rt_w =
         Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::EthEth>(
             make_not_null(&get(*rt_w)), l_max);
 
-    get(*cauchy_news) = 0.5 * eth_eth_rt_w / get(*rt_w);
+    // note factor of 2 due to news definition difference. The factor of two
+    // intentionally matches  SpEC
+    get(*cauchy_news) =  eth_eth_rt_w / get(*rt_w);
   }
 };
+
 
 template <>
 struct CalculateRobinsonTrautman<Tags::Du<Tags::RobinsonTrautmanW>> {

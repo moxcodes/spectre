@@ -10,6 +10,7 @@ set(LIBRARY_SOURCES
   LinearOperators.cpp
   LinearSolve.cpp
   PrecomputeCceDependencies.cpp
+  ScriPlusValues.cpp
   SerialEvolveHelpers.cpp
   )
 
