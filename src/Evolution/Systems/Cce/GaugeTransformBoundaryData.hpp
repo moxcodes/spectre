@@ -19,7 +19,7 @@ namespace Cce {
 // might be a spot to keep an eye on for optimization.
 
 using compute_gauge_adjustments_setup_tags =
-    tmpl::list<Tags::R, Tags::J, Tags::Dr<Tags::J>>;
+    tmpl::list<Tags::BondiR, Tags::BondiJ, Tags::Dr<Tags::BondiJ>>;
 
 template <typename Tag>
 struct ComputeGaugeAdjustedBoundaryValue;
@@ -27,9 +27,10 @@ struct ComputeGaugeAdjustedBoundaryValue;
 // this just needs to be interpolated to the new grid
 // Consider rolling this into the beta or R one
 template <>
-struct ComputeGaugeAdjustedBoundaryValue<Tags::R> {
-  using return_tags = tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::R>,
-                                 Tags::BoundaryValue<Tags::R>>;
+struct ComputeGaugeAdjustedBoundaryValue<Tags::BondiR> {
+  using return_tags =
+      tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::BondiR>,
+                 Tags::BoundaryValue<Tags::BondiR>>;
   using argument_tags =
       tmpl::list<Tags::CauchyAngularCoords, Tags::GaugeOmegaCD, Tags::LMax>;
   static void apply(
@@ -64,7 +65,7 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::DuRDividedByR> {
       tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::DuRDividedByR>,
                  Tags::BoundaryValue<Tags::DuRDividedByR>>;
   using argument_tags =
-      tmpl::list<Tags::U0, Tags::EvolutionGaugeBoundaryValue<Tags::R>,
+      tmpl::list<Tags::U0, Tags::EvolutionGaugeBoundaryValue<Tags::BondiR>,
                  Tags::GaugeA, Tags::GaugeB, Tags::GaugeOmegaCD,
                  Tags::Du<Tags::GaugeOmegaCD>, Tags::CauchyAngularCoords,
                  Tags::LMax>;
@@ -107,9 +108,10 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::DuRDividedByR> {
 };
 
 template <>
-struct ComputeGaugeAdjustedBoundaryValue<Tags::J> {
-  using return_tags = tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::J>,
-                                 Tags::BoundaryValue<Tags::J>>;
+struct ComputeGaugeAdjustedBoundaryValue<Tags::BondiJ> {
+  using return_tags =
+      tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::BondiJ>,
+                 Tags::BoundaryValue<Tags::BondiJ>>;
   using argument_tags =
       tmpl::list<Tags::GaugeC, Tags::GaugeD, Tags::GaugeOmegaCD,
                  Tags::CauchyAngularCoords, Tags::LMax>;
@@ -150,12 +152,12 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::J> {
 };
 
 template <>
-struct ComputeGaugeAdjustedBoundaryValue<Tags::Dr<Tags::J>> {
+struct ComputeGaugeAdjustedBoundaryValue<Tags::Dr<Tags::BondiJ>> {
   using return_tags =
-      tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::Dr<Tags::J>>,
-                 Tags::BoundaryValue<Tags::Dr<Tags::J>>>;
+      tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::Dr<Tags::BondiJ>>,
+                 Tags::BoundaryValue<Tags::Dr<Tags::BondiJ>>>;
   using argument_tags =
-      tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::J>, Tags::GaugeC,
+      tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::BondiJ>, Tags::GaugeC,
                  Tags::GaugeD, Tags::GaugeOmegaCD, Tags::CauchyAngularCoords,
                  Tags::LMax>;
   static void apply(
@@ -203,9 +205,10 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::Dr<Tags::J>> {
 // beta is the same in both gauges. This still should have separate tags for the
 // time being for compatibility with original evolution code.
 template <>
-struct ComputeGaugeAdjustedBoundaryValue<Tags::Beta> {
-  using return_tags = tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::Beta>,
-                                 Tags::BoundaryValue<Tags::Beta>>;
+struct ComputeGaugeAdjustedBoundaryValue<Tags::BondiBeta> {
+  using return_tags =
+      tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::BondiBeta>,
+                 Tags::BoundaryValue<Tags::BondiBeta>>;
   using argument_tags =
       tmpl::list<Tags::GaugeOmegaCD, Tags::CauchyAngularCoords,
                  Tags::InertialAngularCoords, Tags::LMax>;
@@ -232,16 +235,17 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::Beta> {
 };
 
 template <>
-struct ComputeGaugeAdjustedBoundaryValue<Tags::Q> {
+struct ComputeGaugeAdjustedBoundaryValue<Tags::BondiQ> {
   using return_tags =
-      tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::Q>,
-                 Tags::BoundaryValue<Tags::Dr<Tags::U>>,
-                 Tags::BoundaryValue<Tags::Q>, Tags::J, Tags::Dy<Tags::J>>;
+      tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::BondiQ>,
+                 Tags::BoundaryValue<Tags::Dr<Tags::BondiU>>,
+                 Tags::BoundaryValue<Tags::BondiQ>, Tags::BondiJ,
+                 Tags::Dy<Tags::BondiJ>>;
   using argument_tags =
-      tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::J>,
-                 Tags::EvolutionGaugeBoundaryValue<Tags::R>,
-                 Tags::EvolutionGaugeBoundaryValue<Tags::Beta>, Tags::GaugeC,
-                 Tags::GaugeD, Tags::GaugeOmegaCD,
+      tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::BondiJ>,
+                 Tags::EvolutionGaugeBoundaryValue<Tags::BondiR>,
+                 Tags::EvolutionGaugeBoundaryValue<Tags::BondiBeta>,
+                 Tags::GaugeC, Tags::GaugeD, Tags::GaugeOmegaCD,
                  Spectral::Swsh::Tags::Derivative<Tags::GaugeOmegaCD,
                                                   Spectral::Swsh::Tags::Eth>,
                  Tags::CauchyAngularCoords, Tags::LMax>;
@@ -355,14 +359,15 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::Q> {
 
 // NOTE! this gets the boundary value for \f$\hat{U}\f$
 template <>
-struct ComputeGaugeAdjustedBoundaryValue<Tags::U> {
-  using return_tags = tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::U>,
-                                 Tags::BoundaryValue<Tags::U>, Tags::J>;
+struct ComputeGaugeAdjustedBoundaryValue<Tags::BondiU> {
+  using return_tags =
+      tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::BondiU>,
+                 Tags::BoundaryValue<Tags::BondiU>, Tags::BondiJ>;
   using argument_tags =
-      tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::J>,
-                 Tags::EvolutionGaugeBoundaryValue<Tags::R>,
-                 Tags::EvolutionGaugeBoundaryValue<Tags::Beta>, Tags::GaugeC,
-                 Tags::GaugeD, Tags::GaugeOmegaCD,
+      tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::BondiJ>,
+                 Tags::EvolutionGaugeBoundaryValue<Tags::BondiR>,
+                 Tags::EvolutionGaugeBoundaryValue<Tags::BondiBeta>,
+                 Tags::GaugeC, Tags::GaugeD, Tags::GaugeOmegaCD,
                  Spectral::Swsh::Tags::Derivative<Tags::GaugeOmegaCD,
                                                   Spectral::Swsh::Tags::Eth>,
                  Tags::CauchyAngularCoords, Tags::LMax>;
@@ -421,16 +426,16 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::U> {
 };
 
 template <>
-struct ComputeGaugeAdjustedBoundaryValue<Tags::W> {
-  using return_tags =
-      tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::W>,
-                 Tags::BoundaryValue<Tags::W>, Tags::BoundaryValue<Tags::U>,
-                 Tags::EvolutionGaugeBoundaryValue<Tags::U>,
-                 Tags::EvolutionGaugeBoundaryValue<Tags::Beta>, Tags::J>;
+struct ComputeGaugeAdjustedBoundaryValue<Tags::BondiW> {
+  using return_tags = tmpl::list<
+      Tags::EvolutionGaugeBoundaryValue<Tags::BondiW>,
+      Tags::BoundaryValue<Tags::BondiW>, Tags::BoundaryValue<Tags::BondiU>,
+      Tags::EvolutionGaugeBoundaryValue<Tags::BondiU>,
+      Tags::EvolutionGaugeBoundaryValue<Tags::BondiBeta>, Tags::BondiJ>;
   using argument_tags =
-      tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::J>, Tags::U0,
-                 Tags::EvolutionGaugeBoundaryValue<Tags::R>, Tags::GaugeOmegaCD,
-                 Tags::Du<Tags::GaugeOmegaCD>,
+      tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::BondiJ>, Tags::U0,
+                 Tags::EvolutionGaugeBoundaryValue<Tags::BondiR>,
+                 Tags::GaugeOmegaCD, Tags::Du<Tags::GaugeOmegaCD>,
                  Spectral::Swsh::Tags::Derivative<Tags::GaugeOmegaCD,
                                                   Spectral::Swsh::Tags::Eth>,
                  Tags::GaugeD, Tags::GaugeC, Tags::CauchyAngularCoords,
@@ -555,15 +560,16 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::W> {
 };
 
 template <>
-struct ComputeGaugeAdjustedBoundaryValue<Tags::H> {
+struct ComputeGaugeAdjustedBoundaryValue<Tags::BondiH> {
   using return_tags =
-      tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::H>, Tags::J,
+      tmpl::list<Tags::EvolutionGaugeBoundaryValue<Tags::BondiH>, Tags::BondiJ,
                  Tags::BoundaryValue<Tags::SpecH>,
-                 Tags::EvolutionGaugeBoundaryValue<Tags::J>,
-                 Tags::BoundaryValue<Tags::Dr<Tags::J>>, Tags::Dy<Tags::J>,
+                 Tags::EvolutionGaugeBoundaryValue<Tags::BondiJ>,
+                 Tags::BoundaryValue<Tags::Dr<Tags::BondiJ>>,
+                 Tags::Dy<Tags::BondiJ>,
                  /* Tags::EvolutionGaugeBoundaryValue<Tags::Dr<Tags::J>>,*/
-                 Tags::U0, Tags::EvolutionGaugeBoundaryValue<Tags::R>,
-                 Tags::BoundaryValue<Tags::R>, Tags::GaugeC>;
+                 Tags::U0, Tags::EvolutionGaugeBoundaryValue<Tags::BondiR>,
+                 Tags::BoundaryValue<Tags::BondiR>, Tags::GaugeC>;
   using argument_tags =
       tmpl::list<Tags::GaugeD, Tags::GaugeA, Tags::GaugeB, Tags::GaugeOmegaCD,
                  Tags::GaugeOmega, Tags::Du<Tags::GaugeOmegaCD>,
@@ -747,7 +753,7 @@ struct GaugeUpdateU {
                  Tags::Exp2Beta, Tags::LMax>;
   using return_tags =
       tmpl::list<Tags::DuCauchyCartesianCoords, Tags::Du<Tags::GaugeC>,
-                 Tags::Du<Tags::GaugeD>, Tags::U0, Tags::U,
+                 Tags::Du<Tags::GaugeD>, Tags::U0, Tags::BondiU,
                  Tags::Du<Tags::GaugeOmegaCD>, Tags::GaugeC, Tags::GaugeD>;
 
   static void apply(
@@ -920,7 +926,7 @@ struct GaugeUpdateUManualTransform {
                  Tags::Exp2Beta, Tags::LMax>;
   using return_tags =
       tmpl::list<Tags::DuCauchyCartesianCoords, Tags::Du<Tags::GaugeC>,
-                 Tags::Du<Tags::GaugeD>, Tags::U0, Tags::U,
+                 Tags::Du<Tags::GaugeD>, Tags::U0, Tags::BondiU,
                  Tags::Du<Tags::GaugeOmegaCD>, Tags::GaugeC, Tags::GaugeD>;
 
   static void apply(
@@ -1118,7 +1124,7 @@ struct GaugeUpdateDuXtildeOfX {
       tmpl::list<Tags::GaugeOmega, Tags::InertialAngularCoords, Tags::LMax>;
   using return_tags =
       tmpl::list<Tags::DuInertialCartesianCoords, Tags::GaugeA, Tags::GaugeB,
-                 Tags::U, Tags::U0, Tags::Du<Tags::GaugeOmega>>;
+                 Tags::BondiU, Tags::U0, Tags::Du<Tags::GaugeOmega>>;
   static void apply(
       const gsl::not_null<tnsr::i<DataVector, 3>*> du_x_tilde_of_x,
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> a,
@@ -1196,8 +1202,8 @@ struct InitializeXtildeOfX {
 
       // TEST nonunity conformal factor
       // get<1>(*x_tilde_of_x)[collocation_point.offset] =
-          // collocation_point.phi +
-          // 1.0e-3 * cos(collocation_point.phi) * sin(collocation_point.theta);
+      // collocation_point.phi +
+      // 1.0e-3 * cos(collocation_point.phi) * sin(collocation_point.theta);
       // TEST omega = 1
       // get<1>(*x_tilde_of_x)[collocation_point.offset] =
       // collocation_point.phi + 1.0e-3 * sin(collocation_point.theta);
@@ -1294,18 +1300,18 @@ struct InitializeGauge {
       // TEST nonunity conformal factor
 
       // auto rootfind = boost::math::tools::bisect(
-          // [&collocation_point](double x) {
-            // return collocation_point.phi -
-                   // (x + 1.0e-3 * cos(x) * sin(collocation_point.theta));
-          // },
-          // collocation_point.phi - 2.0e-3, collocation_point.phi + 2.0e-3,
-          // [](double x, double y) { return abs(x - y) < 1.0e-14; });
+      // [&collocation_point](double x) {
+      // return collocation_point.phi -
+      // (x + 1.0e-3 * cos(x) * sin(collocation_point.theta));
+      // },
+      // collocation_point.phi - 2.0e-3, collocation_point.phi + 2.0e-3,
+      // [](double x, double y) { return abs(x - y) < 1.0e-14; });
 
       // printf("rootfind test %e, %e, %e\n", collocation_point.phi,
       // rootfind.first, rootfind.second);
 
       // get<1>(*x_of_x_tilde)[collocation_point.offset] =
-          // 0.5 * (rootfind.first + rootfind.second);
+      // 0.5 * (rootfind.first + rootfind.second);
       // get<1>(*x_of_x_tilde)[collocation_point.offset] =
       // collocation_point.phi - 1.0e-3 * sin(collocation_point.theta);
     }

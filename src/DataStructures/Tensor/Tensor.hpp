@@ -437,6 +437,25 @@ class Tensor<X, Symm, IndexList<Indices...>> {
   std::pair<std::vector<std::string>, std::vector<X>> get_vector_of_data() const
       noexcept;
 
+  /*!
+   * \brief Checks the size of each component of the tensor, and resizes if
+   * necessary.
+   *
+   * \details This operation is not permitted when any of the components of the
+   * tensor is non-owning (see `VectorImpl` for ownership details).
+   * \note This utility should NOT be used when it is anticipated that the
+   * components will be the wrong size. In that case, suggest either manual
+   * checking or restructuring so that resizing is less common. The internal
+   * call uses `UNLIKELY` to perform the checks most quickly when resizing is
+   * unnecessary.
+   */
+  void SPECTRE_ALWAYS_INLINE
+  destructive_resize_components(const size_t new_size) noexcept {
+    for(auto vector : *this) {
+      vector.destructive_resize(new_size);
+    }
+  }
+
   /// \cond HIDDEN_SYMBOLS
   /// Serialization function used by Charm++
   void pup(PUP::er& p) noexcept {  // NOLINT

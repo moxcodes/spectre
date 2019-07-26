@@ -20,7 +20,11 @@ target_link_libraries(
   ${LIBRARY}
   INTERFACE ApparentHorizons
   INTERFACE DataStructures
+  INTERFACE Domain
   INTERFACE ErrorHandling
+  INTERFACE Informer
   INTERFACE IO
+  INTERFACE LinearOperators
+  INTERFACE Spectral
   INTERFACE Time
   )

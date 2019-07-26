@@ -14,14 +14,11 @@ void trigonometric_functions_on_swsh_collocation(
     const gsl::not_null<Scalar<DataVector>*> sin_phi,
     const gsl::not_null<Scalar<DataVector>*> sin_theta,
     const size_t l_max) noexcept {
-  check_and_resize(make_not_null(&get(*cos_phi)),
-                   Spectral::Swsh::number_of_swsh_collocation_points(l_max));
-  check_and_resize(make_not_null(&get(*cos_theta)),
-                   Spectral::Swsh::number_of_swsh_collocation_points(l_max));
-  check_and_resize(make_not_null(&get(*sin_phi)),
-                   Spectral::Swsh::number_of_swsh_collocation_points(l_max));
-  check_and_resize(make_not_null(&get(*sin_theta)),
-                   Spectral::Swsh::number_of_swsh_collocation_points(l_max));
+  const size_t size = Spectral::Swsh::number_of_swsh_collocation_points(l_max);
+  cos_phi->destructive_resize_components(size);
+  cos_theta->destructive_resize_components(size);
+  sin_phi->destructive_resize_components(size);
+  sin_theta->destructive_resize_components(size);
 
   const auto& collocation = Spectral::Swsh::precomputed_collocation<
       Spectral::Swsh::ComplexRepresentation::Interleaved>(l_max);
@@ -41,9 +38,11 @@ void cartesian_to_angular_coordinates_and_derivatives(
     const Scalar<DataVector>& cos_phi, const Scalar<DataVector>& cos_theta,
     const Scalar<DataVector>& sin_phi, const Scalar<DataVector>& sin_theta,
     const double extraction_radius) noexcept {
-  check_and_resize(cartesian_coords, get(cos_phi).size());
-  check_and_resize(cartesian_to_angular_jacobian, get(cos_phi).size());
-  check_and_resize(inverse_cartesian_to_angular_jacobian, get(cos_phi).size());
+  cartesian_coords->destructive_resize_components(get(cos_phi).size());
+  cartesian_to_angular_jacobian->destructive_resize_components(
+      get(cos_phi).size());
+  inverse_cartesian_to_angular_jacobian->destructive_resize_components(
+      get(cos_phi).size());
 
   // note: factor of r scaled out
   get<0>(*cartesian_coords) = get(sin_theta) * get(cos_phi);
@@ -100,9 +99,9 @@ void cartesian_spatial_metric_and_derivatives(
     const YlmSpherepack& spherical_harmonics, const bool radial_renormalize,
     const size_t l_max) noexcept {
   size_t size = get<0, 0>(inverse_cartesian_to_angular_jacobian).size();
-  check_and_resize(cartesian_spatial_metric, size);
-  check_and_resize(d_cartesian_spatial_metric, size);
-  check_and_resize(dt_cartesian_spatial_metric, size);
+  cartesian_spatial_metric->destructive_resize_components(size);
+  d_cartesian_spatial_metric->destructive_resize_components(size);
+  dt_cartesian_spatial_metric->destructive_resize_components(size);
 
   // It is assumed at this point that the coefficients are provided in the ylm
   // spherepack format, as prepared by the utility in `ReadBoundaryDataH5.hpp`.
@@ -226,9 +225,9 @@ void cartesian_shift_and_derivatives(
     const YlmSpherepack& spherical_harmonics, const bool radial_renormalize,
     const size_t l_max) noexcept {
   size_t size = get<0, 0>(inverse_cartesian_to_angular_jacobian).size();
-  check_and_resize(cartesian_shift, size);
-  check_and_resize(d_cartesian_shift, size);
-  check_and_resize(dt_cartesian_shift, size);
+  cartesian_shift->destructive_resize_components(size);
+  d_cartesian_shift->destructive_resize_components(size);
+  dt_cartesian_shift->destructive_resize_components(size);
 
   // Allocations
   tnsr::iJ<DataVector, 3> angular_d_cartesian_shift_gauss_legendre{
@@ -326,9 +325,9 @@ void cartesian_lapse_and_derivatives(
     const YlmSpherepack& spherical_harmonics, const bool radial_renormalize,
     const size_t l_max) noexcept {
   size_t size = get<0, 0>(inverse_cartesian_to_angular_jacobian).size();
-  check_and_resize(cartesian_lapse, size);
-  check_and_resize(d_cartesian_lapse, size);
-  check_and_resize(dt_cartesian_lapse, size);
+  cartesian_lapse->destructive_resize_components(size);
+  d_cartesian_lapse->destructive_resize_components(size);
+  dt_cartesian_lapse->destructive_resize_components(size);
 
   // Allocations
   tnsr::i<DataVector, 3> angular_d_cartesian_lapse_gauss_legendre{
@@ -422,7 +421,7 @@ void generalized_harmonic_quantities(
     const Scalar<DataVector>& cartesian_lapse,
     const tnsr::i<DataVector, 3>& d_cartesian_lapse,
     const Scalar<DataVector>& dt_cartesian_lapse) noexcept {
-  check_and_resize(dt_psi, get(dt_cartesian_lapse).size());
+  dt_psi->destructive_resize_components(get(dt_cartesian_lapse).size());
 
   GeneralizedHarmonic::phi(
       phi, cartesian_lapse, d_cartesian_lapse, cartesian_shift,
@@ -469,8 +468,8 @@ void null_metric_and_derivative(
     const tnsr::aa<DataVector, 3>& dt_psi,
     const tnsr::aa<DataVector, 3>& psi) noexcept {
   size_t size = get<0, 0>(psi).size();
-  check_and_resize(null_metric, size);
-  check_and_resize(du_null_metric, size);
+  null_metric->destructive_resize_components(size);
+  du_null_metric->destructive_resize_components(size);
 
   get<0, 0>(*null_metric) = get<0, 0>(psi);
   get<0, 0>(*du_null_metric) = get<0, 0>(dt_psi);
@@ -555,9 +554,9 @@ void worldtube_normal_and_derivatives(
     const Scalar<DataVector>& sin_theta,
     const tnsr::II<DataVector, 3> inverse_spatial_metric) noexcept {
   size_t size = get<0, 0>(psi).size();
-  check_and_resize(angular_d_worldtube_normal, size);
-  check_and_resize(worldtube_normal, size);
-  check_and_resize(dt_worldtube_normal, size);
+  angular_d_worldtube_normal->destructive_resize_components(size);
+  worldtube_normal->destructive_resize_components(size);
+  dt_worldtube_normal->destructive_resize_components(size);
 
   // Allocation
   tnsr::i<DataVector, 3> sigma{size};
@@ -619,9 +618,9 @@ void null_vector_l_and_derivatives(
     const tnsr::aa<DataVector, 3>& psi, const tnsr::I<DataVector, 3>& shift,
     const tnsr::I<DataVector, 3>& worldtube_normal) noexcept {
   size_t size = get(lapse).size();
-  check_and_resize(angular_d_null_l, size);
-  check_and_resize(du_null_l, size);
-  check_and_resize(null_l, size);
+  angular_d_null_l->destructive_resize_components(size);
+  du_null_l->destructive_resize_components(size);
+  null_l->destructive_resize_components(size);
 
   // Allocation
   DataVector denominator = get(lapse);
@@ -693,8 +692,8 @@ void dlambda_null_metric_and_inverse(
     const tnsr::aa<DataVector, 3>& psi) noexcept {
   // first, the (down-index) null metric
   size_t size = get<0, 0>(psi).size();
-  check_and_resize(dlambda_null_metric, size);
-  check_and_resize(dlambda_inverse_null_metric, size);
+  dlambda_null_metric->destructive_resize_components(size);
+  dlambda_inverse_null_metric->destructive_resize_components(size);
 
   get<0, 0>(*dlambda_null_metric) = get<0>(null_l) * get<0, 0>(dt_psi) +
                                     2.0 * get<0>(du_null_l) * get<0, 0>(psi);
@@ -750,7 +749,14 @@ void dlambda_null_metric_and_inverse(
               null_l.get(0) * cartesian_to_angular_jacobian.get(A + 1, i) *
               cartesian_to_angular_jacobian.get(B + 1, j) *
               dt_psi.get(i + 1, j + 1);
-
+        }
+      }
+    }
+  }
+  for (size_t A = 0; A < 2; ++A) {
+    for (size_t B = A; B < 2; ++B) {
+      for (size_t i = 0; i < 3; ++i) {
+        for (size_t j = 0; j < 3; ++j) {
           for (size_t k = 0; k < 3; ++k) {
             dlambda_null_metric->get(A + 2, B + 2) +=
                 null_l.get(k + 1) *
@@ -840,7 +846,7 @@ void dlambda_null_metric_and_inverse(
 
 void bondi_r(const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> r,
              const tnsr::aa<DataVector, 3>& null_metric) noexcept {
-  check_and_resize(r, get<0, 0>(null_metric).size());
+  r->destructive_resize_components(get<0, 0>(null_metric).size());
 
   // the inclusion of the std::complex<double> informs the Blaze expression
   // templates to turn the result into a ComplexDataVector
@@ -857,7 +863,7 @@ void d_bondi_r(
     const tnsr::aa<DataVector, 3>& du_null_metric,
     const tnsr::AA<DataVector, 3>& inverse_null_metric, size_t l_max,
     const YlmSpherepack /*spherical_harmonic*/) noexcept {
-  check_and_resize(d_r, get<0, 0>(inverse_null_metric).size());
+  d_r->destructive_resize_components(get<0, 0>(inverse_null_metric).size());
 
   // compute the time derivative part
   get<0>(*d_r) =
@@ -891,7 +897,7 @@ void dyads(
 void beta_worldtube_data(
     const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> beta,
     const tnsr::a<DataVector, 3>& d_r) noexcept {
-  check_and_resize(beta, get<0>(d_r).size());
+  beta->destructive_resize_components(get<0>(d_r).size());
   get(*beta).data() = std::complex<double>(-0.5, 0.0) * log(get<1>(d_r));
 }
 
@@ -900,7 +906,7 @@ void bondi_u_worldtube_data(
     const tnsr::i<ComplexDataVector, 2>& down_dyad,
     const tnsr::a<DataVector, 3>& d_r,
     const tnsr::AA<DataVector, 3>& inverse_null_metric) noexcept {
-  check_and_resize(bondi_u, get<0>(d_r).size());
+  bondi_u->destructive_resize_components(get<0>(d_r).size());
   get(*bondi_u).data() = -get<0>(down_dyad) * get<1, 2>(inverse_null_metric) -
                          get<1>(down_dyad) * get<1, 3>(inverse_null_metric);
 
@@ -918,7 +924,7 @@ void bondi_w_worldtube_data(
     const tnsr::a<DataVector, 3>& d_r,
     const tnsr::AA<DataVector, 3>& inverse_null_metric,
     const Scalar<SpinWeighted<ComplexDataVector, 0>>& r) noexcept {
-  check_and_resize(bondi_w, get(r).data().size());
+  bondi_w->destructive_resize_components(get(r).data().size());
 
   get(*bondi_w).data() =
       std::complex<double>(1.0, 0.0) *
@@ -944,7 +950,7 @@ void bondi_j_worldtube_data(
     const tnsr::aa<DataVector, 3>& null_metric,
     const Scalar<SpinWeighted<ComplexDataVector, 0>> r,
     const tnsr::i<ComplexDataVector, 2>& up_dyad) noexcept {
-  check_and_resize(bondi_j, get(r).data().size());
+  bondi_j->destructive_resize_components(get(r).data().size());
 
   get(*bondi_j).data() =
       0.5 *
@@ -961,13 +967,13 @@ void dr_bondi_j(
     const Scalar<SpinWeighted<ComplexDataVector, 2>>& bondi_j,
     const Scalar<SpinWeighted<ComplexDataVector, 0>>& r,
     const tnsr::i<ComplexDataVector, 2>& up_dyad) noexcept {
-  check_and_resize(dr_j, get(r).data().size());
+  dr_j->destructive_resize_components(get(r).data().size());
   get(*dr_j) = -2.0 * get(bondi_j) / get(r);
   for (size_t A = 0; A < 2; ++A) {
     for (size_t B = 0; B < 2; ++B) {
       get(*dr_j).data() += 0.5 * up_dyad.get(A) * up_dyad.get(B) *
-                                 dlambda_null_metric.get(A + 2, B + 2) /
-                                 (square(get(r).data()) * get<1>(d_r));
+                           dlambda_null_metric.get(A + 2, B + 2) /
+                           (square(get(r).data()) * get<1>(d_r));
     }
   }
 }
@@ -978,7 +984,7 @@ void d2lambda_bondi_r(
     const Scalar<SpinWeighted<ComplexDataVector, 2>>& dr_j,
     const Scalar<SpinWeighted<ComplexDataVector, 2>>& bondi_j,
     const Scalar<SpinWeighted<ComplexDataVector, 0>>& r) noexcept {
-  check_and_resize(d2lambda_r, get(bondi_j).data().size());
+  d2lambda_r->destructive_resize_components(get(bondi_j).data().size());
   get(*d2lambda_r) = -0.25 * get(r) *
                      (get(dr_j) * conj(get(dr_j)) -
                       0.25 *
@@ -1000,7 +1006,7 @@ void bondi_q_worldtube_data(
     const Scalar<SpinWeighted<ComplexDataVector, 2>>& bondi_j,
     const Scalar<SpinWeighted<ComplexDataVector, 0>>& r,
     const Scalar<SpinWeighted<ComplexDataVector, 1>>& bondi_u) noexcept {
-  check_and_resize(bondi_q, get(bondi_j).data().size());
+  bondi_q->destructive_resize_components(get(bondi_j).data().size());
   // Allocation
   Scalar<SpinWeighted<ComplexDataVector, 1>> dlambda_bondi_u;
 
@@ -1041,7 +1047,7 @@ void bondi_h_worldtube_data(
     const tnsr::aa<DataVector, 3>& du_null_metric,
     const Scalar<SpinWeighted<ComplexDataVector, 0>>& r,
     const tnsr::i<ComplexDataVector, 2>& up_dyad) noexcept {
-  check_and_resize(bondi_h, get(bondi_j).data().size());
+  bondi_h->destructive_resize_components(get(bondi_j).data().size());
 
   get(*bondi_h).data() =
       -2.0 * get<0>(d_r) / get(r).data() * get(bondi_j).data();

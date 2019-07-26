@@ -234,14 +234,14 @@ void bondi_h_worldtube_data(
  * Sufficient tags to provide full worldtube boundary data at a particular
  * time are set in `bondi_boundary_data`. In particular, the following tags
  * are set:
- * - Cce::Tags::Beta
- * - Cce::Tags::U
- * - Cce::Tags::Q
- * - Cce::Tags::W
- * - Cce::Tags::J
- * - Cce::Tags::H
- * - Cce::Tags::R
- * - Cce::Tags::Du<Cce::Tags::R>
+ * - Cce::Tags::BondiBeta
+ * - Cce::Tags::BondiU
+ * - Cce::Tags::BondiQ
+ * - Cce::Tags::BondiW
+ * - Cce::Tags::BondiJ
+ * - Cce::Tags::BondiH
+ * - Cce::Tags::BondiR
+ * - Cce::Tags::Du<Cce::Tags::BondiR>
  *
  * The mathematical transformations are implemented as a set of individual
  * cascaded functions below. The details of the manipulations that are
@@ -387,7 +387,7 @@ void create_bondi_boundary_data_from_cauchy(
                                   cartesian_to_angular_jacobian, phi, dt_psi,
                                   du_null_l, inverse_null_metric, null_l, psi);
 
-  auto& r = get<Tags::BoundaryValue<Tags::R>>(*bondi_boundary_data);
+  auto& r = get<Tags::BoundaryValue<Tags::BondiR>>(*bondi_boundary_data);
   bondi_r(make_not_null(&r), null_metric);
 
   tnsr::a<DataVector, 3> d_r{size};
@@ -400,24 +400,24 @@ void create_bondi_boundary_data_from_cauchy(
   tnsr::i<ComplexDataVector, 2> up_dyad{size};
   dyads(make_not_null(&down_dyad), make_not_null(&up_dyad));
 
-  beta_worldtube_data(make_not_null(&get<Tags::BoundaryValue<Tags::Beta>>(
+  beta_worldtube_data(make_not_null(&get<Tags::BoundaryValue<Tags::BondiBeta>>(
                           *bondi_boundary_data)),
                       d_r);
 
-  auto& bondi_u = get<Tags::BoundaryValue<Tags::U>>(*bondi_boundary_data);
+  auto& bondi_u = get<Tags::BoundaryValue<Tags::BondiU>>(*bondi_boundary_data);
   bondi_u_worldtube_data(make_not_null(&bondi_u), down_dyad, d_r,
                          inverse_null_metric);
 
-  bondi_w_worldtube_data(
-      make_not_null(&get<Tags::BoundaryValue<Tags::W>>(*bondi_boundary_data)),
-      d_r, inverse_null_metric, r);
+  bondi_w_worldtube_data(make_not_null(&get<Tags::BoundaryValue<Tags::BondiW>>(
+                             *bondi_boundary_data)),
+                         d_r, inverse_null_metric, r);
 
-  auto& bondi_j = get<Tags::BoundaryValue<Tags::J>>(*bondi_boundary_data);
+  auto& bondi_j = get<Tags::BoundaryValue<Tags::BondiJ>>(*bondi_boundary_data);
   get(bondi_j).data() = ComplexDataVector{size};
   bondi_j_worldtube_data(make_not_null(&bondi_j), null_metric, r, up_dyad);
 
   auto& dr_j =
-      get<Tags::BoundaryValue<Tags::Dr<Tags::J>>>(*bondi_boundary_data);
+      get<Tags::BoundaryValue<Tags::Dr<Tags::BondiJ>>>(*bondi_boundary_data);
   get(dr_j).data() = ComplexDataVector{size};
   dr_bondi_j(make_not_null(&dr_j), dlambda_null_metric, d_r, bondi_j, r,
              up_dyad);
@@ -437,13 +437,14 @@ void create_bondi_boundary_data_from_cauchy(
   // TODO need also dr_u = d_lambda_u / d_lambda_r
 
   bondi_q_worldtube_data(
-      make_not_null(&get<Tags::BoundaryValue<Tags::Q>>(*bondi_boundary_data)),
       make_not_null(
-          &get<Tags::BoundaryValue<Tags::Dr<Tags::U>>>(*bondi_boundary_data)),
+          &get<Tags::BoundaryValue<Tags::BondiQ>>(*bondi_boundary_data)),
+      make_not_null(&get<Tags::BoundaryValue<Tags::Dr<Tags::BondiU>>>(
+          *bondi_boundary_data)),
       d2lambda_r, dlambda_inverse_null_metric, d_r, down_dyad,
       angular_d_dlambda_r, inverse_null_metric, bondi_j, r, bondi_u);
 
-  auto& bondi_h = get<Tags::BoundaryValue<Tags::H>>(*bondi_boundary_data);
+  auto& bondi_h = get<Tags::BoundaryValue<Tags::BondiH>>(*bondi_boundary_data);
   bondi_h_worldtube_data(make_not_null(&bondi_h), d_r, bondi_j, du_null_metric,
                          r, up_dyad);
 

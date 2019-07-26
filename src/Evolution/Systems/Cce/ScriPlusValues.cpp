@@ -164,7 +164,7 @@ void calculate_non_inertial_news(
   Scalar<SpinWeighted<ComplexDataVector, 2>> j_tilde{number_of_angular_points *
                                                      number_of_radial_points};
   // This function works just as well in reverse
-  CalculateCauchyGauge<Tags::CauchyGauge<Tags::J>>::apply(
+  CalculateCauchyGauge<Tags::CauchyGauge<Tags::BondiJ>>::apply(
       make_not_null(&j_tilde), j, gauge_c, gauge_d, omega_cd, x_of_x_tilde,
       l_max);
   SpinWeighted<ComplexDataVector, 2> scri_j_tilde{number_of_angular_points};
@@ -176,7 +176,7 @@ void calculate_non_inertial_news(
   // dy_j_tilde
   Scalar<SpinWeighted<ComplexDataVector, 2>> dy_j_tilde{
       number_of_angular_points * number_of_radial_points};
-  ComputePreSwshDerivatives<Tags::Dy<Tags::J>>::apply(
+  ComputePreSwshDerivatives<Tags::Dy<Tags::BondiJ>>::apply(
       make_not_null(&dy_j_tilde), j_tilde, l_max);
 
   // scri_u_hat
@@ -241,7 +241,7 @@ void calculate_non_inertial_news(
 
   Scalar<SpinWeighted<ComplexDataVector, 2>> dy_h_tilde{get(h_tilde).size()};
 
-  ComputePreSwshDerivatives<Tags::Dy<Tags::H>>::apply(
+  ComputePreSwshDerivatives<Tags::Dy<Tags::BondiH>>::apply(
       make_not_null(&dy_h_tilde), h_tilde, l_max);
   auto dy_h_at_scri = ComplexDataVector{
       get(dy_h_tilde).data().data() +

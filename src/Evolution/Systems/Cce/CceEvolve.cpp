@@ -7,7 +7,7 @@
 #include "Evolution/Systems/Cce/ScriPlusInterpolationManager.hpp"
 #include "Evolution/Systems/Cce/ScriPlusValues.hpp"
 #include "NumericalAlgorithms/Spectral/SwshFiltering.hpp"
-#include "NumericalAlgorithms/Spectral/SwshTransformJob.hpp"
+#include "NumericalAlgorithms/Spectral/SwshTransform.hpp"
 
 namespace Cce {
 
@@ -16,29 +16,29 @@ ComplexModalVector compute_mode_difference_at_scri(
     double time, std::string prefix, const ComplexModalVector& modes,
     size_t l_max) {
   std::string filename;
-  if (cpp17::is_same_v<BondiTag, Tags::Beta> or
-      cpp17::is_same_v<BondiTag, Tags::CauchyGaugeScriPlus<Tags::Beta>>) {
+  if (cpp17::is_same_v<BondiTag, Tags::BondiBeta> or
+      cpp17::is_same_v<BondiTag, Tags::CauchyGaugeScriPlus<Tags::BondiBeta>>) {
     filename = "betaScriNoninertial.h5";
   }
-  if (cpp17::is_same_v<BondiTag, Tags::U> or
+  if (cpp17::is_same_v<BondiTag, Tags::BondiU> or
       cpp17::is_same_v<BondiTag, Tags::U0> or
       cpp17::is_same_v<BondiTag, Tags::CauchyGaugeScriPlus<Tags::U0>>) {
     filename = "UScriNoninertial.h5";
   }
-  if (cpp17::is_same_v<BondiTag, Tags::Q> or
-      cpp17::is_same_v<BondiTag, Tags::CauchyGaugeScriPlus<Tags::Q>>) {
+  if (cpp17::is_same_v<BondiTag, Tags::BondiQ> or
+      cpp17::is_same_v<BondiTag, Tags::CauchyGaugeScriPlus<Tags::BondiQ>>) {
     filename = "QScriNoninertial.h5";
   }
-  if (cpp17::is_same_v<BondiTag, Tags::W> or
-      cpp17::is_same_v<BondiTag, Tags::CauchyGaugeScriPlus<Tags::W>>) {
+  if (cpp17::is_same_v<BondiTag, Tags::BondiW> or
+      cpp17::is_same_v<BondiTag, Tags::CauchyGaugeScriPlus<Tags::BondiW>>) {
     filename = "WScriNoninertial.h5";
   }
-  if (cpp17::is_same_v<BondiTag, Tags::J> or
-      cpp17::is_same_v<BondiTag, Tags::CauchyGaugeScriPlus<Tags::J>>) {
+  if (cpp17::is_same_v<BondiTag, Tags::BondiJ> or
+      cpp17::is_same_v<BondiTag, Tags::CauchyGaugeScriPlus<Tags::BondiJ>>) {
     filename = "JScriNoninertial.h5";
   }
-  if (cpp17::is_same_v<BondiTag, Tags::H> or
-      cpp17::is_same_v<BondiTag, Tags::CauchyGaugeScriPlus<Tags::H>>) {
+  if (cpp17::is_same_v<BondiTag, Tags::BondiH> or
+      cpp17::is_same_v<BondiTag, Tags::CauchyGaugeScriPlus<Tags::BondiH>>) {
     filename = "HScriNoninertial.h5";
   }
   if (cpp17::is_same_v<BondiTag, Tags::News>) {
@@ -64,24 +64,24 @@ ComplexModalVector compute_mode_difference_at_bondi_r_200(
     double time, std::string prefix, const ComplexModalVector& modes,
     size_t l_max) {
   std::string filename;
-  if (cpp17::is_same_v<BondiTag, Tags::Beta> or
-      cpp17::is_same_v<BondiTag, Tags::CauchyGauge<Tags::Beta>>) {
+  if (cpp17::is_same_v<BondiTag, Tags::BondiBeta> or
+      cpp17::is_same_v<BondiTag, Tags::CauchyGauge<Tags::BondiBeta>>) {
     filename = "betaR200modes.h5";
   }
-  if (cpp17::is_same_v<BondiTag, Tags::U> or
-      cpp17::is_same_v<BondiTag, Tags::CauchyGauge<Tags::U>>) {
+  if (cpp17::is_same_v<BondiTag, Tags::BondiU> or
+      cpp17::is_same_v<BondiTag, Tags::CauchyGauge<Tags::BondiU>>) {
     filename = "UR200modes.h5";
   }
-  if (cpp17::is_same_v<BondiTag, Tags::Q> or
-      cpp17::is_same_v<BondiTag, Tags::CauchyGauge<Tags::Q>>) {
+  if (cpp17::is_same_v<BondiTag, Tags::BondiQ> or
+      cpp17::is_same_v<BondiTag, Tags::CauchyGauge<Tags::BondiQ>>) {
     filename = "QR200modes.h5";
   }
-  if (cpp17::is_same_v<BondiTag, Tags::W> or
-      cpp17::is_same_v<BondiTag, Tags::CauchyGauge<Tags::W>>) {
+  if (cpp17::is_same_v<BondiTag, Tags::BondiW> or
+      cpp17::is_same_v<BondiTag, Tags::CauchyGauge<Tags::BondiW>>) {
     filename = "WR200modes.h5";
   }
-  if (cpp17::is_same_v<BondiTag, Tags::J> or
-      cpp17::is_same_v<BondiTag, Tags::CauchyGauge<Tags::J>>) {
+  if (cpp17::is_same_v<BondiTag, Tags::BondiJ> or
+      cpp17::is_same_v<BondiTag, Tags::CauchyGauge<Tags::BondiJ>>) {
     filename = "JR200modes.h5";
   }
   if (cpp17::is_same_v<BondiTag, Tags::SpecH> or
@@ -146,7 +146,7 @@ void regularity_preserving_hypersurface_computation(
     db::mutate_apply<RadialIntegrateBondi<Tags::BoundaryValue, BondiTag>>(box);
   }
 
-  if (cpp17::is_same_v<BondiTag, Tags::U>) {
+  if (cpp17::is_same_v<BondiTag, Tags::BondiU>) {
     db::mutate_apply<GaugeUpdateU>(box, regularity_preserving);
     db::mutate_apply<GaugeUpdateDuXtildeOfX>(box);
 
@@ -185,7 +185,7 @@ void regularity_preserving_robinson_trautman_hypersurface_computation(
   db::mutate_apply<
       RadialIntegrateBondi<Tags::EvolutionGaugeBoundaryValue, BondiTag>>(box);
 
-  if (cpp17::is_same_v<BondiTag, Tags::U>) {
+  if (cpp17::is_same_v<BondiTag, Tags::BondiU>) {
     db::mutate<Tags::U0>(
         box,
         [&time](const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*>
@@ -329,7 +329,7 @@ void compare_and_record_r200_values(
     typename db::item_type<tag>::type r200_slice;
     ComplexDataVector r200_slice_buffer = get(db::get<tag>(*box)).data();
     r200_slice.data() = interpolate_to_bondi_r(
-        get(db::get<tag>(*box)).data(), get(db::get<Tags::R>(*box)).data(),
+        get(db::get<tag>(*box)).data(), get(db::get<Tags::BondiR>(*box)).data(),
         200.0, l_max);
 
     auto r200_goldberg_modes = Spectral::Swsh::libsharp_to_goldberg_modes(
@@ -364,7 +364,8 @@ void compare_and_record_r200_values_from_rp(
 
     r200_slice.data() = interpolate_to_bondi_r(
         get(db::get<tag>(*box)).data(),
-        get(db::get<Tags::BoundaryValue<Tags::R>>(*box)).data(), 200.0, l_max);
+        get(db::get<Tags::BoundaryValue<Tags::BondiR>>(*box)).data(), 200.0,
+        l_max);
 
     typename db::item_type<tag>::type r200_cauchy_gauge{r200_slice.size()};
     Spectral::Swsh::filter_swsh_boundary_quantity(make_not_null(&r200_slice),
@@ -399,7 +400,8 @@ void compare_and_record_r200_value_inertial(
 
   r200_slice.data() = interpolate_to_bondi_r(
       get(db::get<Tag>(*box)).data(),
-      get(db::get<Tags::EvolutionGaugeBoundaryValue<Tags::R>>(*box)).data() /
+      get(db::get<Tags::EvolutionGaugeBoundaryValue<Tags::BondiR>>(*box))
+              .data() /
           get(db::get<Tags::GaugeOmegaCD>(*box)).data(),
       200.0, l_max);
 
@@ -413,7 +415,7 @@ void compare_and_record_r200_value_inertial(
                                        l_max);
     auto inertial_modes_from_file = CalculateInertialModes<Tag>::compute(
         box, mode_compare.get_comparison_modes(time),
-        2.0 * get(db::get<Tags::R>(*box)).data() / 200.0);
+        2.0 * get(db::get<Tags::BondiR>(*box)).data() / 200.0);
     recorder->append_mode_data(
         "/" + Tag::name() + "_r200_difference", time,
         r200_goldberg_modes.data() - inertial_modes_from_file,
@@ -528,18 +530,20 @@ void run_trial_cce(std::string input_filename,
     // do not quite align).
     // TODO: investigate if this is still necessary. If it is, there is still a
     // problem.
-    db::mutate_apply<ComputePreSwshDerivatives<Tags::Dy<Tags::J>>>(
+    db::mutate_apply<ComputePreSwshDerivatives<Tags::Dy<Tags::BondiJ>>>(
         make_not_null(&box));
-    db::mutate<Tags::BoundaryValue<Tags::H>,
-               Tags::BoundaryValue<Tags::DuRDividedByR>, Tags::Dy<Tags::J>>(
+    db::mutate<Tags::BoundaryValue<Tags::BondiH>,
+               Tags::BoundaryValue<Tags::DuRDividedByR>,
+               Tags::Dy<Tags::BondiJ>>(
         make_not_null(&box),
         [&l_max](
-            const gsl::not_null<db::item_type<Tags::BoundaryValue<Tags::H>>*>
+            const gsl::not_null<
+                db::item_type<Tags::BoundaryValue<Tags::BondiH>>*>
                 boundary_h,
             const gsl::not_null<
                 db::item_type<Tags::BoundaryValue<Tags::DuRDividedByR>>*>
                 du_r_divided_by_r,
-            const gsl::not_null<db::item_type<Tags::Dy<Tags::J>>*> dy_j,
+            const gsl::not_null<db::item_type<Tags::Dy<Tags::BondiJ>>*> dy_j,
             const db::item_type<Tags::BoundaryValue<Tags::SpecH>>& spec_h) {
           ComplexDataVector boundary_dy_j{
               get(*dy_j).data().data(),
@@ -553,42 +557,42 @@ void run_trial_cce(std::string input_filename,
         },
         db::get<Tags::BoundaryValue<Tags::SpecH>>(box));
 
-    tmpl::for_each<tmpl::list<Tags::Beta, Tags::Q, Tags::U, Tags::W, Tags::H>>(
-        [&box, &l_max, &l_filter_start](auto x) {
-          using bondi_tag = typename decltype(x)::type;
-          perform_hypersurface_computation<bondi_tag,
-                                           swsh_derivatives_variables_tag,
-                                           transform_buffer_variables_tag,
-                                           pre_swsh_derivatives_variables_tag>(
-              make_not_null(&box));
+    tmpl::for_each<tmpl::list<Tags::BondiBeta, Tags::BondiQ, Tags::BondiU,
+                              Tags::BondiW, Tags::BondiH>>([&box, &l_max,
+                                                            &l_filter_start](
+                                                               auto x) {
+      using bondi_tag = typename decltype(x)::type;
+      perform_hypersurface_computation<
+          bondi_tag, swsh_derivatives_variables_tag,
+          transform_buffer_variables_tag, pre_swsh_derivatives_variables_tag>(
+          make_not_null(&box));
 
-          db::mutate<bondi_tag>(
-              make_not_null(&box),
-              [&l_max,
-               &l_filter_start](const gsl::not_null<db::item_type<bondi_tag>*>
-                                    bondi_quantity) {
-                Spectral::Swsh::filter_swsh_volume_quantity(
-                    make_not_null(&get(*bondi_quantity)), l_max, l_filter_start,
-                    108.0, 8);
-              });
-        });
+      db::mutate<bondi_tag>(
+          make_not_null(&box),
+          [&l_max, &l_filter_start](
+              const gsl::not_null<db::item_type<bondi_tag>*> bondi_quantity) {
+            Spectral::Swsh::filter_swsh_volume_quantity(
+                make_not_null(&get(*bondi_quantity)), l_max, l_filter_start,
+                108.0, 8);
+          });
+    });
 
-    ComplexDataVector du_j = get(db::get<Tags::H>(box)).data();
-    history.insert(time.time(), get(db::get<Tags::J>(box)).data(),
+    ComplexDataVector du_j = get(db::get<Tags::BondiH>(box)).data();
+    history.insert(time.time(), get(db::get<Tags::BondiJ>(box)).data(),
                    std::move(du_j));
 
     db::mutate<Tags::SpecH>(
         make_not_null(&box),
         [](const gsl::not_null<db::item_type<Tags::SpecH>*> spec_h,
-           const db::item_type<Tags::H>& h,
+           const db::item_type<Tags::BondiH>& h,
            const db::item_type<Tags::DuRDividedByR>& du_r_divided_by_r,
            const db::item_type<Tags::OneMinusY>& one_minus_y,
-           const db::item_type<Tags::Dy<Tags::J>>& dy_j) {
+           const db::item_type<Tags::Dy<Tags::BondiJ>>& dy_j) {
           get(*spec_h) =
               get(h) - get(du_r_divided_by_r) * get(one_minus_y) * get(dy_j);
         },
-        db::get<Tags::H>(box), db::get<Tags::DuRDividedByR>(box),
-        db::get<Tags::OneMinusY>(box), db::get<Tags::Dy<Tags::J>>(box));
+        db::get<Tags::BondiH>(box), db::get<Tags::DuRDividedByR>(box),
+        db::get<Tags::OneMinusY>(box), db::get<Tags::Dy<Tags::BondiJ>>(box));
     if (time.substep() == 0) {
       // perform a comparison of boundary values and scri+ values on each new
       // time advancement
@@ -600,33 +604,37 @@ void run_trial_cce(std::string input_filename,
                          return abs(x - time.step_time().value()) < 1.0e-8;
                        }) != times.end() or
           (comparison_file_prefix == "" and step_counter % 12 == 0)) {
-        record_boundary_values<Tags::BoundaryValue,
-                               tmpl::list<Tags::Beta, Tags::Q, Tags::U, Tags::W,
-                                          Tags::SpecH, Tags::J, Tags::R>>(
+        record_boundary_values<
+            Tags::BoundaryValue,
+            tmpl::list<Tags::BondiBeta, Tags::BondiQ, Tags::BondiU,
+                       Tags::BondiW, Tags::SpecH, Tags::BondiJ, Tags::BondiR>>(
             make_not_null(&box), make_not_null(&recorder),
             time.step_time().value(), l_max, comparison_l_max);
 
-        compare_and_record_scri_values<tmpl::list<Tags::J, Tags::Beta, Tags::Q,
-                                                  Tags::U, Tags::W, Tags::H>>(
+        compare_and_record_scri_values<
+            tmpl::list<Tags::BondiJ, Tags::BondiBeta, Tags::BondiQ,
+                       Tags::BondiU, Tags::BondiW, Tags::BondiH>>(
             make_not_null(&box), make_not_null(&recorder),
             comparison_file_prefix, time.step_time().value(), l_max,
             comparison_l_max, number_of_radial_points);
 
         // note: SpecH is available, but needs to be computed on its own for the
         // comparison to be useful.
-        compare_and_record_r200_values<tmpl::list<
-            Tags::J, Tags::Beta, Tags::Q, Tags::U, Tags::W, Tags::SpecH>>(
+        compare_and_record_r200_values<
+            tmpl::list<Tags::BondiJ, Tags::BondiBeta, Tags::BondiQ,
+                       Tags::BondiU, Tags::BondiW, Tags::SpecH>>(
             make_not_null(&box), make_not_null(&recorder),
             comparison_file_prefix, time.step_time().value(), l_max,
             comparison_l_max, number_of_radial_points);
       }
     }
-    db::mutate<Tags::J>(make_not_null(&box),
-                        [&stepper, &time_step, &history](
-                            const gsl::not_null<db::item_type<Tags::J>*> j) {
-                          stepper.update_u(make_not_null(&get(*j).data()),
-                                           make_not_null(&history), time_step);
-                        });
+    db::mutate<Tags::BondiJ>(
+        make_not_null(&box),
+        [&stepper, &time_step,
+         &history](const gsl::not_null<db::item_type<Tags::BondiJ>*> j) {
+          stepper.update_u(make_not_null(&get(*j).data()),
+                           make_not_null(&history), time_step);
+        });
     time = stepper.next_time_id(time, time_step);
     // printf("next time: %f\n", time.time().value());
     // get the worldtube data for the next time step.
@@ -790,11 +798,12 @@ void run_trial_regularity_preserving_cce(
   db::mutate_apply<GaugeAdjustInitialJ>(make_not_null(&box));
 
   // TESTING
-  // db::mutate_apply<ComputeGaugeAdjustedBoundaryValue<Tags::Beta>>
+  // db::mutate_apply<ComputeGaugeAdjustedBoundaryValue<Tags::BondiBeta>>
   // (make_not_null(&box));
-  // db::mutate_apply<ComputeGaugeAdjustedBoundaryValue<Tags::J>>
+  // db::mutate_apply<ComputeGaugeAdjustedBoundaryValue<Tags::BondiJ>>
   // (make_not_null(&box));
-  // db::mutate_apply<ComputeGaugeAdjustedBoundaryValue<Tags::Dr<Tags::J>>>(
+  // db::mutate_apply<ComputeGaugeAdjustedBoundaryValue<
+  // Tags::Dr<Tags::BondiJ>>>(
   // make_not_null(&box));
   // TESTING
   db::mutate_apply<InitializeScriPlusValue<Tags::InertialRetardedTime>>(
@@ -817,18 +826,20 @@ void run_trial_regularity_preserving_cce(
       mutate_all_precompute_cce_dependencies<Tags::BoundaryValue>(
           make_not_null(&box));
 
-      db::mutate_apply<ComputePreSwshDerivatives<Tags::Dy<Tags::J>>>(
+      db::mutate_apply<ComputePreSwshDerivatives<Tags::Dy<Tags::BondiJ>>>(
           make_not_null(&box));
-      db::mutate<Tags::BoundaryValue<Tags::H>,
-                 Tags::BoundaryValue<Tags::DuRDividedByR>, Tags::Dy<Tags::J>>(
+      db::mutate<Tags::BoundaryValue<Tags::BondiH>,
+                 Tags::BoundaryValue<Tags::DuRDividedByR>,
+                 Tags::Dy<Tags::BondiJ>>(
           make_not_null(&box),
           [&l_max](
-              const gsl::not_null<db::item_type<Tags::BoundaryValue<Tags::H>>*>
+              const gsl::not_null<
+                  db::item_type<Tags::BoundaryValue<Tags::BondiH>>*>
                   boundary_h,
               const gsl::not_null<
                   db::item_type<Tags::BoundaryValue<Tags::DuRDividedByR>>*>
                   du_r_divided_by_r,
-              const gsl::not_null<db::item_type<Tags::Dy<Tags::J>>*> dy_j,
+              const gsl::not_null<db::item_type<Tags::Dy<Tags::BondiJ>>*> dy_j,
               const db::item_type<Tags::BoundaryValue<Tags::SpecH>>& spec_h) {
             ComplexDataVector boundary_dy_j{
                 get(*dy_j).data().data(),
@@ -843,7 +854,8 @@ void run_trial_regularity_preserving_cce(
           db::get<Tags::BoundaryValue<Tags::SpecH>>(box));
     }
 
-    tmpl::for_each<tmpl::list<Tags::Beta, Tags::Q, Tags::U, Tags::W, Tags::H>>(
+    tmpl::for_each<tmpl::list<Tags::BondiBeta, Tags::BondiQ, Tags::BondiU,
+                              Tags::BondiW, Tags::BondiH>>(
         [&box, &l_max, &l_filter_start, &regularity_preserving](auto x) {
           using bondi_tag = typename decltype(x)::type;
           regularity_preserving_hypersurface_computation<
@@ -853,7 +865,7 @@ void run_trial_regularity_preserving_cce(
                                                   regularity_preserving);
 
           // this isn't super elegant. consider alternatives
-          // if (cpp17::is_same_v<bondi_tag, Tags::U>) {
+          // if (cpp17::is_same_v<bondi_tag, Tags::BondiU>) {
           // db::mutate<Tags::Du<Tags::GaugeA>, Tags::Du<Tags::GaugeB>,
           // Tags::Du<Tags::GaugeOmega>>(
           // make_not_null(&box),
@@ -888,8 +900,8 @@ void run_trial_regularity_preserving_cce(
         CalculateScriPlusValue<Tags::Du<Tags::InertialRetardedTime>>>(
         make_not_null(&box));
 
-    ComplexDataVector du_j = get(db::get<Tags::H>(box)).data();
-    j_history.insert(time.time(), get(db::get<Tags::J>(box)).data(),
+    ComplexDataVector du_j = get(db::get<Tags::BondiH>(box)).data();
+    j_history.insert(time.time(), get(db::get<Tags::BondiJ>(box)).data(),
                      std::move(du_j));
 
     DataVector du_x = get<0>(db::get<Tags::DuCauchyCartesianCoords>(box));
@@ -940,7 +952,7 @@ void run_trial_regularity_preserving_cce(
     // computation that we're actually performing a reliable coordinate
     // transformation as we hope.
 
-    tmpl::for_each<tmpl::list<Tags::Beta, Tags::U0>>([&box](auto x) {
+    tmpl::for_each<tmpl::list<Tags::BondiBeta, Tags::U0>>([&box](auto x) {
       using tag = typename decltype(x)::type;
       db::mutate_apply<CalculateScriPlusValue<Tags::CauchyGaugeScriPlus<tag>>>(
           make_not_null(&box));
@@ -956,23 +968,22 @@ void run_trial_regularity_preserving_cce(
     db::mutate<Tags::SpecH>(
         make_not_null(&box),
         [](const gsl::not_null<db::item_type<Tags::SpecH>*> spec_h,
-           const db::item_type<Tags::H>& h,
+           const db::item_type<Tags::BondiH>& h,
            const db::item_type<Tags::DuRDividedByR>& du_r_divided_by_r,
            const db::item_type<Tags::OneMinusY>& one_minus_y,
-           const db::item_type<Tags::Dy<Tags::J>>& dy_j) {
+           const db::item_type<Tags::Dy<Tags::BondiJ>>& dy_j) {
           get(*spec_h) =
               get(h) - get(du_r_divided_by_r) * get(one_minus_y) * get(dy_j);
         },
-        db::get<Tags::H>(box), db::get<Tags::DuRDividedByR>(box),
-        db::get<Tags::OneMinusY>(box), db::get<Tags::Dy<Tags::J>>(box));
+        db::get<Tags::BondiH>(box), db::get<Tags::DuRDividedByR>(box),
+        db::get<Tags::OneMinusY>(box), db::get<Tags::Dy<Tags::BondiJ>>(box));
 
-    tmpl::for_each<
-        tmpl::list<Tags::Beta, Tags::J, Tags::W, Tags::U, Tags::SpecH>>(
-        [&box](auto x) {
-          using tag = typename decltype(x)::type;
-          db::mutate_apply<CalculateCauchyGauge<Tags::CauchyGauge<tag>>>(
-              make_not_null(&box));
-        });
+    tmpl::for_each<tmpl::list<Tags::BondiBeta, Tags::BondiJ, Tags::BondiW,
+                              Tags::BondiU, Tags::SpecH>>([&box](auto x) {
+      using tag = typename decltype(x)::type;
+      db::mutate_apply<CalculateCauchyGauge<Tags::CauchyGauge<tag>>>(
+          make_not_null(&box));
+    });
 
     // DEBUG output
 
@@ -1005,15 +1016,16 @@ void run_trial_regularity_preserving_cce(
       get(du_gauge_omega_identity).data() = ComplexDataVector{
           Spectral::Swsh::number_of_swsh_collocation_points(l_max), 0.0};
 
-      db::mutate<Tags::NonInertialNews, Tags::J, Tags::Beta, Tags::SpecH,
-                 Tags::EvolutionGaugeBoundaryValue<Tags::R>, Tags::U>(
-          make_not_null(&box), calculate_non_inertial_news, gauge_c_identity,
-          gauge_d_identity, gauge_omega_identity, du_gauge_omega_identity,
-          eth_gauge_omega_identity, x_of_x_tilde_identity,
-          x_of_x_tilde_identity, l_max, false);
+      db::mutate<Tags::NonInertialNews, Tags::BondiJ, Tags::BondiBeta,
+                 Tags::SpecH, Tags::EvolutionGaugeBoundaryValue<Tags::BondiR>,
+                 Tags::BondiU>(make_not_null(&box), calculate_non_inertial_news,
+                               gauge_c_identity, gauge_d_identity,
+                               gauge_omega_identity, du_gauge_omega_identity,
+                               eth_gauge_omega_identity, x_of_x_tilde_identity,
+                               x_of_x_tilde_identity, l_max, false);
     } else {
-      db::mutate<Tags::NonInertialNews, Tags::J, Tags::Beta, Tags::SpecH,
-                 Tags::BoundaryValue<Tags::R>, Tags::U>(
+      db::mutate<Tags::NonInertialNews, Tags::BondiJ, Tags::BondiBeta,
+                 Tags::SpecH, Tags::BoundaryValue<Tags::BondiR>, Tags::BondiU>(
           make_not_null(&box), calculate_non_inertial_news,
           db::get<Tags::GaugeC>(box), db::get<Tags::GaugeD>(box),
           db::get<Tags::GaugeOmegaCD>(box),
@@ -1070,14 +1082,15 @@ void run_trial_regularity_preserving_cce(
                          return abs(x - time.step_time().value()) < 1.0e-8;
                        }) != times.end() or
           (comparison_file_prefix == "" and step_counter % 12 == 0)) {
-        record_boundary_values<Tags::BoundaryValue,
-                               tmpl::list<Tags::Beta, Tags::Q, Tags::U, Tags::W,
-                                          Tags::SpecH, Tags::J, Tags::R>>(
+        record_boundary_values<
+            Tags::BoundaryValue,
+            tmpl::list<Tags::BondiBeta, Tags::BondiQ, Tags::BondiU,
+                       Tags::BondiW, Tags::SpecH, Tags::BondiJ, Tags::BondiR>>(
             make_not_null(&box), make_not_null(&recorder),
             time.step_time().value(), l_max, comparison_l_max);
 
         compare_and_record_scri_values<
-            tmpl::list<Tags::CauchyGaugeScriPlus<Tags::Beta>,
+            tmpl::list<Tags::CauchyGaugeScriPlus<Tags::BondiBeta>,
                        Tags::CauchyGaugeScriPlus<Tags::U0>>>(
             make_not_null(&box), make_not_null(&recorder),
             comparison_file_prefix, time.step_time().value(), l_max,
@@ -1101,8 +1114,9 @@ void run_trial_regularity_preserving_cce(
               comparison_l_max);
         }
 
-        compare_and_record_scri_values<tmpl::list<Tags::J, Tags::Beta, Tags::Q,
-                                                  Tags::U, Tags::W, Tags::H>>(
+        compare_and_record_scri_values<
+            tmpl::list<Tags::BondiJ, Tags::BondiBeta, Tags::BondiQ,
+                       Tags::BondiU, Tags::BondiW, Tags::BondiH>>(
             make_not_null(&box), make_not_null(&recorder),
             comparison_file_prefix, time.step_time().value(), l_max,
             comparison_l_max, number_of_radial_points);
@@ -1110,34 +1124,35 @@ void run_trial_regularity_preserving_cce(
         // note: SpecH is available, but needs to be computed on its own for
         // the comparison to be useful.
 
-        compare_and_record_r200_value_inertial<Tags::J>(
+        compare_and_record_r200_value_inertial<Tags::BondiJ>(
             make_not_null(&box), make_not_null(&recorder),
             comparison_file_prefix, "JR200modes.h5", time.step_time().value(),
             l_max, comparison_l_max, number_of_radial_points);
 
         compare_and_record_r200_values_from_rp<tmpl::list<
-            Tags::CauchyGauge<Tags::J>, Tags::CauchyGauge<Tags::Beta>,
-            Tags::CauchyGauge<Tags::W>, Tags::CauchyGauge<Tags::U>,
+            Tags::CauchyGauge<Tags::BondiJ>, Tags::CauchyGauge<Tags::BondiBeta>,
+            Tags::CauchyGauge<Tags::BondiW>, Tags::CauchyGauge<Tags::BondiU>,
             Tags::CauchyGauge<Tags::SpecH>
-            /*,Tags::CauchyGauge<Tags::Q>, Tags::CauchyGauge<Tags::U>*/>>(
+            /*,Tags::CauchyGauge<Tags::BondiQ>,
+              Tags::CauchyGauge<Tags::BondiU>*/>>(
             make_not_null(&box), make_not_null(&recorder),
             comparison_file_prefix, time.step_time().value(), l_max,
             comparison_l_max, number_of_radial_points);
 
-        // compare_and_record_r200_values<tmpl::list<Tags::J, Tags::Beta>>(
-        // make_not_null(&box), make_not_null(&recorder),
+        // compare_and_record_r200_values<tmpl::list<Tags::BondiJ,
+        // Tags::BondiBeta>>( make_not_null(&box), make_not_null(&recorder),
         // comparison_file_prefix, time.step_time().value(), l_max,
         // comparison_l_max, number_of_radial_points);
       }
     }
-    db::mutate<Tags::J, Tags::CauchyCartesianCoords,
+    db::mutate<Tags::BondiJ, Tags::CauchyCartesianCoords,
                Tags::InertialCartesianCoords, Tags::InertialRetardedTime,
                Tags::GaugeC, Tags::GaugeD>(
         make_not_null(&box),
         [&stepper, &time_step, &j_history, &x_history, &y_history, &z_history,
          &x_tilde_history, &y_tilde_history, &z_tilde_history, &u_bondi_history,
          &gauge_c_history, &gauge_d_history](
-            const gsl::not_null<db::item_type<Tags::J>*> j,
+            const gsl::not_null<db::item_type<Tags::BondiJ>*> j,
             const gsl::not_null<db::item_type<Tags::CauchyCartesianCoords>*>
                 x_of_x_tilde,
             const gsl::not_null<db::item_type<Tags::InertialCartesianCoords>*>
@@ -1250,7 +1265,7 @@ void record_l2_error_with_cauchy_gauge(
         l_max);
     ComplexModalVector transformed_cauchy_modes;
 
-    // if (cpp17::is_same_v<Tag, Tags::J>) {
+    // if (cpp17::is_same_v<Tag, Tags::BondiJ>) {
     transformed_cauchy_modes = CalculateInertialModes<Tag>::compute(
         box, make_not_null(&cauchy_view),
         ComplexDataVector{number_of_angular_points, 1.0});
@@ -1377,15 +1392,18 @@ void test_regularity_preserving_cce_rt(
   db::mutate_apply<InitializeRobinsonTrautman>(make_not_null(&box));
 
   tmpl::for_each<tmpl::list<
-      Tags::BoundaryValue<Tags::R>, Tags::BoundaryValue<Tags::DuRDividedByR>,
-      Tags::BoundaryValue<Tags::J>, Tags::BoundaryValue<Tags::Dr<Tags::J>>,
-      Tags::BoundaryValue<Tags::Dr<Tags::U>>, Tags::BoundaryValue<Tags::Beta>,
-      Tags::BoundaryValue<Tags::U>, Tags::BoundaryValue<Tags::Q>,
-      Tags::BoundaryValue<Tags::W>, Tags::BoundaryValue<Tags::H>,
-      Tags::BoundaryValue<Tags::SpecH>>>([&box](auto x) {
-    using tag = typename decltype(x)::type;
-    db::mutate_apply<CalculateRobinsonTrautman<tag>>(make_not_null(&box));
-  });
+      Tags::BoundaryValue<Tags::BondiR>,
+      Tags::BoundaryValue<Tags::DuRDividedByR>,
+      Tags::BoundaryValue<Tags::BondiJ>,
+      Tags::BoundaryValue<Tags::Dr<Tags::BondiJ>>,
+      Tags::BoundaryValue<Tags::Dr<Tags::BondiU>>,
+      Tags::BoundaryValue<Tags::BondiBeta>, Tags::BoundaryValue<Tags::BondiU>,
+      Tags::BoundaryValue<Tags::BondiQ>, Tags::BoundaryValue<Tags::BondiW>,
+      Tags::BoundaryValue<Tags::BondiH>, Tags::BoundaryValue<Tags::SpecH>>>(
+      [&box](auto x) {
+        using tag = typename decltype(x)::type;
+        db::mutate_apply<CalculateRobinsonTrautman<tag>>(make_not_null(&box));
+      });
 
   ScriPlusInterpolationManager<FlexibleBarycentricInterpolator,
                                ComplexDataVector>
@@ -1430,26 +1448,27 @@ void test_regularity_preserving_cce_rt(
     mutate_all_precompute_cce_dependencies<Tags::EvolutionGaugeBoundaryValue>(
         make_not_null(&box));
 
-    tmpl::for_each<tmpl::list<Tags::Beta, Tags::Q, Tags::U, Tags::W, Tags::H>>(
-        [&box, &l_max, &l_filter_start, &time](auto x) {
-          using bondi_tag = typename decltype(x)::type;
-          // printf("before computation for : %s\n", bondi_tag::name().c_str());
-          regularity_preserving_robinson_trautman_hypersurface_computation<
-              bondi_tag, swsh_derivatives_variables_tag,
-              transform_buffer_variables_tag,
-              pre_swsh_derivatives_variables_tag>(make_not_null(&box),
-                                                  time.time().value());
+    tmpl::for_each<tmpl::list<Tags::BondiBeta, Tags::BondiQ, Tags::BondiU,
+                              Tags::BondiW, Tags::BondiH>>([&box, &l_max,
+                                                            &l_filter_start,
+                                                            &time](auto x) {
+      using bondi_tag = typename decltype(x)::type;
+      // printf("before computation for : %s\n", bondi_tag::name().c_str());
+      regularity_preserving_robinson_trautman_hypersurface_computation<
+          bondi_tag, swsh_derivatives_variables_tag,
+          transform_buffer_variables_tag, pre_swsh_derivatives_variables_tag>(
+          make_not_null(&box), time.time().value());
 
-          // db::mutate<bondi_tag>(
-          // make_not_null(&box),
-          // [&l_max,
-          // &l_filter_start](const gsl::not_null<db::item_type<bondi_tag>*>
-          // bondi_quantity) {
-          // Spectral::Swsh::filter_swsh_volume_quantity(
-          // make_not_null(&get(*bondi_quantity)), l_max, l_filter_start,
-          // 108.0, 8);
-          // });
-        });
+      // db::mutate<bondi_tag>(
+      // make_not_null(&box),
+      // [&l_max,
+      // &l_filter_start](const gsl::not_null<db::item_type<bondi_tag>*>
+      // bondi_quantity) {
+      // Spectral::Swsh::filter_swsh_volume_quantity(
+      // make_not_null(&get(*bondi_quantity)), l_max, l_filter_start,
+      // 108.0, 8);
+      // });
+    });
     // printf("calculating time derivatives\n");
     db::mutate_apply<
         CalculateScriPlusValue<Tags::Du<Tags::InertialRetardedTime>>>(
@@ -1460,8 +1479,8 @@ void test_regularity_preserving_cce_rt(
         make_not_null(&box));
 
     // printf("recording time derivatives\n");
-    ComplexDataVector du_j = get(db::get<Tags::H>(box)).data();
-    j_history.insert(time.time(), get(db::get<Tags::J>(box)).data(),
+    ComplexDataVector du_j = get(db::get<Tags::BondiH>(box)).data();
+    j_history.insert(time.time(), get(db::get<Tags::BondiJ>(box)).data(),
                      std::move(du_j));
 
     ComplexDataVector du_omega_cd =
@@ -1511,15 +1530,15 @@ void test_regularity_preserving_cce_rt(
     db::mutate<Tags::SpecH>(
         make_not_null(&box),
         [](const gsl::not_null<db::item_type<Tags::SpecH>*> spec_h,
-           const db::item_type<Tags::H>& h,
+           const db::item_type<Tags::BondiH>& h,
            const db::item_type<Tags::DuRDividedByR>& du_r_divided_by_r,
            const db::item_type<Tags::OneMinusY>& one_minus_y,
-           const db::item_type<Tags::Dy<Tags::J>>& dy_j) {
+           const db::item_type<Tags::Dy<Tags::BondiJ>>& dy_j) {
           get(*spec_h) =
               get(h) - get(du_r_divided_by_r) * get(one_minus_y) * get(dy_j);
         },
-        db::get<Tags::H>(box), db::get<Tags::DuRDividedByR>(box),
-        db::get<Tags::OneMinusY>(box), db::get<Tags::Dy<Tags::J>>(box));
+        db::get<Tags::BondiH>(box), db::get<Tags::DuRDividedByR>(box),
+        db::get<Tags::OneMinusY>(box), db::get<Tags::Dy<Tags::BondiJ>>(box));
 
     db::mutate_apply<CalculateRobinsonTrautman<Tags::CauchyGauge<Tags::News>>>(
         make_not_null(&box));
@@ -1527,8 +1546,8 @@ void test_regularity_preserving_cce_rt(
     // note gauge arguments are 'backwards', because the 'cauchy' gauge for RT
     // is actually the inertial gauge, and we deliberately warp it for the
     // evolution
-    db::mutate<Tags::News, Tags::J, Tags::Beta, Tags::SpecH,
-               Tags::EvolutionGaugeBoundaryValue<Tags::R>, Tags::U>(
+    db::mutate<Tags::News, Tags::BondiJ, Tags::BondiBeta, Tags::SpecH,
+               Tags::EvolutionGaugeBoundaryValue<Tags::BondiR>, Tags::BondiU>(
         make_not_null(&box), calculate_non_inertial_news,
         db::get<Tags::GaugeA>(box), db::get<Tags::GaugeB>(box),
         db::get<Tags::GaugeOmega>(box),
@@ -1539,16 +1558,16 @@ void test_regularity_preserving_cce_rt(
         db::get<Tags::InertialAngularCoords>(box),
         db::get<Tags::CauchyAngularCoords>(box), l_max, false);
 
-    tmpl::for_each<
-        tmpl::list<Tags::CauchyGauge<Tags::J>, Tags::CauchyGauge<Tags::Beta>,
-                   Tags::CauchyGauge<Tags::U>, Tags::CauchyGauge<Tags::Q>,
-                   Tags::CauchyGauge<Tags::W>, Tags::CauchyGauge<Tags::H>>>(
+    tmpl::for_each<tmpl::list<
+        Tags::CauchyGauge<Tags::BondiJ>, Tags::CauchyGauge<Tags::BondiBeta>,
+        Tags::CauchyGauge<Tags::BondiU>, Tags::CauchyGauge<Tags::BondiQ>,
+        Tags::CauchyGauge<Tags::BondiW>, Tags::CauchyGauge<Tags::BondiH>>>(
         [&box](auto x) {
           using tag = typename decltype(x)::type;
           db::mutate_apply<CalculateRobinsonTrautman<tag>>(make_not_null(&box));
         });
 
-    // tmpl::for_each<tmpl::list<Tags::Beta>>([&box](auto x) {
+    // tmpl::for_each<tmpl::list<Tags::BondiBeta>>([&box](auto x) {
     // using tag = typename decltype(x)::type;
     // db::mutate_apply<CalculateCauchyGauge<Tags::CauchyGauge<tag>>>(
     // make_not_null(&box));
@@ -1564,13 +1583,15 @@ void test_regularity_preserving_cce_rt(
       // printf("recording boundary values\n");
       record_boundary_values<
           Tags::EvolutionGaugeBoundaryValue,
-          tmpl::list<Tags::Beta, Tags::Q, Tags::U, Tags::W, Tags::J, Tags::R>>(
+          tmpl::list<Tags::BondiBeta, Tags::BondiQ, Tags::BondiU, Tags::BondiW,
+                     Tags::BondiJ, Tags::BondiR>>(
           make_not_null(&box), make_not_null(&recorder),
           time.step_time().value(), l_max, comparison_l_max);
 
       // printf("recording scri values\n");
       compare_and_record_scri_values<
-          tmpl::list<Tags::J, Tags::Beta, Tags::Q, Tags::U, Tags::W, Tags::H>>(
+          tmpl::list<Tags::BondiJ, Tags::BondiBeta, Tags::BondiQ, Tags::BondiU,
+                     Tags::BondiW, Tags::BondiH>>(
           make_not_null(&box), make_not_null(&recorder), "",
           time.step_time().value(), l_max, comparison_l_max,
           number_of_radial_points);
@@ -1593,21 +1614,22 @@ void test_regularity_preserving_cce_rt(
           time.step_time().value(), l_max, comparison_l_max, 1);
 
       // printf("recording l2 error with cauchy gauge values\n");
-      record_l2_error_with_cauchy_gauge<Tags::J>(
+      record_l2_error_with_cauchy_gauge<Tags::BondiJ>(
           make_not_null(&box), make_not_null(&recorder),
           time.step_time().value(), l_max, comparison_l_max,
           number_of_radial_points);
 
       // printf("recording r200 values\n");
       compare_and_record_r200_values<
-          tmpl::list<Tags::J, Tags::Beta, Tags::Q, Tags::U, Tags::H>>(
-          make_not_null(&box), make_not_null(&recorder), "",
-          time.step_time().value(), l_max, comparison_l_max,
-          number_of_radial_points);
+          tmpl::list<Tags::BondiJ, Tags::BondiBeta, Tags::BondiQ, Tags::BondiU,
+                     Tags::BondiH>>(make_not_null(&box),
+                                    make_not_null(&recorder), "",
+                                    time.step_time().value(), l_max,
+                                    comparison_l_max, number_of_radial_points);
       // }
     }
     // printf("stepping\n");
-    db::mutate<Tags::J, Tags::CauchyCartesianCoords,
+    db::mutate<Tags::BondiJ, Tags::CauchyCartesianCoords,
                Tags::InertialCartesianCoords, Tags::RobinsonTrautmanW,
                Tags::GaugeOmegaCD>(
         make_not_null(&box),
@@ -1615,7 +1637,7 @@ void test_regularity_preserving_cce_rt(
           &stepper, &time_step, &j_history, &rt_w_history, &x_history,
           &y_history, &z_history, &x_tilde_history, &y_tilde_history,
           &z_tilde_history, &omega_history
-        ](const gsl::not_null<db::item_type<Tags::J>*> j,
+        ](const gsl::not_null<db::item_type<Tags::BondiJ>*> j,
           const gsl::not_null<db::item_type<Tags::CauchyCartesianCoords>*>
               x_of_x_tilde,
           const gsl::not_null<db::item_type<Tags::InertialCartesianCoords>*>
@@ -1678,15 +1700,17 @@ void test_regularity_preserving_cce_rt(
 
     // get the worldtube data for the next time step.
     tmpl::for_each<tmpl::list<
-        Tags::BoundaryValue<Tags::R>, Tags::BoundaryValue<Tags::DuRDividedByR>,
-        Tags::BoundaryValue<Tags::J>, Tags::BoundaryValue<Tags::Dr<Tags::J>>,
-        Tags::BoundaryValue<Tags::Dr<Tags::U>>, Tags::BoundaryValue<Tags::Beta>,
-        Tags::BoundaryValue<Tags::U>, Tags::BoundaryValue<Tags::Q>,
-        Tags::BoundaryValue<Tags::W>, Tags::BoundaryValue<Tags::H>>>(
-        [&box](auto x) {
-          using tag = typename decltype(x)::type;
-          db::mutate_apply<CalculateRobinsonTrautman<tag>>(make_not_null(&box));
-        });
+        Tags::BoundaryValue<Tags::BondiR>,
+        Tags::BoundaryValue<Tags::DuRDividedByR>,
+        Tags::BoundaryValue<Tags::BondiJ>,
+        Tags::BoundaryValue<Tags::Dr<Tags::BondiJ>>,
+        Tags::BoundaryValue<Tags::Dr<Tags::BondiU>>,
+        Tags::BoundaryValue<Tags::BondiBeta>, Tags::BoundaryValue<Tags::BondiU>,
+        Tags::BoundaryValue<Tags::BondiQ>, Tags::BoundaryValue<Tags::BondiW>,
+        Tags::BoundaryValue<Tags::BondiH>>>([&box](auto x) {
+      using tag = typename decltype(x)::type;
+      db::mutate_apply<CalculateRobinsonTrautman<tag>>(make_not_null(&box));
+    });
     step_counter++;
   }
 }

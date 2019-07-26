@@ -72,7 +72,7 @@ struct PrecomputeCceDependencies<BoundaryPrefix, Tags::OneMinusY> {
     size_t number_of_angular_points =
         Spectral::Swsh::number_of_swsh_collocation_points(l_max);
     size_t number_of_radial_points =
-        get(one_minus_y)->size() / number_of_angular_points;
+        get(*one_minus_y).size() / number_of_angular_points;
     const auto& one_minus_y_collocation =
         1.0 - Spectral::collocation_points<Spectral::Basis::Legendre,
                                            Spectral::Quadrature::GaussLobatto>(

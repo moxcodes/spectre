@@ -15,7 +15,7 @@
 #include "NumericalAlgorithms/Spectral/SwshCoefficients.hpp"  // IWYU pragma: keep
 #include "NumericalAlgorithms/Spectral/SwshCollocation.hpp"
 #include "NumericalAlgorithms/Spectral/SwshTags.hpp"
-#include "NumericalAlgorithms/Spectral/SwshTransformJob.hpp"
+#include "NumericalAlgorithms/Spectral/SwshTransform.hpp"
 #include "Utilities/Gsl.hpp"
 #include "Utilities/TMPL.hpp"
 
@@ -79,7 +79,7 @@ class SpinWeightedSphericalHarmonic {
                 const DataVector& theta, const DataVector& phi,
                 const DataVector& sin_theta_over_2,
                 const DataVector& cos_theta_over_2) noexcept {
-    check_and_resize(result, theta.size());
+    result->destructive_resize(theta.size());
     *result = 0.0;
     // TODO there should be a way to do away with this allocation. My first pass
     // involved a nasty ternary that made Blaze sad :(
@@ -209,7 +209,7 @@ class SwshInterpolator {
 
   void interpolate(const gsl::not_null<ComplexDataVector*> interpolated,
                    const ComplexModalVector& goldberg_modes) noexcept {
-    check_and_resize(interpolated, cos_theta_.size());
+    interpolated->destructive_resize(cos_theta_.size());
     *interpolated = 0.0;
 
     // used only if s=0;
@@ -427,7 +427,7 @@ void swsh_interpolate_from_pfaffian(
         source_collocation,
     const DataVector& target_theta,
     const DataVector& target_phi_times_sin_theta, const size_t l_max) noexcept {
-  check_and_resize(target_collocation, target_theta.size());
+  target_collocation->destructive_resize(target_theta.size());
   SpinWeighted<ComplexModalVector, Spin> goldberg_modes =
       libsharp_to_goldberg_modes(swsh_transform(source_collocation, l_max),
                                  l_max);
@@ -469,7 +469,7 @@ void swsh_interpolate(
         source_collocation,
     const DataVector& target_theta, const DataVector& target_phi,
     const size_t l_max) noexcept {
-  check_and_resize(target_collocation, target_theta.size());
+  target_collocation->destructive_resize(target_theta.size());
   SpinWeighted<ComplexModalVector, Spin> goldberg_modes =
       libsharp_to_goldberg_modes(swsh_transform(source_collocation, l_max),
                                  l_max);

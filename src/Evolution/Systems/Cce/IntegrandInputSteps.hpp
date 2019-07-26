@@ -14,7 +14,8 @@ namespace Cce {
 
 namespace detail {
 using bondi_hypersurface_step_tags =
-    tmpl::list<Tags::Beta, Tags::Q, Tags::U, Tags::W, Tags::H>;
+    tmpl::list<Tags::BondiBeta, Tags::BondiQ, Tags::BondiU, Tags::BondiW,
+               Tags::BondiH>;
 
 template <typename Tag>
 struct TagsToComputeForImpl {
@@ -94,7 +95,7 @@ struct TagsToComputeForImpl<Tags::BondiW> {
       Spectral::Swsh::Tags::Derivative<Tags::BondiBeta,
                                        Spectral::Swsh::Tags::EthEthbar>,
       Spectral::Swsh::Tags::Derivative<
-          Tags::Multiplies<Tags::BondiJ, Tags::BondiJbar>,
+          ::Tags::Multiplies<Tags::BondiJ, Tags::BondiJbar>,
           Spectral::Swsh::Tags::EthEthbar>,
       Spectral::Swsh::Tags::Derivative<Tags::BondiJ,
                                        Spectral::Swsh::Tags::EthbarEthbar>>;

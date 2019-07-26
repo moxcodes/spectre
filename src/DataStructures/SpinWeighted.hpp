@@ -122,7 +122,8 @@ struct SpinWeighted<T, Spin, true> {
     data_.set_data_ref(start, set_size);
   }
 
-  void destructive_resize(const size_t new_size) noexcept {
+  void SPECTRE_ALWAYS_INLINE
+  destructive_resize(const size_t new_size) noexcept {
     data_.destructive_resize(new_size);
   }
 

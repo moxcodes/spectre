@@ -6,12 +6,12 @@
 #include <boost/math/interpolators/barycentric_rational.hpp>
 #include <boost/math/tools/roots.hpp>
 
-#include "DataStructures/VectorAlgebra.hpp"
 #include "Evolution/Systems/Cce/Tags.hpp"
 #include "NumericalAlgorithms/Spectral/SwshDerivatives.hpp"
 #include "NumericalAlgorithms/Spectral/SwshFiltering.hpp"
 #include "NumericalAlgorithms/Spectral/SwshInterpolation.hpp"
 #include "Utilities/MakeArray.hpp"
+#include "Utilities/VectorAlgebra.hpp"
 
 namespace Cce {
 
@@ -41,8 +41,8 @@ template <typename Tag>
 struct CalculateRobinsonTrautman;
 
 template <>
-struct CalculateRobinsonTrautman<Tags::BoundaryValue<Tags::R>> {
-  using return_tags = tmpl::list<Tags::BoundaryValue<Tags::R>>;
+struct CalculateRobinsonTrautman<Tags::BoundaryValue<Tags::BondiR>> {
+  using return_tags = tmpl::list<Tags::BoundaryValue<Tags::BondiR>>;
   using argument_tags = tmpl::list<>;
 
   static void apply(
@@ -65,8 +65,8 @@ struct CalculateRobinsonTrautman<Tags::BoundaryValue<Tags::DuRDividedByR>> {
 };
 
 template <>
-struct CalculateRobinsonTrautman<Tags::BoundaryValue<Tags::J>> {
-  using return_tags = tmpl::list<Tags::BoundaryValue<Tags::J>>;
+struct CalculateRobinsonTrautman<Tags::BoundaryValue<Tags::BondiJ>> {
+  using return_tags = tmpl::list<Tags::BoundaryValue<Tags::BondiJ>>;
   using argument_tags = tmpl::list<>;
 
   static void apply(
@@ -78,8 +78,8 @@ struct CalculateRobinsonTrautman<Tags::BoundaryValue<Tags::J>> {
 };
 
 template <>
-struct CalculateRobinsonTrautman<Tags::CauchyGauge<Tags::J>> {
-  using return_tags = tmpl::list<Tags::CauchyGauge<Tags::J>>;
+struct CalculateRobinsonTrautman<Tags::CauchyGauge<Tags::BondiJ>> {
+  using return_tags = tmpl::list<Tags::CauchyGauge<Tags::BondiJ>>;
   using argument_tags = tmpl::list<>;
 
   static void apply(
@@ -91,8 +91,8 @@ struct CalculateRobinsonTrautman<Tags::CauchyGauge<Tags::J>> {
 };
 
 template <>
-struct CalculateRobinsonTrautman<Tags::BoundaryValue<Tags::Dr<Tags::J>>> {
-  using return_tags = tmpl::list<Tags::BoundaryValue<Tags::Dr<Tags::J>>>;
+struct CalculateRobinsonTrautman<Tags::BoundaryValue<Tags::Dr<Tags::BondiJ>>> {
+  using return_tags = tmpl::list<Tags::BoundaryValue<Tags::Dr<Tags::BondiJ>>>;
   using argument_tags = tmpl::list<>;
 
   static void apply(
@@ -104,8 +104,8 @@ struct CalculateRobinsonTrautman<Tags::BoundaryValue<Tags::Dr<Tags::J>>> {
 };
 
 template <>
-struct CalculateRobinsonTrautman<Tags::BoundaryValue<Tags::H>> {
-  using return_tags = tmpl::list<Tags::BoundaryValue<Tags::H>>;
+struct CalculateRobinsonTrautman<Tags::BoundaryValue<Tags::BondiH>> {
+  using return_tags = tmpl::list<Tags::BoundaryValue<Tags::BondiH>>;
   using argument_tags = tmpl::list<>;
 
   static void apply(
@@ -117,8 +117,8 @@ struct CalculateRobinsonTrautman<Tags::BoundaryValue<Tags::H>> {
 };
 
 template <>
-struct CalculateRobinsonTrautman<Tags::CauchyGauge<Tags::H>> {
-  using return_tags = tmpl::list<Tags::CauchyGauge<Tags::H>>;
+struct CalculateRobinsonTrautman<Tags::CauchyGauge<Tags::BondiH>> {
+  using return_tags = tmpl::list<Tags::CauchyGauge<Tags::BondiH>>;
   using argument_tags = tmpl::list<>;
 
   static void apply(
@@ -156,8 +156,8 @@ struct CalculateRobinsonTrautman<Tags::CauchyGauge<Tags::SpecH>> {
 };
 
 template <>
-struct CalculateRobinsonTrautman<Tags::BoundaryValue<Tags::Beta>> {
-  using return_tags = tmpl::list<Tags::BoundaryValue<Tags::Beta>>;
+struct CalculateRobinsonTrautman<Tags::BoundaryValue<Tags::BondiBeta>> {
+  using return_tags = tmpl::list<Tags::BoundaryValue<Tags::BondiBeta>>;
   using argument_tags = tmpl::list<Tags::RobinsonTrautmanW, Tags::LMax>;
 
   static void apply(
@@ -170,8 +170,8 @@ struct CalculateRobinsonTrautman<Tags::BoundaryValue<Tags::Beta>> {
 };
 
 template <>
-struct CalculateRobinsonTrautman<Tags::CauchyGauge<Tags::Beta>> {
-  using return_tags = tmpl::list<Tags::CauchyGauge<Tags::Beta>>;
+struct CalculateRobinsonTrautman<Tags::CauchyGauge<Tags::BondiBeta>> {
+  using return_tags = tmpl::list<Tags::CauchyGauge<Tags::BondiBeta>>;
   using argument_tags = tmpl::list<Tags::RobinsonTrautmanW, Tags::LMax>;
 
   static void apply(
@@ -184,15 +184,15 @@ struct CalculateRobinsonTrautman<Tags::CauchyGauge<Tags::Beta>> {
     size_t number_of_radial_points =
         get(*cauchy_beta).size() / number_of_angular_points;
     ComplexDataVector half_log_rt_w = 0.5 * log(get(rt_w).data());
-    get(*cauchy_beta).data() =
-        outer(half_log_rt_w, ComplexDataVector{number_of_radial_points, 1.0});
+    get(*cauchy_beta).data() = outer_product(
+        half_log_rt_w, ComplexDataVector{number_of_radial_points, 1.0});
   }
 };
 
 template <>
-struct CalculateRobinsonTrautman<Tags::BoundaryValue<Tags::Q>> {
+struct CalculateRobinsonTrautman<Tags::BoundaryValue<Tags::BondiQ>> {
   using return_tags =
-      tmpl::list<Tags::BoundaryValue<Tags::Q>, Tags::RobinsonTrautmanW>;
+      tmpl::list<Tags::BoundaryValue<Tags::BondiQ>, Tags::RobinsonTrautmanW>;
   using argument_tags = tmpl::list<Tags::LMax>;
 
   static void apply(
@@ -207,9 +207,9 @@ struct CalculateRobinsonTrautman<Tags::BoundaryValue<Tags::Q>> {
 };
 
 template <>
-struct CalculateRobinsonTrautman<Tags::CauchyGauge<Tags::Q>> {
+struct CalculateRobinsonTrautman<Tags::CauchyGauge<Tags::BondiQ>> {
   using return_tags =
-      tmpl::list<Tags::CauchyGauge<Tags::Q>, Tags::RobinsonTrautmanW>;
+      tmpl::list<Tags::CauchyGauge<Tags::BondiQ>, Tags::RobinsonTrautmanW>;
   using argument_tags = tmpl::list<Tags::LMax>;
 
   static void apply(
@@ -224,16 +224,17 @@ struct CalculateRobinsonTrautman<Tags::CauchyGauge<Tags::Q>> {
         -Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
             make_not_null(&get(*rt_w)), l_max) /
         get(*rt_w);
-    get(*cauchy_q).data() = outer(
+    get(*cauchy_q).data() = outer_product(
         angular_data.data(), ComplexDataVector{number_of_radial_points, 1.0});
   }
 };
 
 template <>
-struct CalculateRobinsonTrautman<Tags::BoundaryValue<Tags::Dr<Tags::U>>> {
-  using return_tags = tmpl::list<Tags::BoundaryValue<Tags::Dr<Tags::U>>,
+struct CalculateRobinsonTrautman<Tags::BoundaryValue<Tags::Dr<Tags::BondiU>>> {
+  using return_tags = tmpl::list<Tags::BoundaryValue<Tags::Dr<Tags::BondiU>>,
                                  Tags::RobinsonTrautmanW>;
-  using argument_tags = tmpl::list<Tags::BoundaryValue<Tags::R>, Tags::LMax>;
+  using argument_tags =
+      tmpl::list<Tags::BoundaryValue<Tags::BondiR>, Tags::LMax>;
 
   static void apply(
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*>
@@ -249,10 +250,11 @@ struct CalculateRobinsonTrautman<Tags::BoundaryValue<Tags::Dr<Tags::U>>> {
 };
 
 template <>
-struct CalculateRobinsonTrautman<Tags::BoundaryValue<Tags::U>> {
+struct CalculateRobinsonTrautman<Tags::BoundaryValue<Tags::BondiU>> {
   using return_tags =
-      tmpl::list<Tags::BoundaryValue<Tags::U>, Tags::RobinsonTrautmanW>;
-  using argument_tags = tmpl::list<Tags::BoundaryValue<Tags::R>, Tags::LMax>;
+      tmpl::list<Tags::BoundaryValue<Tags::BondiU>, Tags::RobinsonTrautmanW>;
+  using argument_tags =
+      tmpl::list<Tags::BoundaryValue<Tags::BondiR>, Tags::LMax>;
 
   static void apply(
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*>
@@ -268,10 +270,11 @@ struct CalculateRobinsonTrautman<Tags::BoundaryValue<Tags::U>> {
 };
 
 template <>
-struct CalculateRobinsonTrautman<Tags::CauchyGauge<Tags::U>> {
+struct CalculateRobinsonTrautman<Tags::CauchyGauge<Tags::BondiU>> {
   using return_tags =
-      tmpl::list<Tags::CauchyGauge<Tags::U>, Tags::RobinsonTrautmanW>;
-  using argument_tags = tmpl::list<Tags::BoundaryValue<Tags::R>, Tags::LMax>;
+      tmpl::list<Tags::CauchyGauge<Tags::BondiU>, Tags::RobinsonTrautmanW>;
+  using argument_tags =
+      tmpl::list<Tags::BoundaryValue<Tags::BondiR>, Tags::LMax>;
 
   static void apply(
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> cauchy_u,
@@ -295,20 +298,22 @@ struct CalculateRobinsonTrautman<Tags::CauchyGauge<Tags::U>> {
                                          Spectral::Quadrature::GaussLobatto>(
                 number_of_radial_points);
     ComplexDataVector one_minus_y =
-        outer(ComplexDataVector{number_of_angular_points, 1.0},
-              one_minus_y_collocation);
+        outer_product(ComplexDataVector{number_of_angular_points, 1.0},
+                      one_minus_y_collocation);
 
     get(*cauchy_u).data() =
-        outer(boundary_data, ComplexDataVector{number_of_radial_points, 1.0}) *
+        outer_product(boundary_data,
+                      ComplexDataVector{number_of_radial_points, 1.0}) *
         one_minus_y / 2.0;
   }
 };
 
 template <>
-struct CalculateRobinsonTrautman<Tags::BoundaryValue<Tags::W>> {
+struct CalculateRobinsonTrautman<Tags::BoundaryValue<Tags::BondiW>> {
   using return_tags =
-      tmpl::list<Tags::BoundaryValue<Tags::W>, Tags::RobinsonTrautmanW>;
-  using argument_tags = tmpl::list<Tags::BoundaryValue<Tags::R>, Tags::LMax>;
+      tmpl::list<Tags::BoundaryValue<Tags::BondiW>, Tags::RobinsonTrautmanW>;
+  using argument_tags =
+      tmpl::list<Tags::BoundaryValue<Tags::BondiR>, Tags::LMax>;
 
   static void apply(
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*>
@@ -328,10 +333,11 @@ struct CalculateRobinsonTrautman<Tags::BoundaryValue<Tags::W>> {
 };
 
 template <>
-struct CalculateRobinsonTrautman<Tags::CauchyGauge<Tags::W>> {
+struct CalculateRobinsonTrautman<Tags::CauchyGauge<Tags::BondiW>> {
   using return_tags =
-      tmpl::list<Tags::CauchyGauge<Tags::W>, Tags::RobinsonTrautmanW>;
-  using argument_tags = tmpl::list<Tags::BoundaryValue<Tags::R>, Tags::LMax>;
+      tmpl::list<Tags::CauchyGauge<Tags::BondiW>, Tags::RobinsonTrautmanW>;
+  using argument_tags =
+      tmpl::list<Tags::BoundaryValue<Tags::BondiR>, Tags::LMax>;
 
   static void apply(
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> cauchy_w,
@@ -353,26 +359,28 @@ struct CalculateRobinsonTrautman<Tags::CauchyGauge<Tags::W>> {
                                          Spectral::Quadrature::GaussLobatto>(
                 number_of_radial_points);
     ComplexDataVector one_minus_y =
-        outer(ComplexDataVector{number_of_angular_points, 1.0},
-              one_minus_y_collocation);
+        outer_product(ComplexDataVector{number_of_angular_points, 1.0},
+                      one_minus_y_collocation);
 
     ComplexDataVector boundary_data_inverse_r =
         (get(*rt_w).data() + eth_ethbar_rt_w.data() - 1.0) /
         get(boundary_r).data();
     ComplexDataVector boundary_data_inverse_r_squared =
         -2.0 / (square(get(*rt_w).data() * get(boundary_r).data()));
-    get(*cauchy_w) = outer(boundary_data_inverse_r,
-                           ComplexDataVector{number_of_radial_points, 1.0}) *
-                         one_minus_y / 2.0 +
-                     outer(boundary_data_inverse_r_squared,
-                           ComplexDataVector{number_of_radial_points, 1.0}) *
-                         square(one_minus_y) / 4.0;
-    get(*cauchy_w) = (outer(boundary_data_inverse_r,
-                            ComplexDataVector{number_of_radial_points, 1.0}) +
-                      outer(boundary_data_inverse_r_squared,
-                            ComplexDataVector{number_of_radial_points, 1.0}) *
-                          one_minus_y / 2.0) *
-                     one_minus_y / 2.0;
+    get(*cauchy_w) =
+        outer_product(boundary_data_inverse_r,
+                      ComplexDataVector{number_of_radial_points, 1.0}) *
+            one_minus_y / 2.0 +
+        outer_product(boundary_data_inverse_r_squared,
+                      ComplexDataVector{number_of_radial_points, 1.0}) *
+            square(one_minus_y) / 4.0;
+    get(*cauchy_w) =
+        (outer_product(boundary_data_inverse_r,
+                       ComplexDataVector{number_of_radial_points, 1.0}) +
+         outer_product(boundary_data_inverse_r_squared,
+                       ComplexDataVector{number_of_radial_points, 1.0}) *
+             one_minus_y / 2.0) *
+        one_minus_y / 2.0;
   }
 };
 
@@ -396,10 +404,9 @@ struct CalculateRobinsonTrautman<Tags::CauchyGauge<Tags::News>> {
 
     // note factor of 2 due to news definition difference. The factor of two
     // intentionally matches  SpEC
-    get(*cauchy_news) =  eth_eth_rt_w / get(*rt_w);
+    get(*cauchy_news) = eth_eth_rt_w / get(*rt_w);
   }
 };
-
 
 template <>
 struct CalculateRobinsonTrautman<Tags::Du<Tags::RobinsonTrautmanW>> {

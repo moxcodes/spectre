@@ -76,7 +76,7 @@ struct GaugeAdjustInitialJ {
                  Tags::GaugeOmega, Tags::GaugeOmegaCD,
                  Tags::CauchyAngularCoords, Tags::InertialAngularCoords,
                  Tags::LMax>;
-  using return_tags = tmpl::list<Tags::J>;
+  using return_tags = tmpl::list<Tags::BondiJ>;
   using argument_tags = tmpl::append<boundary_tags>;
 
   static void apply(
