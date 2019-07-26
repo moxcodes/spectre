@@ -7,7 +7,6 @@
 
 #include "DataStructures/SpinWeighted.hpp"  // IWYU pragma: keep
 #include "DataStructures/Tags.hpp"
-#include "DataStructures/Tensor/Tensor.hpp"
 #include "DataStructures/Variables.hpp"
 #include "Evolution/Systems/Cce/Tags.hpp"  // IWYU pragma: keep
 #include "NumericalAlgorithms/Spectral/SwshTags.hpp"
@@ -29,7 +28,7 @@
 // IWYU pragma: no_forward_declare Cce::Tags::BondiU
 // IWYU pragma: no_forward_declare Cce::Tags::BondiUbar
 // IWYU pragma: no_forward_declare Cce::Tags::BondiW
-// IWYU pragma: no_forward_declare ::Tags::Multiplies
+// IWYU pragma: no_forward_declare Cce::Tags::Multiplies
 // IWYU pragma: no_forward_declare Cce::Tags::Dy
 // IWYU pragma: no_forward_declare Cce::Tags::Integrand
 // IWYU pragma: no_forward_declare Cce::Tags::LinearFactor
@@ -45,11 +44,10 @@
 // IWYU pragma: no_forward_declare Tags::TempTensor
 // IWYU pragma: no_forward_declare Tags::SpinWeighted
 // IWYU pragma: no_forward_declare SpinWeighted
-// IWYU pragma: no_forward_declare Tensor
 
-/// \cond
+///\cond
 class ComplexDataVector;
-/// \endcond
+///\endcond
 
 /// Contains functionality for Cauchy Characteristic Extraction
 namespace Cce {
@@ -86,8 +84,8 @@ struct integrand_terms_to_compute_for_bondi_variable_impl<Tags::BondiH> {
 };
 }  // namespace detail
 
-/// \brief A struct for providing a `tmpl::list` of integrand tags that need to
-/// be computed before integration can proceed for a given Bondi variable tag.
+/// \brief A struct for providing a tmpl::list of integrand tags that need to be
+/// computed before integration can proceed for a given Bondi variable tag.
 template <typename BondiVariable>
 using integrand_terms_to_compute_for_bondi_variable =
     typename detail::integrand_terms_to_compute_for_bondi_variable_impl<
@@ -102,8 +100,8 @@ using integrand_terms_to_compute_for_bondi_variable =
  * The relevant prefix tags are `Tags::Integrand`, `Tags::PoleOfIntegrand`,
  * `Tags::RegularIntegrand`, `Tags::LinearFactor`, and
  * `Tags::LinearFactorForConjugate`. The Bondi quantity tags that these tags may
- * wrap are `Tags::BondiBeta`, `Tags::BondiQ`, `Tags::BondiU`, `Tags::BondiW`,
- * and `Tags::BondiH`.
+ * wrap are `Tags::Beta`, `Tags::BondiQ`, `Tags::BondiU`, `Tags::BondiW`, and
+ * `Tags::BondiH`.
  *
  * The integrand terms which may be computed for a given Bondi variable are
  * enumerated in the type alias `integrand_terms_to_compute_for_bondi_variable`,
@@ -138,14 +136,12 @@ struct ComputeBondiIntegrand;
  * \bar{q}^B.\f]
  * See \cite Bishop1997ik \cite Handmer2014qha for full details.
  *
- * We write the equations of motion in the compactified coordinate \f$ y \equiv
- * 1 - 2 R/ r\f$, where \f$r(u, \theta, \phi)\f$ is the Bondi radius of the
- * \f$y=\f$ constant surface and \f$R(u,\theta,\phi)\f$ is the Bondi radius of
- * the worldtube. The equation which determines \f$\beta\f$ on a surface of
- * constant \f$u\f$ given \f$J\f$ on the same surface is
- * \f[\partial_y (\beta) =
- * \frac{1}{8} (-1 + y) \left(\partial_y (J) \partial_y(\bar{J})
- * - \frac{(\partial_y (J \bar{J}))^2}{4 K^2}\right). \f]
+ * in the compactified coordinate \f$ y \equiv 1 - 2 R/ r\f$, where \f$R\f$
+ * is determined by the worldtube initial data, the equation which
+ * determines \f$\beta\f$ on a surface of constant \f$u\f$ given \f$J\f$ on
+ * the same surface is, \f[\partial_y (\beta) = \frac{1}{8} (-1 + y)
+ * \left(\partial_y (J) \partial_y
+ * (\bar{J}) -  \frac{(\partial_y (J \bar{J}))^2}{4 K^2}\right). \f]
  */
 template <>
 struct ComputeBondiIntegrand<Tags::Integrand<Tags::BondiBeta>> {
@@ -172,10 +168,12 @@ struct ComputeBondiIntegrand<Tags::Integrand<Tags::BondiBeta>> {
 
  private:
   static void apply_impl(
-      gsl::not_null<SpinWeighted<ComplexDataVector, 0>*> integrand_for_beta,
-      const SpinWeighted<ComplexDataVector, 2>& dy_j,
-      const SpinWeighted<ComplexDataVector, 2>& j,
-      const SpinWeighted<ComplexDataVector, 0>& one_minus_y) noexcept;
+      const gsl::not_null<SpinWeighted<ComplexDataVector, 0>*>  // NOLINT
+          integrand_for_beta,
+      const SpinWeighted<ComplexDataVector, 2>& dy_j,        // NOLINT
+      const SpinWeighted<ComplexDataVector, 2>& j,           // NOLINT
+      const SpinWeighted<ComplexDataVector, 0>& one_minus_y  // NOLINT
+      ) noexcept;
 };
 
 /*!
@@ -195,15 +193,14 @@ struct ComputeBondiIntegrand<Tags::Integrand<Tags::BondiBeta>> {
  * and \f$Q = Q_A q^A\f$. See \cite Bishop1997ik \cite Handmer2014qha for full
  * details.
  *
- * We write the equations of motion in the compactified coordinate \f$ y \equiv
- * 1 - 2 R/ r\f$, where \f$r(u, \theta, \phi)\f$ is the Bondi radius of the
- * \f$y=\f$ constant surface and \f$R(u,\theta,\phi)\f$ is the Bondi radius of
- * the worldtube. The equation which determines \f$Q\f$ on a surface of constant
- * \f$u\f$ given \f$J\f$ and \f$\beta\f$ on the same surface is written as
+ * In the compactified coordinate \f$ y \equiv 1 - 2 R/ r\f$, where \f$R\f$ is
+ * determined by the worldtube initial data, the equation which determines
+ * \f$Q\f$ on a surface of constant \f$u\f$ given \f$J\f$ and \f$\beta\f$ on the
+ * same surface is written as,
  * \f[(1 - y) \partial_y Q + 2 Q = A_Q + (1 - y) B_Q.\f]
  * We refer to \f$A_Q\f$ as the "pole part" of the integrand and \f$B_Q\f$
  * as the "regular part". The pole part is computed by this function, and has
- * the expression
+ * the expression,
  * \f[A_Q = -4 \eth \beta.\f]
  */
 template <>
@@ -233,9 +230,10 @@ struct ComputeBondiIntegrand<Tags::PoleOfIntegrand<Tags::BondiQ>> {
 
  private:
   static void apply_impl(
-      gsl::not_null<SpinWeighted<ComplexDataVector, 1>*>
+      const gsl::not_null<SpinWeighted<ComplexDataVector, 1>*>  // NOLINT
           pole_of_integrand_for_q,
-      const SpinWeighted<ComplexDataVector, 1>& eth_beta) noexcept;
+      const SpinWeighted<ComplexDataVector, 1>& eth_beta  // NOLINT
+      ) noexcept;
 };
 
 /*!
@@ -255,15 +253,14 @@ struct ComputeBondiIntegrand<Tags::PoleOfIntegrand<Tags::BondiQ>> {
  * and \f$Q = Q_A q^A\f$. See \cite Bishop1997ik \cite Handmer2014qha for
  * full details.
  *
- * We write the equations of motion in the compactified coordinate \f$ y \equiv
- * 1 - 2 R/ r\f$, where \f$r(u, \theta, \phi)\f$ is the Bondi radius of the
- * \f$y=\f$ constant surface and \f$R(u,\theta,\phi)\f$ is the Bondi radius of
- * the worldtube. The equation which determines \f$Q\f$ on a surface of constant
- * \f$u\f$ given \f$J\f$ and \f$\beta\f$ on the same surface is written as
+ * In the compactified coordinate \f$ y \equiv 1 - 2 R/ r\f$, where \f$R\f$ is
+ * determined by the worldtube initial data, the equation which determines
+ * \f$Q\f$ on a surface of constant \f$u\f$ given \f$J\f$ and \f$\beta\f$ on the
+ * same surface is written as,
  * \f[(1 - y) \partial_y Q + 2 Q = A_Q + (1 - y) B_Q. \f]
  * We refer to \f$A_Q\f$ as the "pole part" of the integrand and \f$B_Q\f$ as
  * the "regular part". The regular part is computed by this function, and has
- * the expression
+ * the expression,
  * \f[  B_Q = - \left(2 \mathcal{A}_Q + \frac{2
  * \bar{\mathcal{A}_Q} J}{K} -  2 \partial_y (\eth (\beta)) +
  * \frac{\partial_y (\bar{\eth} (J))}{K}\right), \f]
@@ -271,7 +268,9 @@ struct ComputeBondiIntegrand<Tags::PoleOfIntegrand<Tags::BondiQ>> {
  * \f[ \mathcal{A}_Q = - \tfrac{1}{4} \eth (\bar{J} \partial_y (J)) +
  * \tfrac{1}{4} J \partial_y (\eth (\bar{J})) -  \tfrac{1}{4} \eth (\bar{J})
  * \partial_y (J) + \frac{\eth (J \bar{J}) \partial_y (J \bar{J})}{8 K^2} -
- * \frac{\bar{J} \eth (R) \partial_y (J)}{4 R}. \f].
+ * \frac{\bar{J} \eth (R) \partial_y (J)}{4 R}. \f]
+ * Due to the number of variables involved in CCE quantities, both the input and
+ * output values are taken as pointers to `Variables`.
  */
 template <>
 struct ComputeBondiIntegrand<Tags::RegularIntegrand<Tags::BondiQ>> {
@@ -318,19 +317,21 @@ struct ComputeBondiIntegrand<Tags::RegularIntegrand<Tags::BondiQ>> {
 
  private:
   static void apply_impl(
-      gsl::not_null<SpinWeighted<ComplexDataVector, 1>*>
+      const gsl::not_null<SpinWeighted<ComplexDataVector, 1>*>  // NOLINT
           regular_integrand_for_q,
-      gsl::not_null<SpinWeighted<ComplexDataVector, 1>*> script_aq,
-      const SpinWeighted<ComplexDataVector, 0>& dy_beta,
-      const SpinWeighted<ComplexDataVector, 2>& dy_j,
-      const SpinWeighted<ComplexDataVector, 2>& j,
-      const SpinWeighted<ComplexDataVector, 1>& eth_dy_beta,
-      const SpinWeighted<ComplexDataVector, 1>& eth_j_jbar,
-      const SpinWeighted<ComplexDataVector, 1>& eth_jbar_dy_j,
-      const SpinWeighted<ComplexDataVector, 1>& ethbar_dy_j,
-      const SpinWeighted<ComplexDataVector, 1>& ethbar_j,
-      const SpinWeighted<ComplexDataVector, 1>& eth_r_divided_by_r,
-      const SpinWeighted<ComplexDataVector, 0>& k) noexcept;
+      const gsl::not_null<SpinWeighted<ComplexDataVector, 1>*>  // NOLINT
+          script_aq,
+      const SpinWeighted<ComplexDataVector, 0>& dy_beta,             // NOLINT
+      const SpinWeighted<ComplexDataVector, 2>& dy_j,                // NOLINT
+      const SpinWeighted<ComplexDataVector, 2>& j,                   // NOLINT
+      const SpinWeighted<ComplexDataVector, 1>& eth_dy_beta,         // NOLINT
+      const SpinWeighted<ComplexDataVector, 1>& eth_j_jbar,          // NOLINT
+      const SpinWeighted<ComplexDataVector, 1>& eth_jbar_dy_j,       // NOLINT
+      const SpinWeighted<ComplexDataVector, 1>& ethbar_dy_j,         // NOLINT
+      const SpinWeighted<ComplexDataVector, 1>& ethbar_j,            // NOLINT
+      const SpinWeighted<ComplexDataVector, 1>& eth_r_divided_by_r,  // NOLINT
+      const SpinWeighted<ComplexDataVector, 0>& k                    // NOLINT
+      ) noexcept;
 };
 
 /*!
@@ -349,12 +350,10 @@ struct ComputeBondiIntegrand<Tags::RegularIntegrand<Tags::BondiQ>> {
  * and \f$U = U_A q^A\f$. See \cite Bishop1997ik \cite Handmer2014qha for full
  * details.
  *
- * We write the equations of motion in the compactified coordinate \f$ y \equiv
- * 1 - 2 R/ r\f$, where \f$r(u, \theta, \phi)\f$ is the Bondi radius of the
- * \f$y=\f$ constant surface and \f$R(u,\theta,\phi)\f$ is the Bondi radius of
- * the worldtube. The equation which determines \f$U\f$ on a surface of constant
- * \f$u\f$ given \f$J\f$, \f$\beta\f$, and \f$Q\f$ on the same surface is
- * written as
+ * In the compactified coordinate \f$ y \equiv 1 - 2 R/ r\f$, where \f$R\f$ is
+ * determined by the worldtube initial data, the equation which determines
+ * \f$U\f$ on a surface of constant \f$u\f$ given \f$J\f$, \f$\beta\f$, and
+ * \f$Q\f$ on the same surface is written as,
  * \f[\partial_y U = \frac{e^{2\beta}}{2 R} (K Q - J \bar{Q}). \f]
  */
 template <>
@@ -373,6 +372,7 @@ struct ComputeBondiIntegrand<Tags::Integrand<Tags::BondiU>> {
                    integration_independent_tags>;
 
   template <typename... Args>
+
   static void apply(
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*>
           regular_integrand_for_u,
@@ -381,13 +381,15 @@ struct ComputeBondiIntegrand<Tags::Integrand<Tags::BondiU>> {
   }
 
  private:
-  static void apply_impl(gsl::not_null<SpinWeighted<ComplexDataVector, 1>*>
-                             regular_integrand_for_u,
-                         const SpinWeighted<ComplexDataVector, 0>& exp_2_beta,
-                         const SpinWeighted<ComplexDataVector, 2>& j,
-                         const SpinWeighted<ComplexDataVector, 1>& q,
-                         const SpinWeighted<ComplexDataVector, 0>& k,
-                         const SpinWeighted<ComplexDataVector, 0>& r) noexcept;
+  static void apply_impl(
+      const gsl::not_null<SpinWeighted<ComplexDataVector, 1>*>  // NOLINT
+          regular_integrand_for_u,
+      const SpinWeighted<ComplexDataVector, 0>& exp_2_beta,  // NOLINT
+      const SpinWeighted<ComplexDataVector, 2>& j,           // NOLINT
+      const SpinWeighted<ComplexDataVector, 1>& q,           // NOLINT
+      const SpinWeighted<ComplexDataVector, 0>& k,           // NOLINT
+      const SpinWeighted<ComplexDataVector, 0>& r            // NOLINT
+      ) noexcept;
 };
 
 /*!
@@ -403,16 +405,14 @@ struct ComputeBondiIntegrand<Tags::Integrand<Tags::BondiU>> {
  * \f[ J \equiv h_{A B} q^A q^B, K \equiv h_{A B} q^A \bar{q}^B.\f]
  * See \cite Bishop1997ik \cite Handmer2014qha for full details.
  *
- * We write the equations of motion in the compactified coordinate \f$ y \equiv
- * 1 - 2 R/ r\f$, where \f$r(u, \theta, \phi)\f$ is the Bondi radius of the
- * \f$y=\f$ constant surface and \f$R(u,\theta,\phi)\f$ is the Bondi radius of
- * the worldtube. The equation which determines \f$W\f$ on a surface of constant
- * \f$u\f$ given \f$J\f$,\f$\beta\f$, \f$Q\f$, and \f$U\f$ on the same surface
- * is written as
- * \f[(1 - y) \partial_y W + 2 W = A_W + (1 - y) B_W.\f] We refer
- * to \f$A_W\f$ as the "pole part" of the integrand and \f$B_W\f$ as the
- * "regular part". The pole part is computed by this function, and has the
- * expression
+ * In the compactified coordinate \f$ y \equiv 1 - 2 R/ r\f$, where \f$R\f$ is
+ * determined by the worldtube initial data, the equation which determines
+ * \f$W\f$ on a surface of constant \f$u\f$ given \f$J\f$,\f$\beta\f$, \f$Q\f$,
+ * and \f$U\f$ on the same surface is written as,
+ * \f[(1 - y) \partial_y W + 2 W = A_W + (1 - y) B_W.\f]
+ * We refer to \f$A_W\f$ as the "pole part" of the integrand and \f$B_W\f$
+ * as the "regular part". The pole part is computed by this function, and has
+ * the expression,
  * \f[A_W = \eth (\bar{U}) + \bar{\eth} (U).\f]
  */
 template <>
@@ -441,9 +441,10 @@ struct ComputeBondiIntegrand<Tags::PoleOfIntegrand<Tags::BondiW>> {
 
  private:
   static void apply_impl(
-      gsl::not_null<SpinWeighted<ComplexDataVector, 0>*>
+      const gsl::not_null<SpinWeighted<ComplexDataVector, 0>*>  // NOLINT
           pole_of_integrand_for_w,
-      const SpinWeighted<ComplexDataVector, 0>& ethbar_u) noexcept;
+      const SpinWeighted<ComplexDataVector, 0>& ethbar_u  // NOLINT
+      ) noexcept;
 };
 
 /*!
@@ -459,20 +460,18 @@ struct ComputeBondiIntegrand<Tags::PoleOfIntegrand<Tags::BondiW>> {
  * \f[ J \equiv h_{A B} q^A q^B, K \equiv h_{A B} q^A \bar{q}^B,\f]
  * See \cite Bishop1997ik \cite Handmer2014qha for full details.
  *
- * We write the equations of motion in the compactified coordinate \f$ y \equiv
- * 1 - 2 R/ r\f$, where \f$r(u, \theta, \phi)\f$ is the Bondi radius of the
- * \f$y=\f$ constant surface and \f$R(u,\theta,\phi)\f$ is the Bondi radius of
- * the worldtube. The equation which determines \f$W\f$ on a surface of constant
- * \f$u\f$ given \f$J\f$, \f$\beta\f$, \f$Q\f$, \f$U\f$ on the same surface is
- * written as
+ * In the compactified coordinate \f$ y \equiv 1 - 2 R/ r\f$, where \f$R\f$ is
+ * determined by the worldtube initial data, the equation which determines
+ * \f$W\f$ on a surface of constant \f$u\f$ given \f$J\f$, \f$\beta\f$, \f$Q\f$,
+ * \f$U\f$ on the same surface is written as,
  * \f[(1 - y) \partial_y W + 2 W = A_W + (1 - y) B_W. \f]
  * We refer to \f$A_W\f$ as the "pole part" of the integrand and \f$B_W\f$ as
  * the "regular part". The regular part is computed by this function, and has
- * the expression
+ * the expression,
  * \f[  B_W = \tfrac{1}{4} \partial_y (\eth (\bar{U})) + \tfrac{1}{4} \partial_y
  * (\bar{\eth} (U)) -  \frac{1}{2 R} + \frac{e^{2 \beta} (\mathcal{A}_W +
  * \bar{\mathcal{A}_W})}{4 R}, \f]
- * where
+ * where,
  * \f{align*}
  * \mathcal{A}_W =& - \eth (\beta) \eth (\bar{J}) + \tfrac{1}{2} \bar{\eth}
  * (\bar{\eth} (J)) + 2 \bar{\eth} (\beta) \bar{\eth} (J) + (\bar{\eth}
@@ -541,25 +540,27 @@ struct ComputeBondiIntegrand<Tags::RegularIntegrand<Tags::BondiW>> {
 
  private:
   static void apply_impl(
-      gsl::not_null<SpinWeighted<ComplexDataVector, 0>*>
+      const gsl::not_null<SpinWeighted<ComplexDataVector, 0>*>  // NOLINT
           regular_integrand_for_w,
-      gsl::not_null<SpinWeighted<ComplexDataVector, 0>*> script_av,
-      const SpinWeighted<ComplexDataVector, 1>& dy_u,
-      const SpinWeighted<ComplexDataVector, 0>& exp_2_beta,
-      const SpinWeighted<ComplexDataVector, 2>& j,
-      const SpinWeighted<ComplexDataVector, 1>& q,
-      const SpinWeighted<ComplexDataVector, 1>& eth_beta,
-      const SpinWeighted<ComplexDataVector, 2>& eth_eth_beta,
-      const SpinWeighted<ComplexDataVector, 0>& eth_ethbar_beta,
-      const SpinWeighted<ComplexDataVector, 2>& eth_ethbar_j,
-      const SpinWeighted<ComplexDataVector, 0>& eth_ethbar_j_jbar,
-      const SpinWeighted<ComplexDataVector, 1>& eth_j_jbar,
-      const SpinWeighted<ComplexDataVector, 0>& ethbar_dy_u,
-      const SpinWeighted<ComplexDataVector, 0>& ethbar_ethbar_j,
-      const SpinWeighted<ComplexDataVector, 1>& ethbar_j,
-      const SpinWeighted<ComplexDataVector, 1>& eth_r_divided_by_r,
-      const SpinWeighted<ComplexDataVector, 0>& k,
-      const SpinWeighted<ComplexDataVector, 0>& r) noexcept;
+      const gsl::not_null<SpinWeighted<ComplexDataVector, 0>*>  // NOLINT
+          script_av,
+      const SpinWeighted<ComplexDataVector, 1>& dy_u,                // NOLINT
+      const SpinWeighted<ComplexDataVector, 0>& exp_2_beta,          // NOLINT
+      const SpinWeighted<ComplexDataVector, 2>& j,                   // NOLINT
+      const SpinWeighted<ComplexDataVector, 1>& q,                   // NOLINT
+      const SpinWeighted<ComplexDataVector, 1>& eth_beta,            // NOLINT
+      const SpinWeighted<ComplexDataVector, 2>& eth_eth_beta,        // NOLINT
+      const SpinWeighted<ComplexDataVector, 0>& eth_ethbar_beta,     // NOLINT
+      const SpinWeighted<ComplexDataVector, 2>& eth_ethbar_j,        // NOLINT
+      const SpinWeighted<ComplexDataVector, 0>& eth_ethbar_j_jbar,   // NOLINT
+      const SpinWeighted<ComplexDataVector, 1>& eth_j_jbar,          // NOLINT
+      const SpinWeighted<ComplexDataVector, 0>& ethbar_dy_u,         // NOLINT
+      const SpinWeighted<ComplexDataVector, 0>& ethbar_ethbar_j,     // NOLINT
+      const SpinWeighted<ComplexDataVector, 1>& ethbar_j,            // NOLINT
+      const SpinWeighted<ComplexDataVector, 1>& eth_r_divided_by_r,  // NOLINT
+      const SpinWeighted<ComplexDataVector, 0>& k,                   // NOLINT
+      const SpinWeighted<ComplexDataVector, 0>& r                    // NOLINT
+      ) noexcept;
 };
 
 /*!
@@ -576,18 +577,16 @@ struct ComputeBondiIntegrand<Tags::RegularIntegrand<Tags::BondiW>> {
  * \f[ J \equiv h_{A B} q^A q^B, K \equiv h_{A B} q^A \bar{q}^B.\f]
  * See \cite Bishop1997ik \cite Handmer2014qha for full details.
  *
- * We write the equations of motion in the compactified coordinate \f$ y \equiv
- * 1 - 2 R/ r\f$, where \f$r(u, \theta, \phi)\f$ is the Bondi radius of the
- * \f$y=\f$ constant surface and \f$R(u,\theta,\phi)\f$ is the Bondi radius of
- * the worldtube. The equation which determines \f$W\f$ on a surface of constant
- * \f$u\f$ given \f$J\f$,\f$\beta\f$, \f$Q\f$, \f$U\f$, and \f$W\f$ on the same
- * surface is written as
- * \f[(1 - y) \partial_y H + H + (1 - y)(\mathcal{D}_J H
- * + \bar{\mathcal{D}}_J \bar{H}) = A_J + (1 - y) B_J.\f]
+ * in the compactified coordinate \f$ y \equiv 1 - 2 R/ r\f$, where \f$R\f$ is
+ * determined by the worldtube initial data, the equation which determines
+ * \f$W\f$ on a surface of constant \f$u\f$ given \f$J\f$,\f$\beta\f$, \f$Q\f$,
+ * \f$U\f$, and \f$W\f$ on the same surface is written as,
+ * \f[(1 - y) \partial_y H + H + (1 - y)(\mathcal{D}_J H + \bar{\mathcal{D}}_J
+ * \bar{H}) = A_J + (1 - y) B_J.\f]
  *
  * We refer to \f$A_J\f$ as the "pole part" of the integrand
  * and \f$B_J\f$ as the "regular part". The pole part is computed by this
- * function, and has the expression
+ * function, and has the expression,
  * \f{align*}
  * A_J =& - \tfrac{1}{2} \eth (J \bar{U}) -  \eth (\bar{U}) J -  \tfrac{1}{2}
  * \bar{\eth} (U) J -  \eth (U) K -  \tfrac{1}{2} (\bar{\eth} (J) U) + 2 J W
@@ -627,16 +626,17 @@ struct ComputeBondiIntegrand<Tags::PoleOfIntegrand<Tags::BondiH>> {
 
  private:
   static void apply_impl(
-      gsl::not_null<SpinWeighted<ComplexDataVector, 2>*>
+      const gsl::not_null<SpinWeighted<ComplexDataVector, 2>*>  // NOLINT
           pole_of_integrand_for_h,
-      const SpinWeighted<ComplexDataVector, 2>& j,
-      const SpinWeighted<ComplexDataVector, 1>& u,
-      const SpinWeighted<ComplexDataVector, 0>& w,
-      const SpinWeighted<ComplexDataVector, 2>& eth_u,
-      const SpinWeighted<ComplexDataVector, 1>& ethbar_j,
-      const SpinWeighted<ComplexDataVector, -2>& ethbar_jbar_u,
-      const SpinWeighted<ComplexDataVector, 0>& ethbar_u,
-      const SpinWeighted<ComplexDataVector, 0>& k) noexcept;
+      const SpinWeighted<ComplexDataVector, 2>& j,               // NOLINT
+      const SpinWeighted<ComplexDataVector, 1>& u,               // NOLINT
+      const SpinWeighted<ComplexDataVector, 0>& w,               // NOLINT
+      const SpinWeighted<ComplexDataVector, 2>& eth_u,           // NOLINT
+      const SpinWeighted<ComplexDataVector, 1>& ethbar_j,        // NOLINT
+      const SpinWeighted<ComplexDataVector, -2>& ethbar_jbar_u,  // NOLINT
+      const SpinWeighted<ComplexDataVector, 0>& ethbar_u,        // NOLINT
+      const SpinWeighted<ComplexDataVector, 0>& k                // NOLINT
+      ) noexcept;
 };
 
 /*!
@@ -653,17 +653,15 @@ struct ComputeBondiIntegrand<Tags::PoleOfIntegrand<Tags::BondiH>> {
  * \f[ J \equiv h_{A B} q^A q^B, K \equiv h_{A B} q^A \bar{q}^B.\f]
  * See \cite Bishop1997ik \cite Handmer2014qha for full details.
  *
- * We write the equations of motion in the compactified coordinate \f$ y \equiv
- * 1 - 2 R/ r\f$, where \f$r(u, \theta, \phi)\f$ is the Bondi radius of the
- * \f$y=\f$ constant surface and \f$R(u,\theta,\phi)\f$ is the Bondi radius of
- * the worldtube. The equation which determines \f$H\f$ on a surface of constant
- * \f$u\f$ given \f$J\f$,\f$\beta\f$, \f$Q\f$, \f$U\f$, and \f$W\f$ on the same
- * surface is written as
+ * In the compactified coordinate \f$ y \equiv 1 - 2 R/ r\f$, where \f$R\f$ is
+ * determined by the worldtube initial data, the equation which determines
+ * \f$W\f$ on a surface of constant \f$u\f$ given \f$J\f$,\f$\beta\f$, \f$Q\f$,
+ * \f$U\f$, and \f$W\f$ on the same surface is written as,
  * \f[(1 - y) \partial_y H + H + (1 - y)(\mathcal{D}_J H + \bar{\mathcal{D}}_J
  * \bar{H}) = A_J + (1 - y) B_J.\f]
  * We refer to \f$A_J\f$ as the "pole part" of the integrand
  * and \f$B_J\f$ as the "regular part". The pole part is computed by this
- * function, and has the expression
+ * function, and has the expression,
  * \f{align*}
  * B_J =& -\tfrac{1}{2} \left(\eth(\partial_y (J) \bar{U}) +  \partial_y
  * (\bar{\eth} (J)) U \right) + J (\mathcal{B}_J + \bar{\mathcal{B}}_J) \notag\\
@@ -685,7 +683,7 @@ struct ComputeBondiIntegrand<Tags::PoleOfIntegrand<Tags::BondiH>> {
  * + \frac{1}{2 R}\right)\bigg]\notag\\
  * &+ (1 - y)^2 \bigg[ \frac{\partial_y (\partial_y (J)) }{4 R} \bigg],
  * \f}
- * where
+ * where,
  * \f{align*}
  * \mathcal{A}_J =& \tfrac{1}{4} \eth (\eth (\bar{J})) -  \frac{1}{4 K^3} -
  * \frac{\eth (\bar{\eth} (J \bar{J})) -  (\eth (\bar{\eth} (\bar{J})) - 4
@@ -791,44 +789,49 @@ struct ComputeBondiIntegrand<Tags::RegularIntegrand<Tags::BondiH>> {
 
  private:
   static void apply_impl(
-      gsl::not_null<SpinWeighted<ComplexDataVector, 2>*>
+      const gsl::not_null<SpinWeighted<ComplexDataVector, 2>*>  // NOLINT
           regular_integrand_for_h,
-      gsl::not_null<SpinWeighted<ComplexDataVector, 0>*> script_aj,
-      gsl::not_null<SpinWeighted<ComplexDataVector, 0>*> script_bj,
-      gsl::not_null<SpinWeighted<ComplexDataVector, 2>*> script_cj,
-      const SpinWeighted<ComplexDataVector, 2>& dy_dy_j,
-      const SpinWeighted<ComplexDataVector, 2>& dy_j,
-      const SpinWeighted<ComplexDataVector, 0>& dy_w,
-      const SpinWeighted<ComplexDataVector, 0>& exp_2_beta,
-      const SpinWeighted<ComplexDataVector, 2>& j,
-      const SpinWeighted<ComplexDataVector, 1>& q,
-      const SpinWeighted<ComplexDataVector, 1>& u,
-      const SpinWeighted<ComplexDataVector, 0>& w,
-      const SpinWeighted<ComplexDataVector, 1>& eth_beta,
-      const SpinWeighted<ComplexDataVector, 2>& eth_eth_beta,
-      const SpinWeighted<ComplexDataVector, 0>& eth_ethbar_beta,
-      const SpinWeighted<ComplexDataVector, 2>& eth_ethbar_j,
-      const SpinWeighted<ComplexDataVector, 0>& eth_ethbar_j_jbar,
-      const SpinWeighted<ComplexDataVector, 1>& eth_j_jbar,
-      const SpinWeighted<ComplexDataVector, 2>& eth_q,
-      const SpinWeighted<ComplexDataVector, 2>& eth_u,
-      const SpinWeighted<ComplexDataVector, 2>& eth_ubar_dy_j,
-      const SpinWeighted<ComplexDataVector, 1>& ethbar_dy_j,
-      const SpinWeighted<ComplexDataVector, 0>& ethbar_ethbar_j,
-      const SpinWeighted<ComplexDataVector, 1>& ethbar_j,
-      const SpinWeighted<ComplexDataVector, -1>& ethbar_jbar_dy_j,
-      const SpinWeighted<ComplexDataVector, -2>& ethbar_jbar_q_minus_2_eth_beta,
-      const SpinWeighted<ComplexDataVector, 0>& ethbar_q,
-      const SpinWeighted<ComplexDataVector, 0>& ethbar_u,
-      const SpinWeighted<ComplexDataVector, 0>& du_r_divided_by_r,
-      const SpinWeighted<ComplexDataVector, 1>& eth_r_divided_by_r,
-      const SpinWeighted<ComplexDataVector, 0>& k,
-      const SpinWeighted<ComplexDataVector, 0>& one_minus_y,
-      const SpinWeighted<ComplexDataVector, 0>& r) noexcept;
+      const gsl::not_null<SpinWeighted<ComplexDataVector, 0>*>  // NOLINT
+          script_aj,
+      const gsl::not_null<SpinWeighted<ComplexDataVector, 0>*>  // NOLINT
+          script_bj,
+      const gsl::not_null<SpinWeighted<ComplexDataVector, 2>*>  // NOLINT
+          script_cj,
+      const SpinWeighted<ComplexDataVector, 2>& dy_dy_j,            // NOLINT
+      const SpinWeighted<ComplexDataVector, 2>& dy_j,               // NOLINT
+      const SpinWeighted<ComplexDataVector, 0>& dy_w,               // NOLINT
+      const SpinWeighted<ComplexDataVector, 0>& exp_2_beta,         // NOLINT
+      const SpinWeighted<ComplexDataVector, 2>& j,                  // NOLINT
+      const SpinWeighted<ComplexDataVector, 1>& q,                  // NOLINT
+      const SpinWeighted<ComplexDataVector, 1>& u,                  // NOLINT
+      const SpinWeighted<ComplexDataVector, 0>& w,                  // NOLINT
+      const SpinWeighted<ComplexDataVector, 1>& eth_beta,           // NOLINT
+      const SpinWeighted<ComplexDataVector, 2>& eth_eth_beta,       // NOLINT
+      const SpinWeighted<ComplexDataVector, 0>& eth_ethbar_beta,    // NOLINT
+      const SpinWeighted<ComplexDataVector, 2>& eth_ethbar_j,       // NOLINT
+      const SpinWeighted<ComplexDataVector, 0>& eth_ethbar_j_jbar,  // NOLINT
+      const SpinWeighted<ComplexDataVector, 1>& eth_j_jbar,         // NOLINT
+      const SpinWeighted<ComplexDataVector, 2>& eth_q,              // NOLINT
+      const SpinWeighted<ComplexDataVector, 2>& eth_u,              // NOLINT
+      const SpinWeighted<ComplexDataVector, 2>& eth_ubar_dy_j,      // NOLINT
+      const SpinWeighted<ComplexDataVector, 1>& ethbar_dy_j,        // NOLINT
+      const SpinWeighted<ComplexDataVector, 0>& ethbar_ethbar_j,    // NOLINT
+      const SpinWeighted<ComplexDataVector, 1>& ethbar_j,           // NOLINT
+      const SpinWeighted<ComplexDataVector, -1>& ethbar_jbar_dy_j,  // NOLINT
+      const SpinWeighted<ComplexDataVector, -2>&                    // NOLINT
+          ethbar_jbar_q_minus_2_eth_beta,
+      const SpinWeighted<ComplexDataVector, 0>& ethbar_q,            // NOLINT
+      const SpinWeighted<ComplexDataVector, 0>& ethbar_u,            // NOLINT
+      const SpinWeighted<ComplexDataVector, 0>& du_r_divided_by_r,   // NOLINT
+      const SpinWeighted<ComplexDataVector, 1>& eth_r_divided_by_r,  // NOLINT
+      const SpinWeighted<ComplexDataVector, 0>& k,                   // NOLINT
+      const SpinWeighted<ComplexDataVector, 0>& one_minus_y,         // NOLINT
+      const SpinWeighted<ComplexDataVector, 0>& r                    // NOLINT
+      ) noexcept;
 };
 
 /*!
- * \brief Computes the linear factor which multiplies \f$H\f$ in the
+ * \brief Computes the linear operator which multiplies \f$H\f$ in the
  * equation which determines the radial (y) dependence of the Bondi quantity
  * \f$H\f$.
  *
@@ -841,16 +844,14 @@ struct ComputeBondiIntegrand<Tags::RegularIntegrand<Tags::BondiH>> {
  * \f[ J \equiv h_{A B} q^A q^B, K \equiv h_{A B} q^A \bar{q}^B.\f]
  * See \cite Bishop1997ik \cite Handmer2014qha for full details.
  *
- * We write the equations of motion in the compactified coordinate \f$ y \equiv
- * 1 - 2 R/ r\f$, where \f$r(u, \theta, \phi)\f$ is the Bondi radius of the
- * \f$y=\f$ constant surface and \f$R(u,\theta,\phi)\f$ is the Bondi radius of
- * the worldtube. The equation which determines \f$H\f$ on a surface of constant
- * \f$u\f$ given \f$J\f$,\f$\beta\f$, \f$Q\f$, \f$U\f$, and \f$W\f$ on the same
- * surface is written as
- * \f[(1 - y) \partial_y H + H + (1 - y) J (\mathcal{D}_J
- * H + \bar{\mathcal{D}}_J \bar{H}) = A_J + (1 - y) B_J.\f]
- * The quantity \f$1 +(1 - y) J \mathcal{D}_J\f$ is the linear factor
- * for the non-conjugated \f$H\f$, and is computed from the equation:
+ * In the compactified coordinate \f$ y \equiv 1 - 2 R/ r\f$, where \f$R\f$ is
+ * determined by the worldtube initial data, the equation which determines
+ * \f$W\f$ on a surface of constant \f$u\f$ given \f$J\f$,\f$\beta\f$, \f$Q\f$,
+ * \f$U\f$, and \f$W\f$ on the same surface is written as,
+ * \f[(1 - y) \partial_y H + H + (1 - y) J (\mathcal{D}_J H +
+ * \bar{\mathcal{D}}_J \bar{H}) = A_J + (1 - y) B_J.\f]
+ * The quantity \f$1 + (1 - y) J \mathcal{D}_J\f$ is the linear operator
+ * pre-factor for the non-conjugated H, and is computed from the equation:
  * \f[\mathcal{D}_J = \frac{1}{4}(-2 \partial_y \bar{J} + \frac{\bar{J}
  * \partial_y (J \bar{J})}{K^2})\f]
  */
@@ -884,15 +885,18 @@ struct ComputeBondiIntegrand<Tags::LinearFactor<Tags::BondiH>> {
 
  private:
   static void apply_impl(
-      gsl::not_null<SpinWeighted<ComplexDataVector, 0>*> linear_factor_for_h,
-      gsl::not_null<SpinWeighted<ComplexDataVector, 2>*> script_djbar,
-      const SpinWeighted<ComplexDataVector, 2>& dy_j,
-      const SpinWeighted<ComplexDataVector, 2>& j,
-      const SpinWeighted<ComplexDataVector, 0>& one_minus_y) noexcept;
+      const gsl::not_null<SpinWeighted<ComplexDataVector, 0>*>  // NOLINT
+          linear_operator_for_h,
+      const gsl::not_null<SpinWeighted<ComplexDataVector, 2>*>  // NOLINT
+          script_djbar,
+      const SpinWeighted<ComplexDataVector, 2>& dy_j,        // NOLINT
+      const SpinWeighted<ComplexDataVector, 2>& j,           // NOLINT
+      const SpinWeighted<ComplexDataVector, 0>& one_minus_y  // NOLINT
+      ) noexcept;
 };
 
 /*!
- * \brief Computes the linear factor which multiplies \f$\bar{H}\f$ in the
+ * \brief Computes the linear operator which multiplies \f$\bar{H}\f$ in the
  * equation which determines the radial (y) dependence of the Bondi quantity
  * \f$H\f$.
  *
@@ -905,16 +909,15 @@ struct ComputeBondiIntegrand<Tags::LinearFactor<Tags::BondiH>> {
  * \f[ J \equiv h_{A B} q^A q^B, K \equiv h_{A B} q^A \bar{q}^B.\f]
  * See \cite Bishop1997ik \cite Handmer2014qha for full details.
  *
- * We write the equations of motion in the compactified coordinate \f$ y \equiv
- * 1 - 2 R/ r\f$, where \f$r(u, \theta, \phi)\f$ is the Bondi radius of the
- * \f$y=\f$ constant surface and \f$R(u,\theta,\phi)\f$ is the Bondi radius of
- * the worldtube. The equation which determines \f$H\f$ on a surface of constant
- * \f$u\f$ given \f$J\f$,\f$\beta\f$, \f$Q\f$, \f$U\f$, and \f$W\f$ on the same
- * surface is written as
+ * In the compactified coordinate \f$ y \equiv 1 - 2 R/ r\f$, where \f$R\f$ is
+ * determined by the worldtube initial data, the equation which determines
+ * \f$W\f$ on a surface of constant \f$u\f$ given \f$J\f$,\f$\beta\f$, \f$Q\f$,
+ * \f$U\f$, and \f$W\f$ on the same surface is written as,
  * \f[(1 - y) \partial_y H + H + (1 - y) J (\mathcal{D}_J H +
  * \bar{\mathcal{D}}_J \bar{H}) = A_J + (1 - y) B_J.\f]
- * The quantity \f$ (1 - y) J \bar{\mathcal{D}}_J\f$ is the linear factor
- * for the non-conjugated \f$H\f$, and is computed from the equation:
+
+ * The quantity \f$ (1 - y) J \bar{\mathcal{D}}_J\f$ is the linear operator
+ * pre-factor for the non-conjugated H, and is computed from the equation:
  * \f[\mathcal{D}_J = \frac{1}{4}(-2 \partial_y \bar{J} + \frac{\bar{J}
  * \partial_y (J \bar{J})}{K^2})\f]
  */
@@ -949,11 +952,13 @@ struct ComputeBondiIntegrand<Tags::LinearFactorForConjugate<Tags::BondiH>> {
 
  private:
   static void apply_impl(
-      gsl::not_null<SpinWeighted<ComplexDataVector, 4>*>
-          linear_factor_for_conjugate_h,
-      gsl::not_null<SpinWeighted<ComplexDataVector, 2>*> script_djbar,
-      const SpinWeighted<ComplexDataVector, 2>& dy_j,
-      const SpinWeighted<ComplexDataVector, 2>& j,
-      const SpinWeighted<ComplexDataVector, 0>& one_minus_y) noexcept;
+      const gsl::not_null<SpinWeighted<ComplexDataVector, 4>*>  // NOLINT
+          linear_operator_for_conjugate_h,
+      const gsl::not_null<SpinWeighted<ComplexDataVector, 2>*>  // NOLINT
+          script_djbar,
+      const SpinWeighted<ComplexDataVector, 2>& dy_j,        // NOLINT
+      const SpinWeighted<ComplexDataVector, 2>& j,           // NOLINT
+      const SpinWeighted<ComplexDataVector, 0>& one_minus_y  // NOLINT
+      ) noexcept;
 };
 }  // namespace Cce
