@@ -72,29 +72,18 @@ struct InitializeJ {
 
 struct GaugeAdjustInitialJ {
   using boundary_tags =
-      tmpl::list<Tags::GaugeA, Tags::GaugeB, Tags::GaugeC, Tags::GaugeD,
-                 Tags::GaugeOmega, Tags::GaugeOmegaCD,
-                 Tags::CauchyAngularCoords, Tags::InertialAngularCoords,
-                 Tags::LMax>;
+      tmpl::list<Tags::GaugeC, Tags::GaugeD, Tags::GaugeOmegaCD,
+                 Tags::CauchyAngularCoords, Tags::LMax>;
   using return_tags = tmpl::list<Tags::BondiJ>;
   using argument_tags = tmpl::append<boundary_tags>;
 
   static void apply(
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> j,
-      const Scalar<SpinWeighted<ComplexDataVector, 2>>& a,
-      const Scalar<SpinWeighted<ComplexDataVector, 0>>& b,
       const Scalar<SpinWeighted<ComplexDataVector, 2>>& c,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& d,
-      const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega_cd,
-      const tnsr::i<DataVector, 2>& x_of_x_tilde,
-      const tnsr::i<DataVector, 2>& x_tilde_of_x, const size_t l_max) noexcept {
+      const tnsr::i<DataVector, 2>& x_of_x_tilde, const size_t l_max) noexcept {
     const size_t number_of_radial_points = get(*j).size() / get(c).size();
-
-    const auto& one_minus_y_collocation =
-        1.0 - Spectral::collocation_points<Spectral::Basis::Legendre,
-                                           Spectral::Quadrature::GaussLobatto>(
-                  number_of_radial_points);
 
     for (size_t i = 0; i < number_of_radial_points; i++) {
       // TODO rewrite

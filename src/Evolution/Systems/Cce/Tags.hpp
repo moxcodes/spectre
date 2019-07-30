@@ -215,7 +215,7 @@ struct DuInertialCartesianCoords : db::SimpleTag {
 };
 
 struct InertialRetardedTime : db::SimpleTag {
-  using type = Scalar<SpinWeighted<ComplexDataVector, 0>>;
+  using type = Scalar<DataVector>;
   static std::string name() noexcept { return "InertialRetardedTime"; }
 };
 

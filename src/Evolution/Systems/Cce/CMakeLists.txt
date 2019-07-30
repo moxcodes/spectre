@@ -5,7 +5,6 @@ set(LIBRARY Cce)
 
 set(LIBRARY_SOURCES
   BoundaryData.cpp
-  CceEvolve.cpp
   Equations.cpp
   LinearOperators.cpp
   LinearSolve.cpp

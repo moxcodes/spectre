@@ -3,12 +3,12 @@
 
 #pragma once
 
-#include <string>
-
+#include <algorithm>
 #include <boost/iterator/zip_iterator.hpp>
 #include <boost/math/interpolators/barycentric_rational.hpp>
 #include <boost/tuple/tuple.hpp>
 #include <boost/tuple/tuple_comparison.hpp>
+#include <string>
 
 #include "ApparentHorizons/SpherepackIterator.hpp"
 #include "ApparentHorizons/YlmSpherepack.hpp"
@@ -274,7 +274,7 @@ class CceCauchyBoundaryDataManager {
     }
     size_t start_of_buffer_to_mid = size_so_far;
     size_t mid_to_end = 0;
-    while (mid_to_end + min(start_of_buffer_to_mid, target_buffer_pad_) <
+    while (mid_to_end + std::min(start_of_buffer_to_mid, target_buffer_pad_) <
                2 * target_buffer_pad_ and
            interpolation_time_end != time_buffer_.end()) {
       if (size_so_far > 2 * target_buffer_pad_) {

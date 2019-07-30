@@ -3,21 +3,80 @@
 
 #pragma once
 
+#include "Evolution/Systems/Cce/BoundaryData.hpp"
+#include "Evolution/Systems/Cce/CharacteristicExtractor.hpp"
+#include "Evolution/Systems/Cce/InitializeWorldtubeBoundary.hpp"
+#include "Parallel/Actions/TerminatePhase.hpp"
+#include "Parallel/AddOptionsToDataBox.hpp"
 #include "Parallel/Info.hpp"
-#include "Evolution/Systems/Cce/Boundary.hpp"
+#include "Parallel/Invoke.hpp"
 
 namespace Cce {
 
+
+namespace Actions {
+struct BoundaryComputeAndSendToExtractor {
+  template <typename DbTags, typename... InboxTags, typename Metavariables,
+            typename ArrayIndex, typename ActionList,
+            typename ParallelComponent>
+  static void apply(db::DataBox<DbTags>& box,
+                    const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
+                    Parallel::ConstGlobalCache<Metavariables>& cache,
+                    const ArrayIndex& /*array_index*/,
+                    const ActionList /*meta*/,
+                    const ParallelComponent* const /*meta*/,
+                    const double time) noexcept {
+    db::mutate<Tags::H5WorldtubeBoundaryDataManager<CubicInterpolator>,
+               ::Tags::Variables<
+                   typename Metavariables::cce_boundary_communication_tags>>(
+        make_not_null(&box),
+        [&time](const gsl::not_null<CceH5BoundaryDataManager<Interpolator>*>
+                    boundary_data_manager,
+                const gsl::not_null<Variables<
+                    typename Metavariables::cce_boundary_communication_tags>*>
+                    boundary_variables_to_populate) noexcept {
+          boundary_data_manager->populate_hypersurface_boundary_data(
+              *boundary_variables_to_populate, time);
+        });
+    send_boundary_data(
+        Parallel::get_parallel_component<CharacteristicExtractor>(cache),
+        db::get<::Tags::Variables<
+            typename Metavariables::cce_boundary_communication_tags>>,
+        time, typename Metavariables::cce_boundary_communication_tags{});
+  }
+
+ private:
+  template <typename ProxyType, typename VariableTagList, typename... Tags>
+  static void send_boundary_data(
+      const ProxyType& extractor_proxy,
+      const Variables<VariableTagList>& boundary_quantities, const double time,
+      tmpl::list<Tags...> /*meta*/) noexcept {
+    Parallel::simple_action<Actions::ReceiveWorldtubeData<tmpl::list<Tags...>>>(
+        extractor_proxy, time, get<Tags>(boundary_quantities)...);
+  }
+};
+}  // namespace Actions
+
 // component
 template <class Metavariables>
-struct WorltubeBoundary {
+struct H5WorldtubeBoundary {
   using chare_type = Parallel::Algorithms::Singleton;
   using const_global_cache_tag_list = tmpl::list<>;
   using metavariables = Metavariables;
-  using worldtube_boundary_computation_steps =
-      tmpl::list<BoundaryTrigonometricValues>;
+  using add_options_to_databox = typename Parallel::AddNoOptionsToDataBox;
+  using initialize_action_list = tmpl::list<InitializeH5WorldtubeBoundary,
+                                            Parallel::Actions::TerminatePhase>;
 
-      using phase_dependent_action_list = tmpl::list<>;
+  using worldtube_boundary_computation_steps = tmpl::list<>;
+
+  using phase_dependent_action_list =
+      tmpl::list<Parallel::PhaseActions<typename Metavariables::Phase,
+                                        Metavariables::Phase::Initialization,
+                                        initialize_action_list>,
+                 Parallel::PhaseActions<typename Metavariables::Phase,
+                                        Metavariables::Phase::Extraction,
+                                        worldtube_boundary_computation_steps>>;
+
   using options = tmpl::list<>;
 
   static void initialize(Parallel::CProxy_ConstGlobalCache<
@@ -26,78 +85,13 @@ struct WorltubeBoundary {
   static void execute_next_phase(
       const typename Metavariables::Phase next_phase,
       const Parallel::CProxy_ConstGlobalCache<Metavariables>&
-          global_cache) noexcept {}
-};
-
-
-template <typename Tag, typename Metavariables>
-struct RecieveDbTag {
-  using temporal_id = typename Metavariables::temporal_id;
-  using type = std::unordered_map<temporal_id, db::item_type<Tag>>;
-};
-
-struct has_all_of {
-  constexpr bool value = /*TODO*/;
-};
-
-
-constexpr bool has_all_of_v = has_all_of::value;
-
-struct has_none_of {
-  constexpr bool value = /*TODO*/;
-};
-
-constexpr bool has_none_of_v = has_none_of::value;
-
-// Actions
-template <typename WorltubeComputation>
-struct AddAndComputeWorldtubeValue {
-  using inbox_tags = tmpl::list<>;
-
-  template <typename DbTags, typename... InboxTags, typename Metavariables,
-            typename ArrayIndex, typename ActionList,
-            typename ParallelComponent,
-            Requires<has_all_of_v<DbTags, WorldtubeComputation::argument_tags>>>
-  static auto apply(db::DataBox<DbTags>& box,
-                    const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
-                    const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
-                    const ArrayIndex& /*array_index*/,
-                    const ActionList /*meta*/,
-                    const ParallelComponent* const /*meta*/) noexcept {
-    /*perform the computation by just mutating the databox*/
+          global_cache) noexcept {
+    auto& local_cache = *(global_cache.ckLocalBranch());
+    if (next_phase == Metavariables::Phase::Extraction) {
+      Parallel::get_parallel_component<H5WorldtubeBoundary>(local_cache)
+          .perform_algorithm();
+    }
   }
-
-  template <typename DbTags, typename... InboxTags, typename Metavariables,
-            typename ArrayIndex, typename ActionList,
-            typename ParallelComponent,
-            Requires<has_none_of<DbTags, WorldtubeComputation::argument_tags>>>
-  static auto apply(db::DataBox<DbTags>& box,
-                    const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
-                    const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
-                    const ArrayIndex& /*array_index*/,
-                    const ActionList /*meta*/,
-                    const ParallelComponent* const /*meta*/) noexcept {
-    /* perform the computation by adding and mutating*/
-
-  }
-
-  // we will check that the interpolator has given the WorldtubeBoundary the
-  // right stuff before allowing execution.
-  template <typename DbTags, typename... InboxTags, typename Metavariables,
-            typename ArrayIndex>
-  static bool is_ready(
-      const db::DataBox<DbTags>& box,
-      const tuples::TaggedTuple<InboxTags...>& inboxes,
-      const Parallel::ConstGlobalcache<Metavariables>& /*cache*/,
-      const ArrayIndex& /*array_index*/) noexcept {}
-};
-
-
-// removes the extra tags stuck in by the worldtube computation
-template <typename WorldtubeComputationList>
-struct CleanupWorldtubeValues {
-
-
 };
 
 }  // namespace Cce

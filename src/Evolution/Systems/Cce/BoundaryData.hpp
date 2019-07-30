@@ -18,6 +18,7 @@
 #include "NumericalAlgorithms/LinearOperators/Transpose.hpp"
 #include "NumericalAlgorithms/Spectral/SwshDerivatives.hpp"
 #include "NumericalAlgorithms/Spectral/SwshTags.hpp"
+#include "Parallel/Printf.hpp"
 #include "PointwiseFunctions/GeneralRelativity/ComputeGhQuantities.hpp"
 #include "PointwiseFunctions/GeneralRelativity/ComputeSpacetimeQuantities.hpp"
 
@@ -215,6 +216,12 @@ void bondi_h_worldtube_data(
     const Scalar<SpinWeighted<ComplexDataVector, 0>>& r,
     const tnsr::i<ComplexDataVector, 2>& up_dyad) noexcept;
 
+using characteristic_worldtube_boundary_tags = tmpl::list<
+    Tags::BoundaryValue<Tags::BondiBeta>, Tags::BoundaryValue<Tags::BondiU>,
+    Tags::BoundaryValue<Tags::BondiW>, Tags::BoundaryValue<Tags::BondiJ>,
+  Tags::BoundaryValue<Tags::Dr<Tags::BondiJ>>,
+    Tags::BoundaryValue<Tags::BondiH>, Tags::BoundaryValue<Tags::BondiR>,
+    Tags::BoundaryValue<Tags::Du<Tags::BondiR>>>;
 /*!
  * \brief Process the worldtube data from metric and derivatives to desired
  * Bondi quantities
@@ -266,6 +273,8 @@ void create_bondi_boundary_data_from_cauchy(
     const bool radial_renormalize) noexcept {
   // optimization note: revisit to merge most allocations into this variables
   size_t size = Spectral::Swsh::number_of_swsh_collocation_points(l_max);
+
+  Parallel::printf("in boundary data computation\n");
 
   // This needs to be restructured to first move everything to an angular
   // basis due to the way that things are provided from the input file.

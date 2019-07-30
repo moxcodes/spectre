@@ -7,6 +7,7 @@
 
 #include "DataStructures/Matrix.hpp"
 #include "DataStructures/Tags.hpp"
+#include "Evolution/Systems/Cce/Equations.hpp"
 #include "Evolution/Systems/Cce/Tags.hpp"
 #include "NumericalAlgorithms/Spectral/SwshTags.hpp"
 
@@ -16,6 +17,10 @@ namespace Cce {
 using bondi_hypersurface_step_tags =
     tmpl::list<Tags::BondiBeta, Tags::BondiQ, Tags::BondiU, Tags::BondiW,
                Tags::BondiH>;
+
+template <typename Tag>
+using integrand_temporary_tags =
+    typename ComputeBondiIntegrand<Tag>::temporary_tags;
 
 namespace detail {
 template <typename Tag>
@@ -103,8 +108,8 @@ struct TagsToComputeForImpl<Tags::BondiW> {
   // Currently, the `eth_ethbar_j` term is the single instance of a swsh
   // derivative needing nested `Spectral::Swsh::Tags::Derivatives` steps to
   // compute. The reason is that if we do not do this in two steps, there are
-  // intermediate terms in the Jacobian which depend on eth_j, which as a spin 3
-  // quantity is not computable with libsharp. If `eth_ethbar_j` becomes not
+  // intermediate terms in the Jacobian which depend on eth_j, which as a spin
+  // 3 quantity is not computable with libsharp. If `eth_ethbar_j` becomes not
   // needed, the remaining `second_swsh_derivative_tags` can be merged to the
   // end of `swsh_derivative_tags` and the corresponding computational steps
   // from `ComputeSwshDerivatives.hpp` removed.
@@ -319,13 +324,13 @@ using all_pre_swsh_derivative_tags_for_tag =
  * `all_pre_swsh_derivative_tags_for_tag<Tags::BondiBeta>`) tags may be computed
  * at once if using a `DataBox` via `mutate_all_pre_swsh_derivatives_for_tag`.
  */
-using all_pre_swsh_derivative_tags =
-    tmpl::remove_duplicates<tmpl::flatten<tmpl::list<
-        all_pre_swsh_derivative_tags_for_tag<Tags::BondiJ>,
-        all_pre_swsh_derivative_tags_for_tag<Tags::BondiBeta>,
-        all_pre_swsh_derivative_tags_for_tag<Tags::BondiQ>,
-        all_pre_swsh_derivative_tags_for_tag<Tags::BondiU>,
-        all_pre_swsh_derivative_tags_for_tag<Tags::BondiW>,
-        pre_swsh_derivative_tags_to_compute_for<Tags::BondiH>, Tags::BondiH>>>;
+using all_pre_swsh_derivative_tags = tmpl::remove_duplicates<tmpl::flatten<
+    tmpl::list<all_pre_swsh_derivative_tags_for_tag<Tags::BondiJ>,
+               all_pre_swsh_derivative_tags_for_tag<Tags::BondiBeta>,
+               all_pre_swsh_derivative_tags_for_tag<Tags::BondiQ>,
+               all_pre_swsh_derivative_tags_for_tag<Tags::BondiU>,
+               all_pre_swsh_derivative_tags_for_tag<Tags::BondiW>,
+               pre_swsh_derivative_tags_to_compute_for<Tags::BondiH>,
+               Tags::BondiH, Tags::SpecH>>>;
 
 }  // namespace Cce

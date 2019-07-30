@@ -690,7 +690,7 @@ void run_trial_regularity_preserving_cce(
   using integration_independent_variables_tag =
       ::Tags::Variables<pre_computation_tags>;
   using pre_swsh_derivatives_variables_tag = ::Tags::Variables<
-      tmpl::append<all_pre_swsh_derivative_tags, tmpl::list<Tags::SpecH>>>;
+      tmpl::append<all_pre_swsh_derivative_tags>>;
   using transform_buffer_variables_tag =
       ::Tags::Variables<all_transform_buffer_tags>;
   using swsh_derivatives_variables_tag =
