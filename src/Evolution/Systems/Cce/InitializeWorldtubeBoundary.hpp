@@ -28,7 +28,7 @@ struct H5WorldtubeBoundaryDataManager : db::SimpleTag{
 
 struct InitializeH5WorldtubeBoundary {
   // TODO hard-coded options
-  static std::string input_filename() noexcept { return "CceR0100.h5"; }
+  static std::string input_filename() noexcept { return "CceR0100"; }
   using interpolator = CubicInterpolator;
   static const size_t number_of_lookahead_points = 100;
   // \TODO

@@ -13,6 +13,7 @@
 #include "Evolution/Systems/Cce/PrecomputeCceDependencies.hpp"
 #include "Parallel/Actions/TerminatePhase.hpp"
 #include "Parallel/AddOptionsToDataBox.hpp"
+#include "Parallel/Printf.hpp"
 #include "Parallel/Info.hpp"
 #include "Parallel/Invoke.hpp"
 #include "ParallelAlgorithms/Actions/MutateApply.hpp"
@@ -22,6 +23,9 @@
 #include "Time/Time.hpp"
 
 namespace Cce {
+
+template <class Metavariables>
+struct CharacteristicExtractor;
 
 namespace Actions {
 struct BoundaryComputeAndSendToExtractor;
@@ -46,16 +50,17 @@ struct RequestBoundaryData {
   template <typename DbTags, typename... InboxTags, typename Metavariables,
             typename ArrayIndex, typename ActionList,
             typename ParallelComponent>
-  static auto apply(const db::DataBox<DbTags>& box,
+  static auto apply(db::DataBox<DbTags>& box,
                     const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
                     Parallel::ConstGlobalCache<Metavariables>& cache,
                     const ArrayIndex& /*array_index*/,
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
+    Parallel::printf("requesting boundary data\n");
     Parallel::simple_action<Actions::BoundaryComputeAndSendToExtractor>(
         Parallel::get_parallel_component<WorldtubeBoundaryComponent>(cache),
         db::get<::Tags::Time>(box).value());
-    std::forward_as_tuple(std::move(box));
+    return std::forward_as_tuple(std::move(box));
   }
 };
 
@@ -63,7 +68,7 @@ struct BlockUntilBoundaryDataReceived {
   template <typename DbTags, typename... InboxTags, typename Metavariables,
             typename ArrayIndex, typename ActionList,
             typename ParallelComponent>
-  static auto apply(const db::DataBox<DbTags>& box,
+  static auto apply(db::DataBox<DbTags>& box,
                     const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
                     const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
                     const ArrayIndex& /*array_index*/,
@@ -79,6 +84,7 @@ struct BlockUntilBoundaryDataReceived {
       const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
       const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
       const ArrayIndex& /*array_index*/) noexcept {
+    Parallel::printf("blocking for boundary data...\n");
     return db::get<Tags::BoundaryTime>(box) ==
            db::get<::Tags::Time>(box).value();
   }
@@ -106,7 +112,7 @@ struct ReceiveWorldtubeData<tmpl::list<BoundaryTags...>> {
             typename Metavariables, typename ArrayIndex>
   static void apply(
       db::DataBox<tmpl::list<DbTags...>>& box,
-      const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
+      Parallel::ConstGlobalCache<Metavariables>& cache,
       const ArrayIndex& /*array_index*/, const double time,
       const db::item_type<BoundaryTags>&... boundary_data) noexcept {
     db::mutate<Tags::BoundaryTime, BoundaryTags...>(
@@ -121,6 +127,8 @@ struct ReceiveWorldtubeData<tmpl::list<BoundaryTags...>> {
           expand_pack(set(databox_boundary_data, boundary_data_to_copy)...);
         },
         time, boundary_data...);
+    // Parallel::get_parallel_component<CharacteristicExtractor>(cache)
+        // .perform_algorithm();
   }
 
  private:
@@ -147,9 +155,10 @@ struct CharacteristicExtractor {
 
   using initialize_action_list =
       tmpl::list<Actions::InitializeCharacteristic,
-                 // FIXME this action is causing error
+                 Actions::RequestBoundaryData<
+                     typename Metavariables::cce_boundary_component>,
                  Actions::BlockUntilBoundaryDataReceived,
-                 // Actions::PopulateCharacteristicInitialHypersurface,
+                 Actions::PopulateCharacteristicInitialHypersurface,
                  Parallel::Actions::TerminatePhase>;
 
   template <typename BondiTag>
@@ -195,11 +204,11 @@ struct CharacteristicExtractor {
   // typename Metavariables::evolved_coordinates_variables_tag>,
   // /*      RecomputeAngularCoordinateFunctions,*/ Actions::AdvanceTime>>;
   using extract_action_list =
-      tmpl::list<  // Actions::BlockUntilBoundaryDataReceived,
-          /*Actions::PrecomputeGlobalCceDependencies,*/
-          /*                 Actions::RequestBoundaryData<
-                             typename Metavariables::cce_boundary_component>,*/
-          /*::Actions::AdvanceTime*/>;
+      tmpl::list<Actions::BlockUntilBoundaryDataReceived,
+                 /*Actions::PrecomputeGlobalCceDependencies,*/
+                 Actions::RequestBoundaryData<
+                     typename Metavariables::cce_boundary_component>,
+                 ::Actions::AdvanceTime>;
 
   using phase_dependent_action_list =
       tmpl::list<Parallel::PhaseActions<typename Metavariables::Phase,

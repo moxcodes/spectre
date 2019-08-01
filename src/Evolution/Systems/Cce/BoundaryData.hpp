@@ -216,12 +216,17 @@ void bondi_h_worldtube_data(
     const Scalar<SpinWeighted<ComplexDataVector, 0>>& r,
     const tnsr::i<ComplexDataVector, 2>& up_dyad) noexcept;
 
+// TODO remove unnecessary boundary values from this list and below routine
 using characteristic_worldtube_boundary_tags = tmpl::list<
     Tags::BoundaryValue<Tags::BondiBeta>, Tags::BoundaryValue<Tags::BondiU>,
-    Tags::BoundaryValue<Tags::BondiW>, Tags::BoundaryValue<Tags::BondiJ>,
-  Tags::BoundaryValue<Tags::Dr<Tags::BondiJ>>,
-    Tags::BoundaryValue<Tags::BondiH>, Tags::BoundaryValue<Tags::BondiR>,
-    Tags::BoundaryValue<Tags::Du<Tags::BondiR>>>;
+    Tags::BoundaryValue<Tags::Dr<Tags::BondiU>>,
+    Tags::BoundaryValue<Tags::BondiQ>, Tags::BoundaryValue<Tags::BondiW>,
+    Tags::BoundaryValue<Tags::BondiJ>,
+    Tags::BoundaryValue<Tags::Dr<Tags::BondiJ>>,
+    Tags::BoundaryValue<Tags::BondiH>, Tags::BoundaryValue<Tags::SpecH>,
+    Tags::BoundaryValue<Tags::BondiR>,
+    Tags::BoundaryValue<Tags::DuRDividedByR>>;
+
 /*!
  * \brief Process the worldtube data from metric and derivatives to desired
  * Bondi quantities

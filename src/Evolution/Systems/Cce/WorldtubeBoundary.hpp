@@ -8,16 +8,22 @@
 #include "Evolution/Systems/Cce/InitializeWorldtubeBoundary.hpp"
 #include "Parallel/Actions/TerminatePhase.hpp"
 #include "Parallel/AddOptionsToDataBox.hpp"
+#include "Parallel/ConstGlobalCache.hpp"
 #include "Parallel/Info.hpp"
 #include "Parallel/Invoke.hpp"
 
-namespace Cce {
+#include "Utilities/TmplDebugging.hpp"
 
+namespace Cce {
 
 namespace Actions {
 struct BoundaryComputeAndSendToExtractor {
   template <typename ParallelComponent, typename... DbTags,
-            typename Metavariables, typename ArrayIndex>
+            typename Metavariables, typename ArrayIndex,
+            Requires<tmpl2::flat_any_v<cpp17::is_same_v<
+                ::Tags::Variables<
+                    typename Metavariables::cce_boundary_communication_tags>,
+                DbTags>...>> = nullptr>
   static void apply(db::DataBox<tmpl::list<DbTags...>>& box,
                     Parallel::ConstGlobalCache<Metavariables>& cache,
                     const ArrayIndex& /*array_index*/,
@@ -26,18 +32,20 @@ struct BoundaryComputeAndSendToExtractor {
                ::Tags::Variables<
                    typename Metavariables::cce_boundary_communication_tags>>(
         make_not_null(&box),
-        [&time](const gsl::not_null<CceH5BoundaryDataManager<Interpolator>*>
-                    boundary_data_manager,
-                const gsl::not_null<Variables<
-                    typename Metavariables::cce_boundary_communication_tags>*>
-                    boundary_variables_to_populate) noexcept {
+        [&time](
+            const gsl::not_null<CceH5BoundaryDataManager<CubicInterpolator>*>
+                boundary_data_manager,
+            const gsl::not_null<Variables<
+                typename Metavariables::cce_boundary_communication_tags>*>
+                boundary_variables_to_populate) noexcept {
           boundary_data_manager->populate_hypersurface_boundary_data(
-              *boundary_variables_to_populate, time);
+              boundary_variables_to_populate, time);
         });
     send_boundary_data(
-        Parallel::get_parallel_component<CharacteristicExtractor>(cache),
+        Parallel::get_parallel_component<
+            CharacteristicExtractor<Metavariables>>(cache),
         db::get<::Tags::Variables<
-            typename Metavariables::cce_boundary_communication_tags>>,
+            typename Metavariables::cce_boundary_communication_tags>>(box),
         time, typename Metavariables::cce_boundary_communication_tags{});
   }
 
