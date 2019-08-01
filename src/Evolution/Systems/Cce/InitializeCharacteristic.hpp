@@ -9,6 +9,7 @@
 #include "Evolution/Systems/Cce/ReadBoundaryDataH5.hpp"
 #include "Evolution/Systems/Cce/Tags.hpp"
 #include "Parallel/Info.hpp"
+#include "ParallelAlgorithms/Initialization/MergeIntoDataBox.hpp"
 #include "Time/Tags.hpp"
 #include "Utilities/NoSuchType.hpp"
 #include "Utilities/Rational.hpp"
@@ -133,7 +134,8 @@ struct InitializeCharacteristic {
         ::Tags::Variables<typename Metavariables::cce_transform_buffer_tags>;
     using swsh_derivative_variables_tag =
         ::Tags::Variables<typename Metavariables::cce_swsh_derivative_tags>;
-
+    using angular_coordinates_variables_tag =
+        ::Tags::Variables<typename Metavariables::cce_angular_coordinate_tags>;
     using coordinate_variables_tag =
         typename Metavariables::evolved_coordinates_variables_tag;
     using dt_coordinate_variables_tag =
@@ -150,24 +152,26 @@ struct InitializeCharacteristic {
       const size_t transform_buffer_size =
           2 * number_of_radial_points *
           Spectral::Swsh::number_of_swsh_coefficients(l_max);
-
-      return db::create_from<
-          db::RemoveTags<>,
-          db::AddSimpleTags<
-              boundary_value_variables_tag, coordinate_variables_tag,
-              dt_coordinate_variables_tag, scri_variables_tag,
-              volume_variables_tag, pre_swsh_derivatives_variables_tag,
-              transform_buffer_variables_tag, swsh_derivative_variables_tag>,
-          db::AddComputeTags<>>(
-          std::move(box),
-          db::item_type<boundary_value_variables_tag>{boundary_size},
-          db::item_type<coordinate_variables_tag>{boundary_size},
-          db::item_type<dt_coordinate_variables_tag>{boundary_size},
-          db::item_type<scri_variables_tag>{boundary_size},
-          db::item_type<volume_variables_tag>{volume_size},
-          db::item_type<pre_swsh_derivatives_variables_tag>{volume_size},
-          db::item_type<transform_buffer_variables_tag>{transform_buffer_size},
-          db::item_type<swsh_derivative_variables_tag>{volume_size});
+      return std::move(box);
+      // return db::create_from<
+      // db::RemoveTags<>,
+      // db::AddSimpleTags<
+      // boundary_value_variables_tag, coordinate_variables_tag,
+      // dt_coordinate_variables_tag, angular_coordinates_variables_tag,
+      // scri_variables_tag, volume_variables_tag,
+      // pre_swsh_derivatives_variables_tag,
+      // transform_buffer_variables_tag, swsh_derivative_variables_tag>,
+      // db::AddComputeTags<>>(
+      // std::move(box),
+      // db::item_type<boundary_value_variables_tag>{boundary_size},
+      // db::item_type<coordinate_variables_tag>{boundary_size},
+      // db::item_type<dt_coordinate_variables_tag>{boundary_size},
+      // db::item_type<angular_coordinates_variables_tag>{boundary_size},
+      // db::item_type<scri_variables_tag>{boundary_size},
+      // db::item_type<volume_variables_tag>{volume_size},
+      // db::item_type<pre_swsh_derivatives_variables_tag>{volume_size},
+      // db::item_type<transform_buffer_variables_tag>{transform_buffer_size},
+      // db::item_type<swsh_derivative_variables_tag>{volume_size});
     }
   };
 
@@ -179,7 +183,7 @@ struct InitializeCharacteristic {
   template <typename DbTags, typename... InboxTags, typename Metavariables,
             typename ArrayIndex, typename ActionList,
             typename ParallelComponent>
-  static auto apply(db::DataBox<DbTags>& /*box*/,
+  static auto apply(db::DataBox<DbTags>& box,
                     const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
                     const Parallel::ConstGlobalCache<Metavariables>& cache,
                     const ArrayIndex& /*array_index*/,

@@ -48,6 +48,8 @@ struct EvolutionMetavars {
   using cce_pre_swsh_derivavtives_tags = Cce::all_pre_swsh_derivative_tags;
   using cce_transform_buffer_tags = Cce::all_transform_buffer_tags;
   using cce_swsh_derivative_tags = Cce::all_swsh_derivative_tags;
+  using cce_angular_coordinate_tags =
+      tmpl::list<Cce::Tags::CauchyAngularCoords>;
 
   using cce_boundary_component = Cce::H5WorldtubeBoundary<EvolutionMetavars>;
   // TODO select between input interpolators

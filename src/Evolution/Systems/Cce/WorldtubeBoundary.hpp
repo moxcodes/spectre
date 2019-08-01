@@ -16,15 +16,11 @@ namespace Cce {
 
 namespace Actions {
 struct BoundaryComputeAndSendToExtractor {
-  template <typename DbTags, typename... InboxTags, typename Metavariables,
-            typename ArrayIndex, typename ActionList,
-            typename ParallelComponent>
-  static void apply(db::DataBox<DbTags>& box,
-                    const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
+  template <typename ParallelComponent, typename... DbTags,
+            typename Metavariables, typename ArrayIndex>
+  static void apply(db::DataBox<tmpl::list<DbTags...>>& box,
                     Parallel::ConstGlobalCache<Metavariables>& cache,
                     const ArrayIndex& /*array_index*/,
-                    const ActionList /*meta*/,
-                    const ParallelComponent* const /*meta*/,
                     const double time) noexcept {
     db::mutate<Tags::H5WorldtubeBoundaryDataManager<CubicInterpolator>,
                ::Tags::Variables<
@@ -48,7 +44,7 @@ struct BoundaryComputeAndSendToExtractor {
  private:
   template <typename ProxyType, typename VariableTagList, typename... Tags>
   static void send_boundary_data(
-      const ProxyType& extractor_proxy,
+      ProxyType& extractor_proxy,
       const Variables<VariableTagList>& boundary_quantities, const double time,
       tmpl::list<Tags...> /*meta*/) noexcept {
     Parallel::simple_action<Actions::ReceiveWorldtubeData<tmpl::list<Tags...>>>(

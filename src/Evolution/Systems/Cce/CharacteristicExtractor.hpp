@@ -48,7 +48,7 @@ struct RequestBoundaryData {
             typename ParallelComponent>
   static auto apply(const db::DataBox<DbTags>& box,
                     const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
-                    const Parallel::ConstGlobalCache<Metavariables>& cache,
+                    Parallel::ConstGlobalCache<Metavariables>& cache,
                     const ArrayIndex& /*array_index*/,
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
@@ -102,15 +102,12 @@ struct ReceiveWorldtubeData;
 
 template <typename... BoundaryTags>
 struct ReceiveWorldtubeData<tmpl::list<BoundaryTags...>> {
-  template <typename DbTags, typename... InboxTags, typename Metavariables,
-            typename ArrayIndex, typename ActionList,
-            typename ParallelComponent>
-  static auto apply(
-      db::DataBox<DbTags>& box,
-      const tuples::TaggedTuple<InboxTags...>& inboxes,
-      const Parallel::ConstGlobalCache<Metavariables>& cache,
-      const ArrayIndex& /*array_index*/, const ActionList /*meta*/,
-      const ParallelComponent* const /*meta*/, const double time,
+  template <typename ParallelComponent, typename... DbTags,
+            typename Metavariables, typename ArrayIndex>
+  static void apply(
+      db::DataBox<tmpl::list<DbTags...>>& box,
+      const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
+      const ArrayIndex& /*array_index*/, const double time,
       const db::item_type<BoundaryTags>&... boundary_data) noexcept {
     db::mutate<Tags::BoundaryTime, BoundaryTags...>(
         make_not_null(&box),
@@ -150,8 +147,9 @@ struct CharacteristicExtractor {
 
   using initialize_action_list =
       tmpl::list<Actions::InitializeCharacteristic,
+                 // FIXME this action is causing error
                  Actions::BlockUntilBoundaryDataReceived,
-                 Actions::PopulateCharacteristicInitialHypersurface,
+                 // Actions::PopulateCharacteristicInitialHypersurface,
                  Parallel::Actions::TerminatePhase>;
 
   template <typename BondiTag>
@@ -197,11 +195,11 @@ struct CharacteristicExtractor {
   // typename Metavariables::evolved_coordinates_variables_tag>,
   // /*      RecomputeAngularCoordinateFunctions,*/ Actions::AdvanceTime>>;
   using extract_action_list =
-      tmpl::list<Actions::BlockUntilBoundaryDataReceived,
-                 /*Actions::PrecomputeGlobalCceDependencies,*/
-                 Actions::RequestBoundaryData<
-                     typename Metavariables::cce_boundary_component>,
-                 ::Actions::AdvanceTime>;
+      tmpl::list<  // Actions::BlockUntilBoundaryDataReceived,
+          /*Actions::PrecomputeGlobalCceDependencies,*/
+          /*                 Actions::RequestBoundaryData<
+                             typename Metavariables::cce_boundary_component>,*/
+          /*::Actions::AdvanceTime*/>;
 
   using phase_dependent_action_list =
       tmpl::list<Parallel::PhaseActions<typename Metavariables::Phase,
