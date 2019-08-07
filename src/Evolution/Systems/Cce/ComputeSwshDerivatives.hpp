@@ -561,6 +561,7 @@ struct ApplySwshJacobianInplace<Spectral::Swsh::Tags::Derivative<
   }
 };
 
+
 namespace detail {
 // A helper to forward to the ApplySwshJacobianInplace mutators that takes
 // advantage of the `OnDemandInputsForSwshJacobian`, which computes blaze

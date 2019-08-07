@@ -82,7 +82,7 @@ struct HistoryEvolvedTensor : db::PrefixTag, db::SimpleTag {
   using tag = Tag;
   using type =
       std::array<TimeSteppers::History<typename db::item_type<Tag>::type,
-                                       typename db::item_type<DtTag>>,
+                                       typename db::item_type<DtTag>::type>,
                  db::item_type<Tag>::size()>;
 };
 

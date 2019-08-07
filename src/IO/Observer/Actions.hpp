@@ -18,6 +18,8 @@
 #include "Parallel/Invoke.hpp"
 #include "Utilities/TaggedTuple.hpp"
 
+#include "Parallel/Printf.hpp"
+
 namespace observers {
 
 /*!
@@ -192,7 +194,10 @@ struct RegisterSenderWithSelf {
                    "Trying to insert a component_id more than once for "
                    "volume observation. This means an element is registering "
                    "itself with the observers more than once.");
+            Parallel::printf("inserting volume array id\n");
             array_component_ids->insert(component_id);
+            Parallel::printf("array_component_ids size %zu\n",
+                             array_component_ids->size());
           });
       const auto my_proc = static_cast<size_t>(Parallel::my_proc());
       auto& observer_writer =
@@ -270,6 +275,49 @@ struct RegisterWithObservers {
   }
 };
 
+// TODO currently just hacked version of above with a forced array index of 0.
+template <typename RegisterHelper>
+struct RegisterSingletonWithObservers {
+  template <typename DbTagList, typename... InboxTags, typename Metavariables,
+            typename ArrayIndex, typename ActionList,
+            typename ParallelComponent>
+  static std::tuple<db::DataBox<DbTagList>&&> apply(
+      db::DataBox<DbTagList>& box,
+      const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
+      Parallel::ConstGlobalCache<Metavariables>& cache,
+      const ArrayIndex& array_index, const ActionList /*meta*/,
+      const ParallelComponent* const /*meta*/) noexcept {
+    auto& observer =
+        *Parallel::get_parallel_component<observers::Observer<Metavariables>>(
+             cache)
+             .ckLocalBranch();
+    std::pair<observers::TypeOfObservation, observers::ObservationId>
+        type_of_observation_and_observation_id_pair =
+            RegisterHelper::template register_info<ParallelComponent>(
+                box, array_index);
+
+    // TODO(): We should really loop through all the events, check if there are
+    // any reduction observers, and any volume observers, if so, then we
+    // register us as having one of:
+    // - TypeOfObservation::Reduction
+    // - TypeOfObservation::Volume
+    // - TypeOfObservation::ReductionAndVolume
+    //
+    // At that point we won't need the template parameter on the class anymore
+    // and everything can be read from an input file.
+    Parallel::simple_action<RegisterSenderWithSelf>(
+        observer,
+        std::move(                                                // NOLINT
+            type_of_observation_and_observation_id_pair.second),  // NOLINT
+        observers::ArrayComponentId{
+            std::add_pointer_t<ParallelComponent>{nullptr},
+            Parallel::ArrayIndex<int>(0)},
+        std::move(                                                // NOLINT
+            type_of_observation_and_observation_id_pair.first));  // NOLINT
+    return {std::move(box)};
+  }
+};
+
 /*!
  * \brief Registers a singleton with the ObserverWriter.
  *
@@ -319,9 +367,10 @@ struct RegisterSingletonWithObserverWriter {
         break;
       case TypeOfObservation::ReductionAndVolume:
       case TypeOfObservation::Volume:
-        ERROR(
-            "Registering volume observations is not supported for singletons. "
-            "The TypeOfObservation should be 'Reduction'.");
+        // FIXME what could possibly go wrong?
+        // ERROR(
+        // "Registering volume observations is not supported for singletons. "
+        // "The TypeOfObservation should be 'Reduction'.");
       default:
         ERROR(
             "Registering an unknown TypeOfObservation. It should be "

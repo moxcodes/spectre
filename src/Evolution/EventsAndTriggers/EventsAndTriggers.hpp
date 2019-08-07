@@ -11,6 +11,7 @@
 #include "Evolution/EventsAndTriggers/Event.hpp"  // IWYU pragma: keep // for option parsing
 #include "Evolution/EventsAndTriggers/Trigger.hpp"  // IWYU pragma: keep // for option parsing
 #include "Options/Options.hpp"
+#include "Parallel/Printf.hpp"
 
 /// \cond
 namespace Parallel {

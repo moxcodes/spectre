@@ -591,6 +591,7 @@ class CceH5BoundaryDataManager {
     // coefficients. This is what the boundary data calculation utility takes
     // as an input, so we now hand off the control flow to the boundary and
     // gauge transform utility
+    Parallel::printf("requested time %f\n", time);
 
     create_bondi_boundary_data_from_cauchy(
         boundary_data,

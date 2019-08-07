@@ -15,6 +15,7 @@
 #include "ErrorHandling/Error.hpp"
 #include "Options/Options.hpp"
 #include "Parallel/CharmPupable.hpp"
+#include "Parallel/Printf.hpp"
 #include "Time/Time.hpp"
 #include "Time/TimeSteppers/TimeStepper.hpp"  // IWYU pragma: keep
 #include "Utilities/ConstantExpressions.hpp"
@@ -97,7 +98,6 @@ void RungeKutta3::update_u(
   const auto& vars = (history->end() - 1).value();
   const auto& dt_vars = (history->end() - 1).derivative();
   const auto& U0 = history->begin().value();
-
   switch (substep) {
     case 0: {
       // from (5.32) of Hesthaven

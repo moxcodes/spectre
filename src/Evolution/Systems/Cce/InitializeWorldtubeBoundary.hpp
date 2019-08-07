@@ -30,7 +30,7 @@ struct InitializeH5WorldtubeBoundary {
   // TODO hard-coded options
   static std::string input_filename() noexcept { return "CceR0100"; }
   using interpolator = CubicInterpolator;
-  static const size_t number_of_lookahead_points = 100;
+  static const size_t number_of_lookahead_points = 200;
   // \TODO
 
   template <class Metavariables>

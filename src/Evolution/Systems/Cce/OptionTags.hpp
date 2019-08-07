@@ -11,8 +11,13 @@ namespace OptionTags{
 struct LMax {
   using type = size_t;
   static constexpr OptionString help{
-      "maximum l value for spin-weighted spherical harmonics, determines "
-      "angular resolution."};
+      "maximum l value for spin-weighted spherical harmonics"};
+};
+
+struct ObservationLMax {
+  using type = size_t;
+  static constexpr OptionString help{
+    "maximum l value for swsh output"};
 };
 
 struct NumberOfRadialPoints {

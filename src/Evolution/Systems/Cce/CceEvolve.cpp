@@ -1458,15 +1458,14 @@ void test_regularity_preserving_cce_rt(
           transform_buffer_variables_tag, pre_swsh_derivatives_variables_tag>(
           make_not_null(&box), time.time().value());
 
-      // db::mutate<bondi_tag>(
-      // make_not_null(&box),
-      // [&l_max,
-      // &l_filter_start](const gsl::not_null<db::item_type<bondi_tag>*>
-      // bondi_quantity) {
-      // Spectral::Swsh::filter_swsh_volume_quantity(
-      // make_not_null(&get(*bondi_quantity)), l_max, l_filter_start,
-      // 108.0, 8);
-      // });
+      db::mutate<bondi_tag>(
+          make_not_null(&box),
+          [&l_max, &l_filter_start](
+              const gsl::not_null<db::item_type<bondi_tag>*> bondi_quantity) {
+            Spectral::Swsh::filter_swsh_volume_quantity(
+                make_not_null(&get(*bondi_quantity)), l_max, l_filter_start,
+                108.0, 8);
+          });
     });
     // printf("calculating time derivatives\n");
     db::mutate_apply<

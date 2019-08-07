@@ -3,6 +3,9 @@
 
 #pragma once
 
+#include <type_traits>
+
+#include "Evolution/EventsAndTriggers/Actions/RunEventsAndTriggers.hpp"
 #include "Evolution/Systems/Cce/ComputePreSwshDerivatives.hpp"
 #include "Evolution/Systems/Cce/ComputeSwshDerivatives.hpp"
 #include "Evolution/Systems/Cce/Equations.hpp"
@@ -11,9 +14,12 @@
 #include "Evolution/Systems/Cce/IntegrandInputSteps.hpp"
 #include "Evolution/Systems/Cce/LinearSolve.hpp"
 #include "Evolution/Systems/Cce/PrecomputeCceDependencies.hpp"
+#include "Evolution/Systems/Cce/ScriPlusValues.hpp"
+#include "IO/Observer/Actions.hpp"
+#include "IO/Observer/ObserverComponent.hpp"
+#include "IO/Observer/RegisterObservers.hpp"
 #include "Parallel/Actions/TerminatePhase.hpp"
 #include "Parallel/AddOptionsToDataBox.hpp"
-#include "Parallel/Printf.hpp"
 #include "Parallel/Info.hpp"
 #include "Parallel/Invoke.hpp"
 #include "ParallelAlgorithms/Actions/MutateApply.hpp"
@@ -21,6 +27,8 @@
 #include "Time/Actions/RecordTimeStepperData.hpp"
 #include "Time/Actions/UpdateU.hpp"
 #include "Time/Time.hpp"
+
+#include "Utilities/TmplDebugging.hpp"
 
 namespace Cce {
 
@@ -31,19 +39,89 @@ namespace Actions {
 struct BoundaryComputeAndSendToExtractor;
 }
 
+template <typename CollectionTagList, typename SearchTag>
+struct is_member;
+
+template <typename... CollectionTags, typename SearchTag>
+struct is_member<tmpl::list<CollectionTags...>, SearchTag> {
+  static constexpr bool value =
+      tmpl2::flat_any_v<cpp17::is_same_v<SearchTag, CollectionTags>...>;
+};
+
+template <typename CollectionTagList, typename SearchTag>
+static constexpr bool is_member_v =
+    is_member<CollectionTagList, SearchTag>::value;
+
 namespace Actions {
 template <typename BondiTag>
-struct CalculatePreSwshDerivativesForTag {};
+struct CalculateIntegrandInputsForTag {
+  template <typename DbTags, typename... InboxTags, typename Metavariables,
+            typename ArrayIndex, typename ActionList,
+            typename ParallelComponent>
+  static auto apply(db::DataBox<DbTags>& box,
+                    const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
+                    Parallel::ConstGlobalCache<Metavariables>& cache,
+                    const ArrayIndex& /*array_index*/,
+                    const ActionList /*meta*/,
+                    const ParallelComponent* const /*meta*/) noexcept {
+    // Parallel::printf("starting hypersurface computation for %s\n",
+    // BondiTag::name());
+    mutate_all_pre_swsh_derivatives_for_tag<BondiTag>(make_not_null(&box));
+    mutate_all_swsh_derivatives_for_tag<
+        BondiTag,
+        ::Tags::Variables<typename Metavariables::cce_swsh_derivative_tags>,
+        ::Tags::Variables<typename Metavariables::cce_transform_buffer_tags>,
+        ::Tags::Variables<
+            typename Metavariables::cce_pre_swsh_derivatives_tags>>(
+        make_not_null(&box));
+    return std::forward_as_tuple(std::move(box));
+  }
+};
 
 template <typename BondiTag>
-struct CalculateSwshDerivativesForTag {};
-
-template <typename BondiTag>
-struct FilterSwshVolumeQuantity {};
+struct FilterSwshVolumeQuantity {
+  template <typename DbTags, typename... InboxTags, typename Metavariables,
+            typename ArrayIndex, typename ActionList,
+            typename ParallelComponent>
+  static auto apply(db::DataBox<DbTags>& box,
+                    const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
+                    Parallel::ConstGlobalCache<Metavariables>& cache,
+                    const ArrayIndex& /*array_index*/,
+                    const ActionList /*meta*/,
+                    const ParallelComponent* const /*meta*/) noexcept {
+    const size_t l_max = db::get<Tags::LMax>(box);
+    const size_t l_filter_start = l_max - 2;
+    // db::mutate<BondiTag>(
+    // make_not_null(&box),
+    // [&l_max, &l_filter_start](
+    // const gsl::not_null<db::item_type<BondiTag>*> bondi_quantity) {
+    // Spectral::Swsh::filter_swsh_volume_quantity(
+    // make_not_null(&get(*bondi_quantity)), l_max, l_filter_start,
+    // 108.0, 8);
+    // });
+    return std::forward_as_tuple(std::move(box));
+  }
+};
 
 struct CalculateAndInterpolateNews {};
 
-struct RecomputeAngularCoordinateFunctions {};
+struct ExitIfEndTimeReached {
+  template <typename DbTags, typename... InboxTags, typename Metavariables,
+            typename ArrayIndex, typename ActionList,
+            typename ParallelComponent>
+  static auto apply(db::DataBox<DbTags>& box,
+                    const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
+                    Parallel::ConstGlobalCache<Metavariables>& cache,
+                    const ArrayIndex& /*array_index*/,
+                    const ActionList /*meta*/,
+                    const ParallelComponent* const /*meta*/) noexcept {
+    Parallel::printf("Time : %f, End: %f\n", db::get<::Tags::Time>(box).value(),
+                     db::get<Tags::EndTime>(box));
+    return std::tuple<db::DataBox<DbTags>&&, bool>(
+        std::move(box),
+        db::get<::Tags::Time>(box).value() >= db::get<Tags::EndTime>(box));
+  }
+};
 
 template <typename WorldtubeBoundaryComponent>
 struct RequestBoundaryData {
@@ -56,10 +134,28 @@ struct RequestBoundaryData {
                     const ArrayIndex& /*array_index*/,
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
-    Parallel::printf("requesting boundary data\n");
     Parallel::simple_action<Actions::BoundaryComputeAndSendToExtractor>(
         Parallel::get_parallel_component<WorldtubeBoundaryComponent>(cache),
         db::get<::Tags::Time>(box).value());
+    return std::forward_as_tuple(std::move(box));
+  }
+};
+
+template <typename WorldtubeBoundaryComponent>
+struct RequestNextBoundaryData {
+  template <typename DbTags, typename... InboxTags, typename Metavariables,
+            typename ArrayIndex, typename ActionList,
+            typename ParallelComponent>
+  static auto apply(db::DataBox<DbTags>& box,
+                    const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
+                    Parallel::ConstGlobalCache<Metavariables>& cache,
+                    const ArrayIndex& /*array_index*/,
+                    const ActionList /*meta*/,
+                    const ParallelComponent* const /*meta*/) noexcept {
+    // TODO pass timeids instead to avoid comparing doubles
+    Parallel::simple_action<Actions::BoundaryComputeAndSendToExtractor>(
+        Parallel::get_parallel_component<WorldtubeBoundaryComponent>(cache),
+        db::get<::Tags::Next<::Tags::TimeId>>(box).time().value());
     return std::forward_as_tuple(std::move(box));
   }
 };
@@ -84,23 +180,31 @@ struct BlockUntilBoundaryDataReceived {
       const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
       const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
       const ArrayIndex& /*array_index*/) noexcept {
-    Parallel::printf("blocking for boundary data...\n");
     return db::get<Tags::BoundaryTime>(box) ==
            db::get<::Tags::Time>(box).value();
   }
 };
 
 struct PrecomputeGlobalCceDependencies {
-  // template <typename DbTags, typename... InboxTags, typename Metavariables,
-  // typename ArrayIndex, typename ActionList,
-  // typename ParallelComponent>
-  // static auto apply(db::DataBox<DbTags>& box,
-  // const tuples::TaggedTuple<InboxTags...>& inboxes,
-  // const Parallel::ConstGlobalCache<Metavariables>& cache,
-  // const ArrayIndex& /*array_index*/,
-  // const ActionList /*meta*/,
-  // const ParallelComponent* const /*meta*/) noexcept {
-  // }
+  template <typename... DbTags, typename... InboxTags, typename Metavariables,
+            typename ArrayIndex, typename ActionList,
+            typename ParallelComponent>
+  static auto apply(db::DataBox<tmpl::list<DbTags...>>& box,
+                    const tuples::TaggedTuple<InboxTags...>& inboxes,
+                    const Parallel::ConstGlobalCache<Metavariables>& cache,
+                    const ArrayIndex& /*array_index*/,
+                    const ActionList /*meta*/,
+                    const ParallelComponent* const /*meta*/) noexcept {
+    // Parallel::printf("global dependencies\n");
+    tmpl::for_each<compute_gauge_adjustments_setup_tags>([&box](auto tag_v) {
+      using tag = typename decltype(tag_v)::type;
+      db::mutate_apply<ComputeGaugeAdjustedBoundaryValue<tag>>(
+          make_not_null(&box));
+    });
+    mutate_all_precompute_cce_dependencies<Tags::EvolutionGaugeBoundaryValue>(
+        make_not_null(&box));
+    return std::forward_as_tuple(std::move(box));
+  }
 };
 
 template <typename TagList>
@@ -109,7 +213,9 @@ struct ReceiveWorldtubeData;
 template <typename... BoundaryTags>
 struct ReceiveWorldtubeData<tmpl::list<BoundaryTags...>> {
   template <typename ParallelComponent, typename... DbTags,
-            typename Metavariables, typename ArrayIndex>
+            typename Metavariables, typename ArrayIndex,
+            Requires<tmpl2::flat_all_v<
+                is_member_v<tmpl::list<DbTags...>, BoundaryTags>...>> = nullptr>
   static void apply(
       db::DataBox<tmpl::list<DbTags...>>& box,
       Parallel::ConstGlobalCache<Metavariables>& cache,
@@ -124,11 +230,13 @@ struct ReceiveWorldtubeData<tmpl::list<BoundaryTags...>> {
            const db::item_type<
                BoundaryTags>&... boundary_data_to_copy) noexcept {
           *databox_boundary_time = time_to_copy;
-          expand_pack(set(databox_boundary_data, boundary_data_to_copy)...);
+          EXPAND_PACK_LEFT_TO_RIGHT(
+              set(databox_boundary_data, boundary_data_to_copy));
         },
         time, boundary_data...);
-    // Parallel::get_parallel_component<CharacteristicExtractor>(cache)
-        // .perform_algorithm();
+    Parallel::get_parallel_component<CharacteristicExtractor<Metavariables>>(
+        cache)
+        .perform_algorithm();
   }
 
  private:
@@ -153,6 +261,19 @@ struct CharacteristicExtractor {
   //                                  template return_tag_list<Metavariables>
   // >;
 
+  struct RegistrationHelper {
+    template <typename ParallelComponent, typename DbTagsList,
+              typename ArrayIndex>
+    static std::pair<observers::TypeOfObservation, observers::ObservationId>
+    register_info(const db::DataBox<DbTagsList>& /*box*/,
+                  const ArrayIndex& /*array_index*/) noexcept {
+      observers::ObservationId fake_initial_observation_id{
+          0., typename Metavariables::swsh_boundary_observation_type{}};
+      return {observers::TypeOfObservation::ReductionAndVolume,
+              fake_initial_observation_id};
+    }
+  };
+
   using initialize_action_list =
       tmpl::list<Actions::InitializeCharacteristic,
                  Actions::RequestBoundaryData<
@@ -165,15 +286,12 @@ struct CharacteristicExtractor {
   using hypersurface_computation = tmpl::list<
       /*need something to check that the boundary data has been sent*/
       ::Actions::MutateApply<ComputeGaugeAdjustedBoundaryValue<BondiTag>>,
-      /*      CalculatePreSwshDerivativesForTag<BondiTag>,*/
-      /*      CalculateSwshDerivativesForTag<BondiTag>,*/
+      Actions::CalculateIntegrandInputsForTag<BondiTag>,
       tmpl::transform<integrand_terms_to_compute_for_bondi_variable<BondiTag>,
                       tmpl::bind<::Actions::MutateApply,
                                  tmpl::bind<ComputeBondiIntegrand, tmpl::_1>>>,
       ::Actions::MutateApply<
           RadialIntegrateBondi<Tags::EvolutionGaugeBoundaryValue, BondiTag>>,
-      /*TODO we need to do something about options for this*/
-      /*      FilterSwshVolumeQuantity<BondiTag>,*/
       /*Once we finish the U computation, we need to update all the
         time-dependent gauge stuff*/
       tmpl::conditional_t<
@@ -184,55 +302,77 @@ struct CharacteristicExtractor {
                   ComputeGaugeAdjustedBoundaryValue<Tags::DuRDividedByR>>,
               ::Actions::MutateApply<PrecomputeCceDependencies<
                   Tags::EvolutionGaugeBoundaryValue, Tags::DuRDividedByR>>>,
-          tmpl::list<>>>;
+          tmpl::list<>>,
+      /*TODO we need to do something about options for this*/
+      Actions::FilterSwshVolumeQuantity<BondiTag>>;
 
-  // using extract_action_list = tmpl::flatten<tmpl::list<
-  //     tmpl::transform<bondi_hypersurface_step_tags,
-  //                     tmpl::bind<hypersurface_computation, tmpl::_1>>,
-  //     /*      CalculateAndInterpolateNews,*/
-  //     /*TODO observers...*/
-  //     Actions::RecordTimeStepperDataSingleTensor<
-  //         typename Metavariables::evolved_swsh_tag,
-  //         typename Metavariables::evolved_swsh_dt_tag>,
-  //     Actions::RecordTimeStepperData<
-  //         typename Metavariables::evolved_coordinates_variables_tag>,
-  //     // update J
-  // Actions::UpdateUSingleTensor<typename Metavariables::evolved_swsh_tag,
-  // typename Metavariables::evolved_swsh_dt_tag>,
-  //     // update coordinate maps
-  // Actions::UpdateU<
-  // typename Metavariables::evolved_coordinates_variables_tag>,
-  // /*      RecomputeAngularCoordinateFunctions,*/ Actions::AdvanceTime>>;
-  using extract_action_list =
-      tmpl::list<Actions::BlockUntilBoundaryDataReceived,
-                 /*Actions::PrecomputeGlobalCceDependencies,*/
-                 Actions::RequestBoundaryData<
-                     typename Metavariables::cce_boundary_component>,
-                 ::Actions::AdvanceTime>;
+  using extract_action_list = tmpl::flatten<tmpl::list<
+      Actions::BlockUntilBoundaryDataReceived,
+      Actions::PrecomputeGlobalCceDependencies,
+      tmpl::transform<bondi_hypersurface_step_tags,
+                      tmpl::bind<hypersurface_computation, tmpl::_1>>,
+      // once we're done integrating, we may as well ask for the next step's
+      // boundary data
+      Actions::RequestNextBoundaryData<
+          typename Metavariables::cce_boundary_component>,
+      ::Actions::MutateApply<
+          CalculateScriPlusValue<::Tags::dt<Tags::InertialRetardedTime>>>,
+      ::Actions::MutateApply<ComputePreSwshDerivatives<Cce::Tags::SpecH>>,
+      ::Actions::MutateApply<CalculateScriPlusValue<Tags::News>>,
+      // TODO send to scri component
+      ::Actions::RecordTimeStepperData<
+          typename Metavariables::evolved_coordinates_variables_tag>,
+      ::Actions::RecordTimeStepperDataSingleTensor<
+          typename Metavariables::evolved_swsh_tag,
+          typename Metavariables::evolved_swsh_dt_tag>,
+      ::Actions::UpdateU<
+          typename Metavariables::evolved_coordinates_variables_tag>,
+      ::Actions::UpdateUSingleTensor<
+          typename Metavariables::evolved_swsh_tag,
+          typename Metavariables::evolved_swsh_dt_tag>,
+      ::Actions::MutateApply<GaugeUpdateAngularFromCartesian<
+          Tags::CauchyAngularCoords, Tags::CauchyCartesianCoords>>,
+      ::Actions::MutateApply<GaugeUpdateJacobianFromCoords<
+          Tags::GaugeC, Tags::GaugeD, Tags::CauchyCartesianCoords,
+          Tags::CauchyAngularCoords>>,
+      ::Actions::MutateApply<GaugeUpdateOmegaCD>, ::Actions::AdvanceTime,
+      ::Actions::RunEventsAndTriggers, Actions::ExitIfEndTimeReached>>;
 
-  using phase_dependent_action_list =
-      tmpl::list<Parallel::PhaseActions<typename Metavariables::Phase,
-                                        Metavariables::Phase::Initialization,
-                                        initialize_action_list>,
-                 Parallel::PhaseActions<typename Metavariables::Phase,
-                                        Metavariables::Phase::Extraction,
-                                        extract_action_list>>;
+  using registration_action_list = tmpl::list<
+      // ::observers::Actions::RegisterSingletonWithObserverWriter<
+      // RegistrationHelper>,
+      ::observers::Actions::RegisterSingletonWithObservers<RegistrationHelper>,
+      Parallel::Actions::TerminatePhase>;
+
+  using phase_dependent_action_list = tmpl::list<
+      Parallel::PhaseActions<typename Metavariables::Phase,
+                             Metavariables::Phase::Initialization,
+                             initialize_action_list>,
+      Parallel::PhaseActions<typename Metavariables::Phase,
+                             Metavariables::Phase::RegisterWithObserver,
+                             registration_action_list>,
+      Parallel::PhaseActions<typename Metavariables::Phase,
+                             Metavariables::Phase::Extraction,
+                             extract_action_list>>;
 
   // TODO options changes in progress, decide what to do with the options
   // type alias when determined
   using options = tmpl::list<>;
 
-  static void initialize(Parallel::CProxy_ConstGlobalCache<
-                         Metavariables>& /*global_cache*/) noexcept {}
+  static void initialize(
+      Parallel::CProxy_ConstGlobalCache<Metavariables>& global_cache) noexcept {
+  }
 
   static void execute_next_phase(
       const typename Metavariables::Phase next_phase,
       const Parallel::CProxy_ConstGlobalCache<Metavariables>&
           global_cache) noexcept {
     auto& local_cache = *(global_cache.ckLocalBranch());
-    if (next_phase == Metavariables::Phase::Extraction) {
-      Parallel::get_parallel_component<CharacteristicExtractor>(local_cache)
-          .perform_algorithm();
+    if (next_phase == Metavariables::Phase::RegisterWithObserver or
+        next_phase == Metavariables::Phase::Extraction) {
+      Parallel::get_parallel_component<CharacteristicExtractor<Metavariables>>(
+          local_cache)
+          .start_phase(next_phase);
     }
   }
 };

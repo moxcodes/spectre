@@ -297,6 +297,28 @@ struct ComputePreSwshDerivatives<Tags::Dy<Tags::BondiU>> {
 };
 // @}
 
+template <>
+struct ComputePreSwshDerivatives<Tags::SpecH> {
+  using pre_swsh_derivative_tags = tmpl::list<Tags::Dy<Tags::BondiJ>>;
+  using swsh_derivative_tags = tmpl::list<>;
+  using integrand_tags = tmpl::list<Tags::BondiH>;
+  using integration_independent_tags =
+      tmpl::list<Tags::DuRDividedByR, Tags::OneMinusY>;
+
+  using return_tags = tmpl::list<Tags::SpecH>;
+  using argument_tags = tmpl::append<pre_swsh_derivative_tags, integrand_tags,
+                                     integration_independent_tags>;
+  static void apply(
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> spec_h,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& dy_bondi_j,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& bondi_h,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& du_r_divided_by_r,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& one_minus_y) noexcept {
+    get(*spec_h) = get(bondi_h) -
+                   get(du_r_divided_by_r) * get(one_minus_y) * get(dy_bondi_j);
+  }
+};
+
 /// Compute the derivative with respect to the numerical radial coordinate
 /// \f$y\f$ of a quantity which is a spin-weighted spherical harmonic
 /// derivative. This is separate from the generic case of a derivative with

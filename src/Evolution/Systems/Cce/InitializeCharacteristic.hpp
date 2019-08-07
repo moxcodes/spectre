@@ -7,6 +7,7 @@
 #include "Evolution/Systems/Cce/InitializeCce.hpp"
 #include "Evolution/Systems/Cce/OptionTags.hpp"
 #include "Evolution/Systems/Cce/ReadBoundaryDataH5.hpp"
+#include "Evolution/Systems/Cce/ScriPlusValues.hpp"
 #include "Evolution/Systems/Cce/Tags.hpp"
 #include "Parallel/Info.hpp"
 #include "ParallelAlgorithms/Initialization/MergeIntoDataBox.hpp"
@@ -37,7 +38,7 @@ struct PopulateCharacteristicInitialHypersurface {
                     const ParallelComponent* const /*meta*/) noexcept {
     // J on the first hypersurface
     db::mutate_apply<InitializeJ<Tags::BoundaryValue>>(make_not_null(&box));
-    // Gauge quantities
+    // Gauge quantities - maybe do this with the action list
     db::mutate_apply<InitializeGauge>(make_not_null(&box));
     db::mutate_apply<GaugeUpdateAngularFromCartesian<
         Tags::CauchyAngularCoords, Tags::CauchyCartesianCoords>>(
@@ -47,6 +48,8 @@ struct PopulateCharacteristicInitialHypersurface {
                                                    Tags::CauchyAngularCoords>>(
         make_not_null(&box));
     db::mutate_apply<GaugeUpdateOmegaCD>(make_not_null(&box));
+    db::mutate_apply<InitializeScriPlusValue<Tags::InertialRetardedTime>>(
+        make_not_null(&box), db::get<::Tags::Time>(box).value());
     return std::forward_as_tuple(std::move(box));
   }
 };
@@ -58,8 +61,9 @@ struct InitializeCharacteristic {
    * "Initialization" phase*/
   // TODO
   static constexpr double start_time = 1000.0;
-  static constexpr double end_time_input =
-      std::numeric_limits<double>::quiet_NaN();
+  // static constexpr double end_time_input =
+      // std::numeric_limits<double>::quiet_NaN();
+  static constexpr double end_time_input = 2000.0;
   static constexpr double target_step_size = 1.0;
 
   using interpolator = CubicInterpolator;
@@ -94,11 +98,12 @@ struct InitializeCharacteristic {
       const TimeDelta fixed_time_step =
           TimeDelta{single_step_slab, Rational{1, 1}};
       const TimeId initial_time_id{true, 0, initial_time};
-
+      Parallel::printf("initial time %zu\n", initial_time_id.substep());
       const auto& time_stepper =
           Parallel::get<::OptionTags::TimeStepper>(cache);
       const TimeId second_time_id =
           time_stepper.next_time_id(initial_time_id, fixed_time_step);
+      Parallel::printf("next time %zu\n", second_time_id.substep());
 
       typename db::item_type<::Tags::HistoryEvolvedVariables<
           coordinate_variables_tag, dt_coordinate_variables_tag>>
@@ -129,7 +134,7 @@ struct InitializeCharacteristic {
                      typename Metavariables::cce_integration_independent_tags,
                      typename Metavariables::cce_temporary_equations_tags>>;
     using pre_swsh_derivatives_variables_tag = ::Tags::Variables<
-        typename Metavariables::cce_pre_swsh_derivavtives_tags>;
+        typename Metavariables::cce_pre_swsh_derivatives_tags>;
     using transform_buffer_variables_tag =
         ::Tags::Variables<typename Metavariables::cce_transform_buffer_tags>;
     using swsh_derivative_variables_tag =
@@ -168,9 +173,10 @@ struct InitializeCharacteristic {
           db::item_type<angular_coordinates_variables_tag>{boundary_size},
           db::item_type<scri_variables_tag>{boundary_size},
           db::item_type<volume_variables_tag>{volume_size},
-          db::item_type<pre_swsh_derivatives_variables_tag>{volume_size},
-          db::item_type<transform_buffer_variables_tag>{transform_buffer_size},
-          db::item_type<swsh_derivative_variables_tag>{volume_size});
+          db::item_type<pre_swsh_derivatives_variables_tag>{volume_size, 0.0},
+          db::item_type<transform_buffer_variables_tag>{transform_buffer_size,
+                                                        0.0},
+          db::item_type<swsh_derivative_variables_tag>{volume_size, 0.0});
     }
   };
 
@@ -201,10 +207,10 @@ struct InitializeCharacteristic {
       end_time = time_buffer[time_buffer.size() - 1];
     }
     // clear out the box first
-    auto initialize_box =
-        db::create<db::AddSimpleTags<Tags::LMax, Tags::BoundaryTime>,
-                   db::AddComputeTags<>>(
-            l_max, std::numeric_limits<double>::quiet_NaN());
+    auto initialize_box = db::create<
+        db::AddSimpleTags<Tags::LMax, Tags::BoundaryTime, Tags::EndTime>,
+        db::AddComputeTags<>>(l_max, std::numeric_limits<double>::quiet_NaN(),
+                              end_time);
     auto evolution_box = EvolutionTags<Metavariables>::initialize(
         std::move(initialize_box), cache, start_time, end_time,
         target_step_size);

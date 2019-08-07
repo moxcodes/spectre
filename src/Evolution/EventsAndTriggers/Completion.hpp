@@ -8,6 +8,7 @@
 #include "Parallel/CharmPupable.hpp"
 #include "Parallel/ConstGlobalCache.hpp"
 #include "Utilities/Registration.hpp"
+#include "Utilities/Requires.hpp"
 #include "Utilities/TMPL.hpp"
 
 namespace Events {
@@ -31,13 +32,26 @@ class Completion : public Event<EventRegistrars> {
 
   using argument_tags = tmpl::list<>;
 
-  template <typename Metavariables, typename ArrayIndex, typename Component>
+  template <typename Metavariables, typename ArrayIndex, typename Component,
+            Requires<cpp17::is_same_v<typename Component::chare_type,
+                                      Parallel::Algorithms::Array>> = nullptr>
   void operator()(Parallel::ConstGlobalCache<Metavariables>& cache,
                   const ArrayIndex& array_index,
                   const Component* const /*meta*/) const noexcept {
     auto al_gore =
         Parallel::get_parallel_component<Component>(cache)[array_index]
         .ckLocal();
+    al_gore->set_terminate(true);
+  }
+
+  template <
+      typename Metavariables, typename ArrayIndex, typename Component,
+      Requires<cpp17::is_same_v<typename Component::chare_type,
+                                Parallel::Algorithms::Singleton>> = nullptr>
+  void operator()(Parallel::ConstGlobalCache<Metavariables>& cache,
+                  const ArrayIndex& /*array_index*/,
+                  const Component* const /*meta*/) const noexcept {
+    auto al_gore = Parallel::get_parallel_component<Component>(cache).ckLocal();
     al_gore->set_terminate(true);
   }
 };

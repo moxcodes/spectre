@@ -279,8 +279,6 @@ void create_bondi_boundary_data_from_cauchy(
   // optimization note: revisit to merge most allocations into this variables
   size_t size = Spectral::Swsh::number_of_swsh_collocation_points(l_max);
 
-  Parallel::printf("in boundary data computation\n");
-
   // This needs to be restructured to first move everything to an angular
   // basis due to the way that things are provided from the input file.
   Scalar<DataVector> sin_theta{size};

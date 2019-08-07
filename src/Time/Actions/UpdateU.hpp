@@ -98,15 +98,17 @@ struct UpdateUSingleTensor {
                  const db::item_type<Tags::TimeStep>& time_step) noexcept {
           const auto& time_stepper =
               Parallel::get<OptionTags::TimeStepper>(cache);
+          // debug
           std::for_each(
               boost::make_zip_iterator(
                   boost::make_tuple(tensor->begin(), histories->begin())),
               boost::make_zip_iterator(
                   boost::make_tuple(tensor->end(), histories->end())),
-              [&time_stepper, &time_step](auto& component_and_history) {
-                time_stepper.update_u(component_and_history.template get<0>(),
-                                      component_and_history.template get<1>(),
-                                      time_step);
+              [&time_stepper, &time_step](auto component_and_history) {
+                time_stepper.update_u(
+                    make_not_null(&component_and_history.template get<0>()),
+                    make_not_null(&component_and_history.template get<1>()),
+                    time_step);
               });
         },
         db::get<Tags::TimeStep>(box));

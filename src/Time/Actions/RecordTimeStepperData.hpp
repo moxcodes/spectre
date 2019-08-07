@@ -95,24 +95,25 @@ struct RecordTimeStepperDataSingleTensor {
     using dt_tensor_tag = DtTensorTag;
     using history_tag = Tags::HistoryEvolvedTensor<TensorTag, DtTensorTag>;
 
-    db::mutate<tensor_tag, history_tag>(
+    db::mutate<tensor_tag, dt_tensor_tag, history_tag>(
         make_not_null(&box),
-        [](const gsl::not_null<db::item_type<dt_tensor_tag>*> dt_tensor,
+        [](const gsl::not_null<db::item_type<tensor_tag>*> tensor,
+           const gsl::not_null<db::item_type<dt_tensor_tag>*> dt_tensor,
            const gsl::not_null<db::item_type<history_tag>*> histories,
-           const db::item_type<tensor_tag>& tensor,
            const db::item_type<Tags::Time>& time) noexcept {
           std::for_each(
               boost::make_zip_iterator(boost::make_tuple(
-                  tensor.begin(), dt_tensor->begin(), histories->begin())),
+                  tensor->begin(), dt_tensor->begin(), histories->begin())),
               boost::make_zip_iterator(boost::make_tuple(
-                  tensor.end(), dt_tensor->end(), histories->end())),
-              [&time](auto& component_and_history) {
+                  tensor->end(), dt_tensor->end(), histories->end())),
+              [&time](auto component_and_history) {
+                auto dt_value = component_and_history.template get<1>();
                 component_and_history.template get<2>().insert(
                     time, component_and_history.template get<0>(),
-                    component_and_history.template get<1>());
+                    std::move(dt_value));
               });
         },
-        db::get<tensor_tag>(box), db::get<Tags::Time>(box));
+        db::get<Tags::Time>(box));
 
     return std::forward_as_tuple(std::move(box));
   }

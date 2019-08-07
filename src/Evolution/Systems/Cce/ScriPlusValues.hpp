@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "DataStructures/DataBox/Prefixes.hpp"
 #include "Evolution/Systems/Cce/ComputePreSwshDerivatives.hpp"
 #include "Evolution/Systems/Cce/GaugeTransformBoundaryData.hpp"
 #include "Evolution/Systems/Cce/Tags.hpp"
@@ -111,18 +112,17 @@ struct CalculateScriPlusValue<Tags::News> {
 };
 
 template <>
-struct CalculateScriPlusValue<Tags::Du<Tags::InertialRetardedTime>> {
+struct CalculateScriPlusValue<::Tags::dt<Tags::InertialRetardedTime>> {
   using argument_tags = tmpl::list<Tags::Exp2Beta>;
-  using return_tags = tmpl::list<Tags::Du<Tags::InertialRetardedTime>>;
+  using return_tags = tmpl::list<::Tags::dt<Tags::InertialRetardedTime>>;
 
   static void apply(
-      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*>
-          du_inertial_time,
+      const gsl::not_null<Scalar<DataVector>*> dt_inertial_time,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& exp2beta) noexcept {
     ComplexDataVector buffer = get(exp2beta).data();
-    get(*du_inertial_time).data() = ComplexDataVector{
-        buffer.data() + buffer.size() - get(*du_inertial_time).size(),
-        get(*du_inertial_time).size()};
+    get(*dt_inertial_time) = real(ComplexDataVector{
+        buffer.data() + buffer.size() - get(*dt_inertial_time).size(),
+        get(*dt_inertial_time).size()});
   }
 };
 
@@ -229,13 +229,11 @@ struct InitializeScriPlusValue<Tags::InertialRetardedTime> {
   using argument_tags = tmpl::list<>;
   using return_tags = tmpl::list<Tags::InertialRetardedTime>;
 
-  static void apply(
-      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*>
-          inertial_time,
-      const double& initial_time) noexcept {
+  static void apply(const gsl::not_null<Scalar<DataVector>*> inertial_time,
+                    const double& initial_time) noexcept {
     // this is arbitrary, has to do with choosing a BMS frame. We choose one
     // that has a particular specified initial time value.
-    get(*inertial_time).data() = initial_time;
+    get(*inertial_time) = initial_time;
   }
 };
 

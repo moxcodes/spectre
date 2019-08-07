@@ -40,9 +40,6 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::BondiR> {
       const tnsr::i<DataVector, 2>& x_of_x_tilde,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega_cd,
       const size_t l_max) noexcept {
-    // Spectral::Swsh::filter_swsh_boundary_quantity(make_not_null(&get(*r)),
-    // l_max, l_max - 2);
-    // SpinWeighted<ComplexDataVector, 0> r_over_omega = get(*r) / get(omega);
     Spectral::Swsh::SwshInterpolator interpolator{
         get<0>(x_of_x_tilde), get<1>(x_of_x_tilde), 0, l_max};
     interpolator.interpolate(
@@ -53,9 +50,6 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::BondiR> {
             .data());
 
     get(*evolution_gauge_r) = get(*evolution_gauge_r) * get(omega_cd);
-
-    // Spectral::Swsh::filter_swsh_boundary_quantity(
-    // make_not_null(&get(*evolution_gauge_r)), l_max, l_max - 2);
   }
 };
 
@@ -715,8 +709,9 @@ struct GaugeUpdateU {
                                                   Spectral::Swsh::Tags::Eth>,
                  Tags::LMax>;
   using return_tags =
-      tmpl::list<Tags::DuCauchyCartesianCoords, Tags::U0, Tags::BondiU,
-                 Tags::Du<Tags::GaugeOmegaCD>, Tags::GaugeC, Tags::GaugeD>;
+      tmpl::list<::Tags::dt<Tags::CauchyCartesianCoords>, Tags::U0,
+                 Tags::BondiU, Tags::Du<Tags::GaugeOmegaCD>, Tags::GaugeC,
+                 Tags::GaugeD>;
 
   static void apply(
       const gsl::not_null<tnsr::i<DataVector, 3>*> du_x,
@@ -734,6 +729,7 @@ struct GaugeUpdateU {
     size_t number_of_radial_points =
         get(*u).size() /
         Spectral::Swsh::number_of_swsh_collocation_points(l_max);
+
     // u_hat_0
     ComplexDataVector u_scri_slice{
         get(*u).data().data() +
@@ -745,11 +741,11 @@ struct GaugeUpdateU {
     // get(*u_0).data() = 0.0;
     get(*u_0).data() = u_scri_slice;
 
-    // printf("debug: u at scri\n");
-    // for(auto val : u_scri_slice) {
-    // printf("%e, %e\n", real(val), imag(val));
+    // Parallel::printf("debug: u at scri\n");
+    // for (auto val : u_scri_slice) {
+      // Parallel::printf("%e, %e\n", real(val), imag(val));
     // }
-    // printf("done\n");
+    // Parallel::printf("done\n");
 
     // TEST
     // get(*u_0).data() = 0.0;
