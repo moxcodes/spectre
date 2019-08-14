@@ -37,7 +37,7 @@ struct ScriPlusInterpolationManager {
     }
   }
 
-  bool first_time_is_ready_to_interpolate() noexcept {
+  bool first_time_is_ready_to_interpolate() const noexcept {
     size_t maxes_below = 0;
     size_t mins_above = 0;
     for (auto a : u_bondi_ranges_) {

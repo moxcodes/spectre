@@ -93,9 +93,11 @@ struct EvolutionMetavars {
                  OptionTags::EventsAndTriggers<events, triggers>>;
 
   struct BoundaryObservationType {};
+  struct InertialObservationType {};
   struct VolumeObservationType {};
   struct InterpolatedScriObservationType {};
   using swsh_boundary_observation_type = BoundaryObservationType;
+  using swsh_inertial_scri_observation_type = InertialObservationType;
   using swsh_volume_observation_type = VolumeObservationType;
   using swsh_interpolation_observation_type = InterpolatedScriObservationType;
 

@@ -121,7 +121,8 @@ class ObserveBoundarySwshModes<tmpl::list<ToObserve...>, EventRegistrars>
       DataVector goldberg_subset{
           reinterpret_cast<double*>(goldberg_modes.data()),
           2 * square(observation_l_max + 1)};
-      swsh_scalars_data.emplace_back(tag::name(), goldberg_subset);
+      swsh_scalars_data.emplace_back("Extract0/" + tag::name(),
+                                     goldberg_subset);
     };
 
     EXPAND_PACK_LEFT_TO_RIGHT(append_goldberg_swsh_mode(
@@ -137,7 +138,7 @@ class ObserveBoundarySwshModes<tmpl::list<ToObserve...>, EventRegistrars>
     // ToObserve>>::type::value_type...>>::type{
     // time.value(), goldberg_swsh_mode_subset(tmpl::type_<ToObserve>{},
     // boundary_swsh_scalars)...};
-
+    Parallel::printf("writing boundary data at %f\n", time.value());
     // TEST
     Parallel::simple_action<observers::Actions::ContributeVolumeData>(
         observer,
@@ -152,7 +153,7 @@ class ObserveBoundarySwshModes<tmpl::list<ToObserve...>, EventRegistrars>
         Index<1>(2 * square(observation_l_max + 1)));
 
     // Parallel::threaded_action<observers
-    ::ThreadedActions::WriteReductionData>(
+    // ::ThreadedActions::WriteReductionData>(
     // observer[0],
     // observers::ObservationId(
     // time.value(),

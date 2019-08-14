@@ -7,6 +7,7 @@
 #include "Evolution/Systems/Cce/OptionTags.hpp"
 #include "Evolution/Systems/Cce/ScriPlusInterpolationManager.hpp"
 #include "Evolution/Systems/Cce/Tags.hpp"
+#include "IO/Observer/Actions.hpp"
 #include "IO/Observer/ObserverComponent.hpp"
 #include "IO/Observer/VolumeActions.hpp"
 #include "NumericalAlgorithms/Spectral/SwshTransform.hpp"
@@ -26,7 +27,7 @@ struct ObserveInertialNews {
             typename ParallelComponent>
   static auto apply(db::DataBox<DbTags>& box,
                     const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
-                    const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
+                    const Parallel::ConstGlobalCache<Metavariables>& cache,
                     const ArrayIndex& /*array_index*/,
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
@@ -35,9 +36,9 @@ struct ObserveInertialNews {
                                           ComplexDataVector, Tags::News>>(
         make_not_null(&box),
         [&interpolation](
-            const gsl::not_null<InterpolationManager<
+            const gsl::not_null<ScriPlusInterpolationManager<
                 FlexibleBarycentricInterpolator, ComplexDataVector>*>
-                interpolation_manger) {
+                interpolation_manager) {
           interpolation =
               interpolation_manager->interpolate_and_pop_first_time();
         });
@@ -45,32 +46,31 @@ struct ObserveInertialNews {
     const size_t l_max = Parallel::get<OptionTags::LMax>(cache);
     const size_t observation_l_max =
         Parallel::get<OptionTags::ObservationLMax>(cache);
-
+    auto to_transform = SpinWeighted<ComplexDataVector, 2>{interpolation.first};
     ComplexModalVector goldberg_modes =
         Spectral::Swsh::libsharp_to_goldberg_modes(
-            Spectral::Swsh::swsh_transform(
-                make_not_null(
-                    &SpinWeighted<ComplexDataVector, 2>{interpolation.first}),
-                l_max),
+            Spectral::Swsh::swsh_transform(make_not_null(&to_transform), l_max),
             l_max)
             .data();
     DataVector goldberg_mode_subset{
         reinterpret_cast<double*>(goldberg_modes.data()),
         2 * square(observation_l_max + 1)};
 
-    auto& observer =
-        *Parallel::get_parallel_component<observer::Observer<Metavariables>>(
+    auto& observer_proxy =
+        *Parallel::get_parallel_component<observers::Observer<Metavariables>>(
              cache)
              .ckLocalBranch();
 
     std::vector<TensorComponent> data_to_send_to_observer;
-    data_to_send_to_observer.emplace_back("News", goldberg_mode_subset);
+    data_to_send_to_observer.emplace_back("Scri0/News", goldberg_mode_subset);
+
+    printf("writing inertial news at %f:\n", interpolation.second);
 
     Parallel::simple_action<observers::Actions::ContributeVolumeData>(
-        observer,
+        observer_proxy,
         observers::ObservationId(
             interpolation.second,
-            typename Metavariables::swsh_boundary_observation_type{}),
+            typename Metavariables::swsh_inertial_scri_observation_type{}),
         std::string{"/cce_scri_data"},
         // what could go wrong?
         observers::ArrayComponentId{
@@ -78,6 +78,7 @@ struct ObserveInertialNews {
             Parallel::ArrayIndex<int>(0)},
         std::move(data_to_send_to_observer),
         Index<1>(2 * square(observation_l_max + 1)));
+    return std::forward_as_tuple(std::move(box));
   }
 
   template <typename DbTags, typename... InboxTags, typename Metavariables,
@@ -95,8 +96,13 @@ struct ObserveInertialNews {
 };
 
 struct ReceiveNonInertialNews {
-  template <typename ParallelComponent, typename... DbTags,
-            typename Metavariables, typename ArrayIndex>
+  template <
+      typename ParallelComponent, typename... DbTags, typename Metavariables,
+      typename ArrayIndex,
+      Requires<tmpl::list_contains_v<
+          tmpl::list<DbTags...>,
+          Tags::InterpolationManager<FlexibleBarycentricInterpolator,
+                                     ComplexDataVector, Tags::News>>> = nullptr>
   static void apply(
       db::DataBox<tmpl::list<DbTags...>>& box,
       Parallel::ConstGlobalCache<Metavariables>& cache,
@@ -107,10 +113,10 @@ struct ReceiveNonInertialNews {
                                           ComplexDataVector, Tags::News>>(
         make_not_null(&box),
         [&inertial_retarded_time,
-         &news](const gsl::not_null<InterpolationManager<
+         &news](const gsl::not_null<ScriPlusInterpolationManager<
                     FlexibleBarycentricInterpolator, ComplexDataVector>*>
-                    interpolation_manger) {
-          interpolation_manger->insert_data(get(inertial_retarded_time),
+                    interpolation_manager) {
+          interpolation_manager->insert_data(get(inertial_retarded_time),
                                             get(news).data());
         });
     // continue observing if there's points that are now ready
@@ -119,9 +125,14 @@ struct ReceiveNonInertialNews {
   }
 };
 
-struct AddTargetInterpolationTime{
-  template <typename ParallelComponent, typename... DbTags,
-            typename Metavariables, typename ArrayIndex>
+struct AddTargetInterpolationTime {
+  template <
+      typename ParallelComponent, typename... DbTags, typename Metavariables,
+      typename ArrayIndex,
+      Requires<tmpl::list_contains_v<
+          tmpl::list<DbTags...>,
+          Tags::InterpolationManager<FlexibleBarycentricInterpolator,
+                                     ComplexDataVector, Tags::News>>> = nullptr>
   static void apply(db::DataBox<tmpl::list<DbTags...>>& box,
                     Parallel::ConstGlobalCache<Metavariables>& cache,
                     const ArrayIndex& /*array_index*/,
@@ -129,9 +140,9 @@ struct AddTargetInterpolationTime{
     db::mutate<Tags::InterpolationManager<FlexibleBarycentricInterpolator,
                                           ComplexDataVector, Tags::News>>(
         make_not_null(&box),
-        [&time](const gsl::not_null<InterpolationManager<
+        [&time](const gsl::not_null<ScriPlusInterpolationManager<
                     FlexibleBarycentricInterpolator, ComplexDataVector>*>
-                    interpolation_manger) {
+                    interpolation_manager) {
           interpolation_manager->insert_target_time(time);
         });
     // continue observing if there's points that are now ready
@@ -145,6 +156,9 @@ struct AddTargetInterpolationTime{
 template <class Metavariables>
 struct CharacteristicScri {
   using chare_type = Parallel::Algorithms::Singleton;
+  using const_global_cache_tag_list = tmpl::list<>;
+  using metavariables = Metavariables;
+
   using add_options_to_databox = typename Parallel::AddNoOptionsToDataBox;
 
   struct RegistrationHelper {
@@ -154,7 +168,14 @@ struct CharacteristicScri {
     register_info(const db::DataBox<DbTagsList>& /*box*/,
                   const ArrayIndex& /*array_index*/) noexcept {
       observers::ObservationId fake_initial_observation_id{
-          0., typename Metavariables::swsh_boundary_observation_type{}};
+          0., typename Metavariables::swsh_inertial_scri_observation_type{}};
+
+      Parallel::printf("debug array id check %zu, %s\n",
+                       observers::ArrayComponentId{
+                           std::add_pointer_t<ParallelComponent>{nullptr},
+                           Parallel::ArrayIndex<int>(0)}
+                           .component_id(),
+                       pretty_type::get_name<ParallelComponent>().c_str());
       return {observers::TypeOfObservation::ReductionAndVolume,
               fake_initial_observation_id};
     }
@@ -178,7 +199,7 @@ struct CharacteristicScri {
                              Metavariables::Phase::RegisterWithObserver,
                              registration_action_list>,
       Parallel::PhaseActions<typename Metavariables::Phase,
-                             Metavariables::Pahse::Extraction,
+                             Metavariables::Phase::Extraction,
                              extract_action_list>>;
   using options = tmpl::list<>;
 
@@ -189,11 +210,11 @@ struct CharacteristicScri {
   static void execute_next_phase(
       const typename Metavariables::Phase next_phase,
       const Parallel::CProxy_ConstGlobalCache<Metavariables>&
-      global_cache) noexcept {
+          global_cache) noexcept {
     auto& local_cache = *(global_cache.ckLocalBranch());
     if (next_phase == Metavariables::Phase::RegisterWithObserver or
         next_phase == Metavariables::Phase::Extraction) {
-      Parallel::get_parallel_component<CharacteristicExtractor<Metavariables>>(
+      Parallel::get_parallel_component<CharacteristicScri<Metavariables>>(
           local_cache)
           .start_phase(next_phase);
     }

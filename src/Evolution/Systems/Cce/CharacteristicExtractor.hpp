@@ -95,7 +95,7 @@ struct FilterSwshVolumeQuantity {
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
     const size_t l_max = db::get<Tags::LMax>(box);
-    const size_t l_filter_start = l_max - 1;
+    const size_t l_filter_start = l_max - 2;
     db::mutate<BondiTag>(
         make_not_null(&box),
         [&l_max, &l_filter_start](
@@ -118,14 +118,16 @@ struct SendNewsToScri {
                     const ArrayIndex& /*array_index*/,
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
-    Parallel::simple_action<Actions::ReceiveNonInertialNews>(
-        Parallel::get_parallel_component<CharacteristicScri<Metavariables>>(
-            cache),
-        db::get<Tags::InertialRetardedTime>(box), db::get<Tags::News>(box));
-    Parallel::simple_action<Actions::AddTargetInterpolationTime>(
-        Parallel::get_parallel_component<CharacteristicScri<Metavariables>>(
-            cache),
-        db::get<::Tags::Time>(box).value());
+    if (db::get<::Tags::TimeId>(box).substep() == 0) {
+      Parallel::simple_action<Actions::ReceiveNonInertialNews>(
+          Parallel::get_parallel_component<CharacteristicScri<Metavariables>>(
+              cache),
+          db::get<Tags::InertialRetardedTime>(box), db::get<Tags::News>(box));
+      Parallel::simple_action<Actions::AddTargetInterpolationTime>(
+          Parallel::get_parallel_component<CharacteristicScri<Metavariables>>(
+              cache),
+          db::get<::Tags::Time>(box).value());
+    }
     return std::forward_as_tuple(std::move(box));
   }
 };
@@ -294,6 +296,12 @@ struct CharacteristicExtractor {
                   const ArrayIndex& /*array_index*/) noexcept {
       observers::ObservationId fake_initial_observation_id{
           0., typename Metavariables::swsh_boundary_observation_type{}};
+      Parallel::printf("debug array id check %zu, %s\n",
+                       observers::ArrayComponentId{
+                           std::add_pointer_t<ParallelComponent>{nullptr},
+                           Parallel::ArrayIndex<int>(0)}
+                           .component_id(),
+                       pretty_type::get_name<ParallelComponent>().c_str());
       return {observers::TypeOfObservation::ReductionAndVolume,
               fake_initial_observation_id};
     }
@@ -327,15 +335,15 @@ struct CharacteristicExtractor {
                   ComputeGaugeAdjustedBoundaryValue<Tags::DuRDividedByR>>,
               ::Actions::MutateApply<PrecomputeCceDependencies<
                   Tags::EvolutionGaugeBoundaryValue, Tags::DuRDividedByR>>>,
-          tmpl::list<>>,
-      /*TODO we need to do something about options for this*/
-      Actions::FilterSwshVolumeQuantity<BondiTag>>;
+          tmpl::list<>>>;
 
   using extract_action_list = tmpl::flatten<tmpl::list<
       Actions::BlockUntilBoundaryDataReceived,
       Actions::PrecomputeGlobalCceDependencies,
       tmpl::transform<bondi_hypersurface_step_tags,
                       tmpl::bind<hypersurface_computation, tmpl::_1>>,
+      /*TODO we need to do something about options for this*/
+      Actions::FilterSwshVolumeQuantity<Tags::BondiH>,
       // once we're done integrating, we may as well ask for the next step's
       // boundary data
       Actions::RequestNextBoundaryData<

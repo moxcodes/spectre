@@ -61,9 +61,9 @@ struct InitializeCharacteristic {
    * "Initialization" phase*/
   // TODO
   static constexpr double start_time = 1000.0;
-  // static constexpr double end_time_input =
-      // std::numeric_limits<double>::quiet_NaN();
-  static constexpr double end_time_input = 2000.0;
+  static constexpr double end_time_input =
+      std::numeric_limits<double>::quiet_NaN();
+  // static constexpr double end_time_input = 2000.0;
   static constexpr double target_step_size = 1.0;
 
   using interpolator = CubicInterpolator;

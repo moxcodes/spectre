@@ -52,3 +52,4 @@ struct InitializeCharacteristicScri {
   }
 };
 }  // namespace Actions
+}  // namespace Cce
