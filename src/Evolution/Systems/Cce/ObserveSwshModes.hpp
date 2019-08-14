@@ -138,8 +138,6 @@ class ObserveBoundarySwshModes<tmpl::list<ToObserve...>, EventRegistrars>
     // time.value(), goldberg_swsh_mode_subset(tmpl::type_<ToObserve>{},
     // boundary_swsh_scalars)...};
 
-    const std::string element_name = MakeString{} << "Extraction0" << '/';
-
     // TEST
     Parallel::simple_action<observers::Actions::ContributeVolumeData>(
         observer,
@@ -150,7 +148,8 @@ class ObserveBoundarySwshModes<tmpl::list<ToObserve...>, EventRegistrars>
         observers::ArrayComponentId{
             std::add_pointer_t<ParallelComponent>{nullptr},
             Parallel::ArrayIndex<int>(0)},
-        std::move(swsh_scalars_data), Index<1>(2));
+        std::move(swsh_scalars_data),
+        Index<1>(2 * square(observation_l_max + 1)));
 
     // Parallel::threaded_action<observers
     ::ThreadedActions::WriteReductionData>(

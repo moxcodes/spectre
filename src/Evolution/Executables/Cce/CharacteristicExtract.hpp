@@ -10,6 +10,7 @@
 #include "Evolution/EventsAndTriggers/Tags.hpp"
 #include "Evolution/Systems/Cce/BoundaryData.hpp"
 #include "Evolution/Systems/Cce/CharacteristicExtractor.hpp"
+#include "Evolution/Systems/Cce/CharacteristicScri.hpp"
 #include "Evolution/Systems/Cce/ObserveSwshModes.hpp"
 #include "Evolution/Systems/Cce/OptionTags.hpp"
 #include "Evolution/Systems/Cce/WorldtubeBoundary.hpp"
@@ -102,7 +103,8 @@ struct EvolutionMetavars {
       tmpl::list<observers::Observer<EvolutionMetavars>,
                  observers::ObserverWriter<EvolutionMetavars>,
                  cce_boundary_component,
-                 Cce::CharacteristicExtractor<EvolutionMetavars>>;
+                 Cce::CharacteristicExtractor<EvolutionMetavars>,
+                 Cce::CharacteristicScri<EvolutionMetavars>>;
 
   static constexpr OptionString help{
       "Perform Cauchy Characteristic Extraction using .h5 input data.\n"

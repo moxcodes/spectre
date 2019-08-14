@@ -35,8 +35,13 @@ namespace Cce {
 template <class Metavariables>
 struct CharacteristicExtractor;
 
+template <class Metavariables>
+struct CharacteristicScri;
+
 namespace Actions {
 struct BoundaryComputeAndSendToExtractor;
+struct ReceiveNonInertialNews;
+struct AddTargetInterpolationTime;
 }
 
 template <typename CollectionTagList, typename SearchTag>
@@ -90,20 +95,40 @@ struct FilterSwshVolumeQuantity {
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
     const size_t l_max = db::get<Tags::LMax>(box);
-    const size_t l_filter_start = l_max - 2;
-    // db::mutate<BondiTag>(
-    // make_not_null(&box),
-    // [&l_max, &l_filter_start](
-    // const gsl::not_null<db::item_type<BondiTag>*> bondi_quantity) {
-    // Spectral::Swsh::filter_swsh_volume_quantity(
-    // make_not_null(&get(*bondi_quantity)), l_max, l_filter_start,
-    // 108.0, 8);
-    // });
+    const size_t l_filter_start = l_max - 1;
+    db::mutate<BondiTag>(
+        make_not_null(&box),
+        [&l_max, &l_filter_start](
+            const gsl::not_null<db::item_type<BondiTag>*> bondi_quantity) {
+          Spectral::Swsh::filter_swsh_volume_quantity(
+              make_not_null(&get(*bondi_quantity)), l_max, l_filter_start,
+              108.0, 8);
+        });
     return std::forward_as_tuple(std::move(box));
   }
 };
 
-struct CalculateAndInterpolateNews {};
+struct SendNewsToScri {
+  template <typename DbTags, typename... InboxTags, typename Metavariables,
+            typename ArrayIndex, typename ActionList,
+            typename ParallelComponent>
+  static auto apply(db::DataBox<DbTags>& box,
+                    const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
+                    Parallel::ConstGlobalCache<Metavariables>& cache,
+                    const ArrayIndex& /*array_index*/,
+                    const ActionList /*meta*/,
+                    const ParallelComponent* const /*meta*/) noexcept {
+    Parallel::simple_action<Actions::ReceiveNonInertialNews>(
+        Parallel::get_parallel_component<CharacteristicScri<Metavariables>>(
+            cache),
+        db::get<Tags::InertialRetardedTime>(box), db::get<Tags::News>(box));
+    Parallel::simple_action<Actions::AddTargetInterpolationTime>(
+        Parallel::get_parallel_component<CharacteristicScri<Metavariables>>(
+            cache),
+        db::get<::Tags::Time>(box).value());
+    return std::forward_as_tuple(std::move(box));
+  }
+};
 
 struct ExitIfEndTimeReached {
   template <typename DbTags, typename... InboxTags, typename Metavariables,
@@ -319,7 +344,7 @@ struct CharacteristicExtractor {
           CalculateScriPlusValue<::Tags::dt<Tags::InertialRetardedTime>>>,
       ::Actions::MutateApply<ComputePreSwshDerivatives<Cce::Tags::SpecH>>,
       ::Actions::MutateApply<CalculateScriPlusValue<Tags::News>>,
-      // TODO send to scri component
+      Actions::SendNewsToScri,
       ::Actions::RecordTimeStepperData<
           typename Metavariables::evolved_coordinates_variables_tag>,
       ::Actions::RecordTimeStepperDataSingleTensor<
@@ -376,5 +401,4 @@ struct CharacteristicExtractor {
     }
   }
 };
-
 }  // namespace Cce
