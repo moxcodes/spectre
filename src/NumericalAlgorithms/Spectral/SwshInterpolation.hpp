@@ -473,7 +473,7 @@ void swsh_interpolate(
     const size_t l_max) noexcept {
   target_collocation->destructive_resize(target_theta.size());
   SpinWeighted<ComplexModalVector, Spin> goldberg_modes =
-      libsharp_to_goldberg_modes(swsh_transform(source_collocation, l_max),
+      libsharp_to_goldberg_modes(swsh_transform(l_max, 1, *source_collocation),
                                  l_max);
   target_collocation->data() = 0.0;
   DataVector sin_theta_over_2 = sin(target_theta / 2);

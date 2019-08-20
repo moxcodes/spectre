@@ -383,9 +383,8 @@ void create_bondi_boundary_data_from_cauchy(
   for (size_t a = 0; a < 4; ++a) {
     buffer_for_derivatives.data() =
         std::complex<double>(1.0, 0.0) * null_l.get(a);
-    Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
-        make_not_null(&eth_buffer), make_not_null(&buffer_for_derivatives),
-        l_max);
+    Spectral::Swsh::swsh_derivatives<tmpl::list<Spectral::Swsh::Tags::Eth>>(
+        l_max, 1, make_not_null(&eth_buffer), buffer_for_derivatives);
     angular_d_null_l.get(1, a) = -real(eth_buffer.data());
     angular_d_null_l.get(2, a) = -imag(eth_buffer.data());
     angular_d_null_l.get(0, a) = 0.0;
@@ -440,9 +439,8 @@ void create_bondi_boundary_data_from_cauchy(
 
   tnsr::i<DataVector, 2> angular_d_dlambda_r{size, 0.0};
   buffer_for_derivatives.data() = std::complex<double>(1.0, 0.0) * get<1>(d_r);
-  Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
-      make_not_null(&eth_buffer), make_not_null(&buffer_for_derivatives),
-      l_max);
+  Spectral::Swsh::swsh_derivatives<tmpl::list<Spectral::Swsh::Tags::Eth>>(
+      l_max, 1, make_not_null(&eth_buffer), buffer_for_derivatives);
   angular_d_dlambda_r.get(0) = -real(eth_buffer.data());
   angular_d_dlambda_r.get(1) = -imag(eth_buffer.data());
 

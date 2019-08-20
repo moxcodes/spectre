@@ -72,13 +72,7 @@ struct CalculateIntegrandInputsForTag {
     // Parallel::printf("starting hypersurface computation for %s\n",
     // BondiTag::name());
     mutate_all_pre_swsh_derivatives_for_tag<BondiTag>(make_not_null(&box));
-    mutate_all_swsh_derivatives_for_tag<
-        BondiTag,
-        ::Tags::Variables<typename Metavariables::cce_swsh_derivative_tags>,
-        ::Tags::Variables<typename Metavariables::cce_transform_buffer_tags>,
-        ::Tags::Variables<
-            typename Metavariables::cce_pre_swsh_derivatives_tags>>(
-        make_not_null(&box));
+    mutate_all_swsh_derivatives_for_tag<BondiTag>(make_not_null(&box));
     return std::forward_as_tuple(std::move(box));
   }
 };
@@ -94,7 +88,7 @@ struct FilterSwshVolumeQuantity {
                     const ArrayIndex& /*array_index*/,
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
-    const size_t l_max = db::get<Tags::LMax>(box);
+    const size_t l_max = db::get<Spectral::Swsh::Tags::LMax>(box);
     const size_t l_filter_start = l_max - 2;
     db::mutate<BondiTag>(
         make_not_null(&box),

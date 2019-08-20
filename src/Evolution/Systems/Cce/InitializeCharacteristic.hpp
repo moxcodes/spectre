@@ -155,8 +155,8 @@ struct InitializeCharacteristic {
           Spectral::Swsh::number_of_swsh_collocation_points(l_max);
       const size_t volume_size = boundary_size * number_of_radial_points;
       const size_t transform_buffer_size =
-          2 * number_of_radial_points *
-          Spectral::Swsh::number_of_swsh_coefficients(l_max);
+          number_of_radial_points *
+          Spectral::Swsh::size_of_libsharp_coefficient_vector(l_max);
       return db::create_from<
           db::RemoveTags<>,
           db::AddSimpleTags<
@@ -207,10 +207,13 @@ struct InitializeCharacteristic {
       end_time = time_buffer[time_buffer.size() - 1];
     }
     // clear out the box first
-    auto initialize_box = db::create<
-        db::AddSimpleTags<Tags::LMax, Tags::BoundaryTime, Tags::EndTime>,
-        db::AddComputeTags<>>(l_max, std::numeric_limits<double>::quiet_NaN(),
-                              end_time);
+    auto initialize_box =
+        db::create<db::AddSimpleTags<Spectral::Swsh::Tags::LMax,
+                                     Spectral::Swsh::Tags::NumberOfRadialPoints,
+                                     Tags::BoundaryTime, Tags::EndTime>,
+                   db::AddComputeTags<>>(
+            l_max, number_of_radial_points,
+            std::numeric_limits<double>::quiet_NaN(), end_time);
     auto evolution_box = EvolutionTags<Metavariables>::initialize(
         std::move(initialize_box), cache, start_time, end_time,
         target_step_size);

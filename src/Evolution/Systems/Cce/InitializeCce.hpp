@@ -73,7 +73,7 @@ struct InitializeJ {
 struct GaugeAdjustInitialJ {
   using boundary_tags =
       tmpl::list<Tags::GaugeC, Tags::GaugeD, Tags::GaugeOmegaCD,
-                 Tags::CauchyAngularCoords, Tags::LMax>;
+                 Tags::CauchyAngularCoords, Spectral::Swsh::Tags::LMax>;
   using return_tags = tmpl::list<Tags::BondiJ>;
   using argument_tags = tmpl::append<boundary_tags>;
 

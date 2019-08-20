@@ -20,7 +20,7 @@ void trigonometric_functions_on_swsh_collocation(
   sin_phi->destructive_resize_components(size);
   sin_theta->destructive_resize_components(size);
 
-  const auto& collocation = Spectral::Swsh::precomputed_collocation<
+  const auto& collocation = Spectral::Swsh::cached_collocation_metadata<
       Spectral::Swsh::ComplexRepresentation::Interleaved>(l_max);
   for (const auto& collocation_point : collocation) {
     get(*sin_theta)[collocation_point.offset] = sin(collocation_point.theta);
@@ -115,7 +115,7 @@ void cartesian_spatial_metric_and_derivatives(
   DataVector transpose_buffer{size};
   std::vector<double> interp_result(size);
 
-  const auto& collocation = Spectral::Swsh::precomputed_collocation<
+  const auto& collocation = Spectral::Swsh::cached_collocation_metadata<
       Spectral::Swsh::ComplexRepresentation::Interleaved>(l_max);
 
   std::vector<std::array<double, 2>> target_points =
@@ -155,9 +155,8 @@ void cartesian_spatial_metric_and_derivatives(
 
       derivative_buffer =
           std::complex<double>(1.0, 0.0) * cartesian_spatial_metric->get(i, j);
-      Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
-          make_not_null(&eth_of_component), make_not_null(&derivative_buffer),
-          l_max);
+      Spectral::Swsh::swsh_derivatives<tmpl::list<Spectral::Swsh::Tags::Eth>>(
+          l_max, 1, make_not_null(&eth_of_component), derivative_buffer);
       angular_d_cartesian_spatial_metric.get(1, i, j) =
           -real(eth_of_component.data());
       angular_d_cartesian_spatial_metric.get(2, i, j) =
@@ -240,7 +239,7 @@ void cartesian_shift_and_derivatives(
 
   std::vector<double> interp_result(size);
 
-  const auto& collocation = Spectral::Swsh::precomputed_collocation<
+  const auto& collocation = Spectral::Swsh::cached_collocation_metadata<
       Spectral::Swsh::ComplexRepresentation::Interleaved>(l_max);
 
   std::vector<std::array<double, 2>> target_points =
@@ -275,9 +274,8 @@ void cartesian_shift_and_derivatives(
 
     derivative_buffer =
         std::complex<double>(1.0, 0.0) * cartesian_shift->get(i);
-    Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
-        make_not_null(&eth_of_component), make_not_null(&derivative_buffer),
-        l_max);
+    Spectral::Swsh::swsh_derivatives<tmpl::list<Spectral::Swsh::Tags::Eth>>(
+        l_max, 1, make_not_null(&eth_of_component), derivative_buffer);
     angular_d_cartesian_shift.get(1, i) = -real(eth_of_component.data());
     angular_d_cartesian_shift.get(2, i) = -imag(eth_of_component.data());
   }
@@ -340,7 +338,7 @@ void cartesian_lapse_and_derivatives(
 
   std::vector<double> interp_result(size);
 
-  const auto& collocation = Spectral::Swsh::precomputed_collocation<
+  const auto& collocation = Spectral::Swsh::cached_collocation_metadata<
       Spectral::Swsh::ComplexRepresentation::Interleaved>(l_max);
 
   std::vector<std::array<double, 2>> target_points =
@@ -373,9 +371,8 @@ void cartesian_lapse_and_derivatives(
             get(*dt_cartesian_lapse).begin());
 
   derivative_buffer = std::complex<double>(1.0, 0.0) * get(*cartesian_lapse);
-  Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
-      make_not_null(&eth_of_component), make_not_null(&derivative_buffer),
-      l_max);
+  Spectral::Swsh::swsh_derivatives<tmpl::list<Spectral::Swsh::Tags::Eth>>(
+      l_max, 1, make_not_null(&eth_of_component), derivative_buffer);
   angular_d_cartesian_lapse.get(1) = -real(eth_of_component.data());
   angular_d_cartesian_lapse.get(2) = -imag(eth_of_component.data());
 
@@ -879,7 +876,7 @@ void d_bondi_r(
        get<3, 3>(inverse_null_metric) * get<3, 3>(dlambda_null_metric));
 
   auto eth_of_r = Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
-      make_not_null(&get(*r)), l_max);
+      l_max, 1, get(*r));
   d_r->get(2) = -real(eth_of_r.data());
   d_r->get(3) = -imag(eth_of_r.data());
 }

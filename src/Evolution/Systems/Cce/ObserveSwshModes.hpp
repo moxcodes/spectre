@@ -76,11 +76,11 @@ class ObserveBoundarySwshModes<tmpl::list<ToObserve...>, EventRegistrars>
 
   ObserveBoundarySwshModes() = default;
 
-  using argument_tags = tmpl::list<::Tags::Time, ToObserve...>;
+  using argument_tags = tmpl::list<::Tags::TimeId, ToObserve...>;
 
   template <typename Metavariables, typename ParallelComponent,
             typename ArrayIndex>
-  void operator()(const Time& time,
+  void operator()(const TimeId& time_id,
                   const db::item_type<ToObserve>&... boundary_swsh_scalars,
                   Parallel::ConstGlobalCache<Metavariables>& cache,
                   const ArrayIndex& array_index,
@@ -112,8 +112,7 @@ class ObserveBoundarySwshModes<tmpl::list<ToObserve...>, EventRegistrars>
           get(boundary_swsh_scalar);
       ComplexModalVector goldberg_modes =
           Spectral::Swsh::libsharp_to_goldberg_modes(
-              Spectral::Swsh::swsh_transform(make_not_null(&boundary_swsh_copy),
-                                             l_max),
+              Spectral::Swsh::swsh_transform(l_max, 1, boundary_swsh_copy),
               l_max)
               .data();
       // suspicious reinterpret cast for making a series of doubles, because
@@ -138,12 +137,12 @@ class ObserveBoundarySwshModes<tmpl::list<ToObserve...>, EventRegistrars>
     // ToObserve>>::type::value_type...>>::type{
     // time.value(), goldberg_swsh_mode_subset(tmpl::type_<ToObserve>{},
     // boundary_swsh_scalars)...};
-    Parallel::printf("writing boundary data at %f\n", time.value());
+    Parallel::printf("writing boundary data at %f\n", time_id.time().value());
     // TEST
     Parallel::simple_action<observers::Actions::ContributeVolumeData>(
         observer,
         observers::ObservationId(
-            time.value(),
+            time_id.time().value(),
             typename Metavariables::swsh_boundary_observation_type{}),
         std::string{"/swsh_boundary_data"},
         observers::ArrayComponentId{

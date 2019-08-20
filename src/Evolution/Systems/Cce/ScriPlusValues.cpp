@@ -57,17 +57,17 @@ void calculate_inertial_h(
 
     auto eth_r_tilde =
         Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
-            r_tilde_boundary, l_max);
+            l_max, 1, *r_tilde_boundary);
 
     SpinWeighted<ComplexDataVector, 1> u_0_bar_j_tilde =
         conj(*u_hat_0) * j_tilde_view;
 
     SpinWeighted<ComplexDataVector, 2> u_0_bar_eth_j_tilde =
         Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
-            make_not_null(&u_0_bar_j_tilde), l_max) -
+            l_max, 1, u_0_bar_j_tilde) -
         j_tilde_view *
             conj(Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
-                u_hat_0, l_max)) -
+                l_max, 1, *u_hat_0)) -
         conj(*u_hat_0) * eth_r_tilde * square(one_minus_y_collocation[i]) /
             (2.0 * (*r_tilde_boundary)) * dy_j_tilde_view;
 
@@ -75,7 +75,7 @@ void calculate_inertial_h(
         0.5 *
         ((*u_hat_0) *
              Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
-                 make_not_null(&j_tilde_view), l_max) -
+                 l_max, 1, j_tilde_view) -
          (*u_hat_0) * conj(eth_r_tilde) * square(one_minus_y_collocation[i]) /
              (2.0 * (*r_tilde_boundary)) * dy_j_tilde_view +
          u_0_bar_eth_j_tilde);
@@ -89,14 +89,12 @@ void calculate_inertial_h(
     interpolator.interpolate(
         make_not_null(&interpolated_h_slice.data()),
         Spectral::Swsh::libsharp_to_goldberg_modes(
-            Spectral::Swsh::swsh_transform(make_not_null(&h_slice), l_max),
-            l_max)
+            Spectral::Swsh::swsh_transform(l_max, 1, h_slice), l_max)
             .data());
     interpolator.interpolate(
         make_not_null(&interpolated_j_slice.data()),
         Spectral::Swsh::libsharp_to_goldberg_modes(
-            Spectral::Swsh::swsh_transform(make_not_null(&j_view), l_max),
-            l_max)
+            Spectral::Swsh::swsh_transform(l_max, 1, j_view), l_max)
             .data());
 
     SpinWeighted<ComplexDataVector, 0> k_tilde;
@@ -107,10 +105,10 @@ void calculate_inertial_h(
                                            conj(interpolated_j_slice.data()));
 
     auto eth_u_0 = Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
-        u_hat_0, l_max);
+        l_max, 1, *u_hat_0);
     auto ethbar_u_0 =
-        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(u_hat_0,
-                                                                      l_max);
+        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(l_max, 1,
+                                                                      *u_hat_0);
 
     SpinWeighted<ComplexDataVector, 2> computed_h_tilde =
         angular_derivative_term -
@@ -192,7 +190,7 @@ void calculate_non_inertial_news(
   u_interpolator.interpolate(
       make_not_null(&scri_u_hat.data()),
       Spectral::Swsh::libsharp_to_goldberg_modes(
-          Spectral::Swsh::swsh_transform(make_not_null(&scri_u), l_max), l_max)
+          Spectral::Swsh::swsh_transform(l_max, 1, scri_u), l_max)
           .data());
   scri_u_hat =
       0.5 * (scri_u_hat * conj(get(gauge_d)) - conj(scri_u_hat) * get(gauge_c));
@@ -200,12 +198,11 @@ void calculate_non_inertial_news(
   SpinWeighted<ComplexDataVector, 0> boundary_r_tilde{number_of_angular_points};
   Spectral::Swsh::SwshInterpolator interpolator{get<0>(x_of_x_tilde),
                                                 get<1>(x_of_x_tilde), 0, l_max};
-  interpolator.interpolate(make_not_null(&boundary_r_tilde.data()),
-                           Spectral::Swsh::libsharp_to_goldberg_modes(
-                               Spectral::Swsh::swsh_transform(
-                                   make_not_null(&get(*boundary_r)), l_max),
-                               l_max)
-                               .data());
+  interpolator.interpolate(
+      make_not_null(&boundary_r_tilde.data()),
+      Spectral::Swsh::libsharp_to_goldberg_modes(
+          Spectral::Swsh::swsh_transform(l_max, 1, get(*boundary_r)), l_max)
+          .data());
   boundary_r_tilde = boundary_r_tilde * get(omega_cd);
 
   // h_tilde
@@ -227,17 +224,16 @@ void calculate_non_inertial_news(
   interpolator.interpolate(
       make_not_null(&scri_beta_tilde.data()),
       Spectral::Swsh::libsharp_to_goldberg_modes(
-          Spectral::Swsh::swsh_transform(make_not_null(&scri_beta), l_max),
-          l_max)
+          Spectral::Swsh::swsh_transform(l_max, 1, scri_beta), l_max)
           .data());
   scri_beta_tilde -= 0.5 * log(get(omega_cd).data());
 
   auto eth_beta_tilde_at_scri =
       Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
-          make_not_null(&scri_beta_tilde), l_max);
+          l_max, 1, scri_beta_tilde);
   auto eth_eth_beta_tilde_at_scri =
       Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::EthEth>(
-          make_not_null(&scri_beta_tilde), l_max);
+          l_max, 1, scri_beta_tilde);
 
   Scalar<SpinWeighted<ComplexDataVector, 2>> dy_h_tilde{get(h_tilde).size()};
 
@@ -261,8 +257,7 @@ void calculate_non_inertial_news(
     news_interpolator.interpolate(
         make_not_null(&get(*news).data()),
         Spectral::Swsh::libsharp_to_goldberg_modes(
-            Spectral::Swsh::swsh_transform(
-                make_not_null(&news_in_inertial_frame), l_max),
+            Spectral::Swsh::swsh_transform(l_max, 1, news_in_inertial_frame),
             l_max)
             .data());
   } else {

@@ -49,8 +49,7 @@ struct ObserveInertialNews {
     auto to_transform = SpinWeighted<ComplexDataVector, 2>{interpolation.first};
     ComplexModalVector goldberg_modes =
         Spectral::Swsh::libsharp_to_goldberg_modes(
-            Spectral::Swsh::swsh_transform(make_not_null(&to_transform), l_max),
-            l_max)
+            Spectral::Swsh::swsh_transform(l_max, 1, to_transform), l_max)
             .data();
     DataVector goldberg_mode_subset{
         reinterpret_cast<double*>(goldberg_modes.data()),

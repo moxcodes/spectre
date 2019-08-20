@@ -239,8 +239,8 @@ struct ComputePreSwshDerivatives<Tags::Dy<Tag>> {
   using integrand_tags = tmpl::list<>;
 
   using return_tags = tmpl::list<Tags::Dy<Tag>>;
-  using argument_tags = tmpl::append<tmpl::list<Spectral::Swsh::Tags::LMax>,
-                                     pre_swsh_derivative_tags>;
+  using argument_tags = tmpl::append<pre_swsh_derivative_tags,
+                                     tmpl::list<Spectral::Swsh::Tags::LMax>>;
 
   static void apply(
       const gsl::not_null<

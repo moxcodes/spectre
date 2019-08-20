@@ -22,7 +22,7 @@ struct CalculateScriPlusValue<Tags::News> {
       tmpl::list<Tags::SpecH, Tags::Dy<Tags::BondiJ>, Tags::BondiBeta,
                  Tags::EvolutionGaugeBoundaryValue<Tags::BondiR>,
                  Tags::EvolutionGaugeBoundaryValue<Tags::DuRDividedByR>,
-                 Tags::LMax>;
+                 Spectral::Swsh::Tags::LMax>;
   using return_tags = tmpl::list<Tags::News, Tags::U0>;
 
   static void apply(
@@ -32,7 +32,7 @@ struct CalculateScriPlusValue<Tags::News> {
       const Scalar<SpinWeighted<ComplexDataVector, 2>>& dy_j,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& beta,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& r,
-      const Scalar<SpinWeighted<ComplexDataVector, 0>>& du_r_divided_by_r,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& /*du_r_divided_by_r*/,
       const size_t l_max) noexcept {
     size_t number_of_angular_points =
         Spectral::Swsh::number_of_swsh_collocation_points(l_max);
@@ -60,10 +60,10 @@ struct CalculateScriPlusValue<Tags::News> {
     // scri+, so don't worry about it.
     auto eth_beta_at_scri =
         Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
-            make_not_null(&beta_at_scri), l_max);
+            l_max, 1, beta_at_scri);
     auto eth_eth_beta_at_scri =
         Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::EthEth>(
-            make_not_null(&beta_at_scri), l_max);
+            l_max, 1, beta_at_scri);
 
     ComplexDataVector dy_j_buffer = get(dy_j).data();
     SpinWeighted<ComplexDataVector, 2> dy_j_at_scri;
@@ -75,24 +75,24 @@ struct CalculateScriPlusValue<Tags::News> {
 
     auto ethbar_u0 =
         Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
-            make_not_null(&get(*u_0)), l_max);
+            l_max, 1, get(*u_0));
     SpinWeighted<ComplexDataVector, 0> r_buffer = get(r);
     SpinWeighted<ComplexDataVector, 1> u0bar_dy_j =
         conj(get(*u_0)) * dy_j_at_scri;
     SpinWeighted<ComplexDataVector, 2> u0bar_eth_dy_j =
-        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
-            make_not_null(&u0bar_dy_j), l_max) -
+        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(l_max, 1,
+                                                                   u0bar_dy_j) -
         dy_j_at_scri *
             conj(Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
-                make_not_null(&get(*u_0)), l_max)) +
-        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
-            make_not_null(&r_buffer), l_max) /
+                l_max, 1, get(*u_0))) +
+        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(l_max, 1,
+                                                                   r_buffer) /
             r_buffer * u0bar_dy_j;
     SpinWeighted<ComplexDataVector, 1> ethbar_dy_j =
         Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
-            make_not_null(&dy_j_at_scri), l_max) +
+            l_max, 1, dy_j_at_scri) +
         Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
-            make_not_null(&r_buffer), l_max) /
+            l_max, 1, r_buffer) /
             r_buffer * dy_j_at_scri;
     // TEST
     SpinWeighted<ComplexDataVector, 2> u_term =
@@ -130,7 +130,7 @@ template <>
 struct CalculateScriPlusValue<Tags::CauchyGaugeScriPlus<Tags::BondiBeta>> {
   using argument_tags =
       tmpl::list<Tags::GaugeOmega, Tags::InertialAngularCoords,
-                 Tags::CauchyAngularCoords, Tags::LMax>;
+                 Tags::CauchyAngularCoords, Spectral::Swsh::Tags::LMax>;
   using return_tags =
       tmpl::list<Tags::CauchyGaugeScriPlus<Tags::BondiBeta>, Tags::BondiBeta>;
   static void apply(
@@ -139,7 +139,8 @@ struct CalculateScriPlusValue<Tags::CauchyGaugeScriPlus<Tags::BondiBeta>> {
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> beta,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega,
       const tnsr::i<DataVector, 2>& x_tilde_of_x,
-      const tnsr::i<DataVector, 2>& x_of_x_tilde, const size_t l_max) noexcept {
+      const tnsr::i<DataVector, 2>& /*x_of_x_tilde*/,
+      const size_t l_max) noexcept {
     size_t number_of_angular_points =
         Spectral::Swsh::number_of_swsh_collocation_points(l_max);
     size_t number_of_radial_points =
@@ -157,8 +158,7 @@ struct CalculateScriPlusValue<Tags::CauchyGaugeScriPlus<Tags::BondiBeta>> {
     interpolator.interpolate(
         make_not_null(&get(*cauchy_gauge_beta).data()),
         Spectral::Swsh::libsharp_to_goldberg_modes(
-            Spectral::Swsh::swsh_transform(make_not_null(&beta_buffer), l_max),
-            l_max)
+            Spectral::Swsh::swsh_transform(l_max, 1, beta_buffer), l_max)
             .data());
   }
 };
@@ -190,27 +190,27 @@ struct CalculateScriPlusValue<Tags::CauchyGaugeScriPlus<Tags::U0>> {
       tmpl::list<Tags::GaugeC, Tags::GaugeD, Tags::GaugeA, Tags::GaugeB,
                  Tags::GaugeOmega, Tags::GaugeOmegaCD,
                  Tags::InertialAngularCoords, Tags::CauchyAngularCoords,
-                 Tags::LMax>;
+                 Spectral::Swsh::Tags::LMax>;
   using return_tags = tmpl::list<Tags::CauchyGaugeScriPlus<Tags::U0>, Tags::U0>;
   static void apply(
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*>
           cauchy_gauge_u0,
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> u0,
-      const Scalar<SpinWeighted<ComplexDataVector, 2>>& c,
-      const Scalar<SpinWeighted<ComplexDataVector, 0>>& d,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& /*c*/,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& /*d*/,
       const Scalar<SpinWeighted<ComplexDataVector, 2>>& a,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& b,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega,
-      const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega_cd,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& /*omega_cd*/,
       const tnsr::i<DataVector, 2>& x_tilde_of_x,
-      const tnsr::i<DataVector, 2>& x_of_x_tilde, const size_t l_max) noexcept {
+      const tnsr::i<DataVector, 2>& /*x_of_x_tilde*/,
+      const size_t l_max) noexcept {
     Spectral::Swsh::SwshInterpolator interpolator{
         get<0>(x_tilde_of_x), get<1>(x_tilde_of_x), 1, l_max};
     interpolator.interpolate(
         make_not_null(&get(*cauchy_gauge_u0).data()),
         Spectral::Swsh::libsharp_to_goldberg_modes(
-            Spectral::Swsh::swsh_transform(make_not_null(&get(*u0)), l_max),
-            l_max)
+            Spectral::Swsh::swsh_transform(l_max, 1, get(*u0)), l_max)
             .data());
 
     get(*cauchy_gauge_u0) = 0.5 / square(get(omega)) *
@@ -267,7 +267,7 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::BondiBeta>> {
   using argument_tags =
       tmpl::list<Tags::GaugeOmega, Tags::GaugeA, Tags::GaugeB, Tags::GaugeC,
                  Tags::GaugeD, Tags::InertialAngularCoords,
-                 Tags::CauchyAngularCoords, Tags::LMax>;
+                 Tags::CauchyAngularCoords, Spectral::Swsh::Tags::LMax>;
   using return_tags =
       tmpl::list<Tags::CauchyGauge<Tags::BondiBeta>, Tags::BondiBeta>;
 
@@ -276,12 +276,13 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::BondiBeta>> {
           cauchy_beta,
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> beta,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega,
-      const Scalar<SpinWeighted<ComplexDataVector, 2>>& a,
-      const Scalar<SpinWeighted<ComplexDataVector, 0>>& b,
-      const Scalar<SpinWeighted<ComplexDataVector, 2>>& c,
-      const Scalar<SpinWeighted<ComplexDataVector, 0>>& d,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& /*a*/,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& /*b*/,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& /*c*/,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& /*d*/,
       const tnsr::i<DataVector, 2>& x_tilde_of_x,
-      const tnsr::i<DataVector, 2>& x_of_x_tilde, const size_t l_max) noexcept {
+      const tnsr::i<DataVector, 2>& /*x_of_x_tilde*/,
+      const size_t l_max) noexcept {
     // angular slices
     size_t number_of_angular_points =
         Spectral::Swsh::number_of_swsh_collocation_points(l_max);
@@ -313,8 +314,7 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::BondiBeta>> {
       interpolator.interpolate(
           make_not_null(&interpolated_cauchy_beta_slice.data()),
           Spectral::Swsh::libsharp_to_goldberg_modes(
-              Spectral::Swsh::swsh_transform(make_not_null(&beta_slice), l_max),
-              l_max)
+              Spectral::Swsh::swsh_transform(l_max, 1, beta_slice), l_max)
               .data());
 
       ComplexDataVector cauchy_beta_slice{
@@ -325,8 +325,8 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::BondiBeta>> {
     }
 
     // SpinWeighted<ComplexDataVector, 0> test_beta_cauchy{get(d).size()};
-    const auto& collocation = Spectral::Swsh::precomputed_collocation<
-        Spectral::Swsh::ComplexRepresentation::Interleaved>(l_max);
+    // const auto& collocation = Spectral::Swsh::cached_collocation_metadata<
+    // Spectral::Swsh::ComplexRepresentation::Interleaved>(l_max);
     // for (const auto& collocation_point : collocation) {
     //   test_beta_cauchy.data()[collocation_point.offset] =
     //       sin(collocation_point.theta) * sin(collocation_point.phi);
@@ -442,12 +442,13 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::BondiBeta>> {
 
 template <>
 struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::SpecH>> {
-  using argument_tags = tmpl::list<
-      Tags::GaugeOmega, Tags::GaugeOmegaCD, Tags::Du<Tags::GaugeOmegaCD>,
-      Spectral::Swsh::Tags::Derivative<Tags::GaugeOmegaCD,
-                                       Spectral::Swsh::Tags::Eth>,
-      Tags::GaugeA, Tags::GaugeB, Tags::BoundaryValue<Tags::SpecH>,
-      Tags::InertialAngularCoords, Tags::LMax>;
+  using argument_tags =
+      tmpl::list<Tags::GaugeOmega, Tags::GaugeOmegaCD,
+                 Tags::Du<Tags::GaugeOmegaCD>,
+                 Spectral::Swsh::Tags::Derivative<Tags::GaugeOmegaCD,
+                                                  Spectral::Swsh::Tags::Eth>,
+                 Tags::GaugeA, Tags::GaugeB, Tags::BoundaryValue<Tags::SpecH>,
+                 Tags::InertialAngularCoords, Spectral::Swsh::Tags::LMax>;
   using return_tags =
       tmpl::list<Tags::CauchyGauge<Tags::SpecH>, Tags::SpecH, Tags::BondiJ,
                  Tags::CauchyGauge<Tags::BondiJ>, Tags::U0,
@@ -458,7 +459,8 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::SpecH>> {
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> cauchy_h,
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> h,
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> j,
-      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> cauchy_j,
+      const gsl::not_null<
+          Scalar<SpinWeighted<ComplexDataVector, 2>>*> /*cauchy_j*/,
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> u_0,
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> dy_j,
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*>
@@ -469,7 +471,7 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::SpecH>> {
       const Scalar<SpinWeighted<ComplexDataVector, 1>>& eth_omega_cd,
       const Scalar<SpinWeighted<ComplexDataVector, 2>>& a,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& b,
-      const Scalar<SpinWeighted<ComplexDataVector, 2>>& boundary_h,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& /*boundary_h*/,
       const tnsr::i<DataVector, 2>& x_tilde_of_x, const size_t l_max) noexcept {
     // TODO add interpolation first
     size_t number_of_angular_points =
@@ -511,18 +513,18 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::SpecH>> {
 
       auto eth_r_tilde =
           Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
-              make_not_null(&get(*r_tilde_boundary)), l_max);
+              l_max, 1, get(*r_tilde_boundary));
 
       SpinWeighted<ComplexDataVector, 1> u_0_bar_j_tilde =
           conj(get(*u_0)) * j_view;
 
       SpinWeighted<ComplexDataVector, 2> u_0_bar_eth_j_tilde =
           Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
-              make_not_null(&u_0_bar_j_tilde), l_max) -
+              l_max, 1, u_0_bar_j_tilde) -
           j_view *
               conj(
                   Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
-                      make_not_null(&get(*u_0)), l_max)) -
+                      l_max, 1, get(*u_0))) -
           conj(get(*u_0)) * eth_r_tilde * square(one_minus_y_collocation[i]) /
               (2.0 * get(*r_tilde_boundary)) * dy_j_view;
 
@@ -530,7 +532,7 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::SpecH>> {
           0.5 *
           (get(*u_0) *
                Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
-                   make_not_null(&j_view), l_max) -
+                   l_max, 1, j_view) -
            get(*u_0) * conj(eth_r_tilde) * square(one_minus_y_collocation[i]) /
                (2.0 * get(*r_tilde_boundary)) * dy_j_view +
            u_0_bar_eth_j_tilde);
@@ -540,10 +542,10 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::SpecH>> {
                                     conj(get(*u_0)) * get(eth_omega_cd));
 
       auto eth_u_0 = Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
-          make_not_null(&get(*u_0)), l_max);
+          l_max, 1, get(*u_0));
       auto ethbar_u_0 =
           Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
-              make_not_null(&get(*u_0)), l_max);
+              l_max, 1, get(*u_0));
 
       ComplexDataVector k_tilde =
           sqrt(1.0 + j_view.data() * conj(j_view.data()));
@@ -563,14 +565,12 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::SpecH>> {
       interpolator.interpolate(
           make_not_null(&interpolated_cauchy_h_slice.data()),
           Spectral::Swsh::libsharp_to_goldberg_modes(
-              Spectral::Swsh::swsh_transform(make_not_null(&h_slice), l_max),
-              l_max)
+              Spectral::Swsh::swsh_transform(l_max, 1, h_slice), l_max)
               .data());
       interpolator.interpolate(
           make_not_null(&interpolated_cauchy_j_slice.data()),
           Spectral::Swsh::libsharp_to_goldberg_modes(
-              Spectral::Swsh::swsh_transform(make_not_null(&j_view), l_max),
-              l_max)
+              Spectral::Swsh::swsh_transform(l_max, 1, j_view), l_max)
               .data());
 
       ComplexDataVector interpolated_k =
@@ -609,7 +609,7 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::BondiW>> {
                                                   Spectral::Swsh::Tags::Eth>,
                  Tags::EvolutionGaugeBoundaryValue<Tags::BondiR>,
                  Tags::BoundaryValue<Tags::BondiW>, Tags::InertialAngularCoords,
-                 Tags::LMax>;
+                 Spectral::Swsh::Tags::LMax>;
   using return_tags = tmpl::list<Tags::CauchyGauge<Tags::BondiW>, Tags::BondiW,
                                  Tags::BondiU, Tags::BondiBeta, Tags::BondiJ>;
 
@@ -623,7 +623,7 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::BondiW>> {
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& du_omega_cd,
       const Scalar<SpinWeighted<ComplexDataVector, 1>>& eth_omega_cd,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& r_tilde_boundary,
-      const Scalar<SpinWeighted<ComplexDataVector, 0>>& boundary_w,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& /*boundary_w*/,
       const tnsr::i<DataVector, 2>& x_tilde_of_x, const size_t l_max) noexcept {
     // TODO add interpolation first
     size_t number_of_angular_points =
@@ -678,8 +678,7 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::BondiW>> {
       interpolator.interpolate(
           make_not_null(&interpolated_cauchy_w_slice.data()),
           Spectral::Swsh::libsharp_to_goldberg_modes(
-              Spectral::Swsh::swsh_transform(make_not_null(&w_slice), l_max),
-              l_max)
+              Spectral::Swsh::swsh_transform(l_max, 1, w_slice), l_max)
               .data());
 
       cauchy_w_view = interpolated_cauchy_w_slice.data();
@@ -700,8 +699,9 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::BondiW>> {
 
 template <>
 struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::BondiJ>> {
-  using argument_tags = tmpl::list<Tags::GaugeA, Tags::GaugeB, Tags::GaugeOmega,
-                                   Tags::InertialAngularCoords, Tags::LMax>;
+  using argument_tags =
+      tmpl::list<Tags::GaugeA, Tags::GaugeB, Tags::GaugeOmega,
+                 Tags::InertialAngularCoords, Spectral::Swsh::Tags::LMax>;
   using return_tags = tmpl::list<Tags::CauchyGauge<Tags::BondiJ>, Tags::BondiJ>;
 
   static void apply(
@@ -732,8 +732,7 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::BondiJ>> {
       interpolator.interpolate(
           make_not_null(&interpolated_cauchy_j_slice.data()),
           Spectral::Swsh::libsharp_to_goldberg_modes(
-              Spectral::Swsh::swsh_transform(make_not_null(&j_slice), l_max),
-              l_max)
+              Spectral::Swsh::swsh_transform(l_max, 1, j_slice), l_max)
               .data());
 
       ComplexDataVector cauchy_j_view{
@@ -764,7 +763,7 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::BondiU>> {
                  Spectral::Swsh::Tags::Derivative<Tags::GaugeOmegaCD,
                                                   Spectral::Swsh::Tags::Eth>,
                  Tags::GaugeA, Tags::GaugeB, Tags::BoundaryValue<Tags::BondiU>,
-                 Tags::InertialAngularCoords, Tags::LMax>;
+                 Tags::InertialAngularCoords, Spectral::Swsh::Tags::LMax>;
   using return_tags = tmpl::list<Tags::CauchyGauge<Tags::BondiU>, Tags::BondiU,
                                  Tags::BondiJ, Tags::BondiBeta>;
 
@@ -780,7 +779,7 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::BondiU>> {
       const Scalar<SpinWeighted<ComplexDataVector, 1>>& eth_omega_cd,
       const Scalar<SpinWeighted<ComplexDataVector, 2>>& a,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& b,
-      const Scalar<SpinWeighted<ComplexDataVector, 1>>& boundary_u,
+      const Scalar<SpinWeighted<ComplexDataVector, 1>>& /*boundary_u*/,
       const tnsr::i<DataVector, 2> x_tilde_of_x, const size_t l_max) noexcept {
     size_t number_of_angular_points =
         Spectral::Swsh::number_of_swsh_collocation_points(l_max);
@@ -820,8 +819,7 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::BondiU>> {
       interpolator.interpolate(
           make_not_null(&interpolated_cauchy_u_slice.data()),
           Spectral::Swsh::libsharp_to_goldberg_modes(
-              Spectral::Swsh::swsh_transform(make_not_null(&u_slice), l_max),
-              l_max)
+              Spectral::Swsh::swsh_transform(l_max, 1, u_slice), l_max)
               .data());
 
       cauchy_u_view =
@@ -850,7 +848,7 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::BondiQ>> {
                  Tags::GaugeOmega,
                  Spectral::Swsh::Tags::Derivative<Tags::GaugeOmega,
                                                   Spectral::Swsh::Tags::Eth>,
-                 Tags::GaugeA, Tags::GaugeB, Tags::LMax>;
+                 Tags::GaugeA, Tags::GaugeB, Spectral::Swsh::Tags::LMax>;
   using return_tags =
       tmpl::list<Tags::CauchyGauge<Tags::BondiQ>, Tags::Dy<Tags::BondiU>,
                  Tags::CauchyGauge<Tags::BondiJ>,
@@ -863,9 +861,9 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::BondiQ>> {
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*>
           cauchy_beta,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& r,
-      const Scalar<SpinWeighted<ComplexDataVector, 1>>& u_0,
+      const Scalar<SpinWeighted<ComplexDataVector, 1>>& /*u_0*/,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega,
-      const Scalar<SpinWeighted<ComplexDataVector, 1>>& eth_omega,
+      const Scalar<SpinWeighted<ComplexDataVector, 1>>& /*eth_omega*/,
       const Scalar<SpinWeighted<ComplexDataVector, 2>>& a,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& b,
       const size_t l_max) noexcept {
@@ -875,10 +873,10 @@ struct CalculateCauchyGauge<Tags::CauchyGauge<Tags::BondiQ>> {
         get(*dy_u).size() / number_of_angular_points;
 
     // FIXME this is currently specialized to omega = 1
-    const auto& one_minus_y_collocation =
-        1.0 - Spectral::collocation_points<Spectral::Basis::Legendre,
-                                           Spectral::Quadrature::GaussLobatto>(
-                  number_of_radial_points);
+    // const auto& one_minus_y_collocation =
+    // 1.0 - Spectral::collocation_points<Spectral::Basis::Legendre,
+    // Spectral::Quadrature::GaussLobatto>(
+    // number_of_radial_points);
 
     for (size_t i = 0; i < number_of_radial_points; ++i) {
       ComplexDataVector dy_u_slice{
@@ -919,17 +917,18 @@ struct CalculateInertialModes<Tags::BondiJ> {
       const gsl::not_null<DataBoxType*> box,
       const ComplexModalVector& goldberg_cauchy_modes,
       const ComplexDataVector& view_y) noexcept {
-    const size_t l_max = db::get<Tags::LMax>(*box);
+    const size_t l_max = db::get<Spectral::Swsh::Tags::LMax>(*box);
     SpinWeighted<ComplexModalVector, 2> libsharp_modes{
-        2 * Spectral::Swsh::number_of_swsh_coefficients(l_max)};
+        Spectral::Swsh::size_of_libsharp_coefficient_vector(l_max)};
 
-    const auto& coefficients = Spectral::Swsh::precomputed_coefficients(l_max);
+    const auto& coefficients =
+        Spectral::Swsh::cached_coefficients_metadata(l_max);
 
     for (auto coefficient_iter = coefficients.begin();
          coefficient_iter != coefficients.end(); ++coefficient_iter) {
       // if(plus_m_index < goldberg_cauchy_modes.size()) {
-      Spectral::Swsh::set_libsharp_modes_from_goldberg_modes(
-          coefficient_iter, make_not_null(&libsharp_modes), 0,
+      Spectral::Swsh::goldberg_modes_to_libsharp_modes_single_pair(
+          *coefficient_iter, make_not_null(&libsharp_modes), 0,
           goldberg_cauchy_modes[square((*coefficient_iter).l) +
                                 (*coefficient_iter).l + (*coefficient_iter).m],
           goldberg_cauchy_modes[square((*coefficient_iter).l) +
@@ -940,8 +939,8 @@ struct CalculateInertialModes<Tags::BondiJ> {
       // }
     }
     Scalar<SpinWeighted<ComplexDataVector, 2>> cauchy_j;
-    get(cauchy_j) = Spectral::Swsh::inverse_swsh_transform(
-        make_not_null(&libsharp_modes), l_max);
+    get(cauchy_j) =
+        Spectral::Swsh::inverse_swsh_transform(l_max, 1, libsharp_modes);
     return CalculateInertialModes<Tags::BondiJ>::compute(
         box, make_not_null(&cauchy_j), view_y);
   }
@@ -950,7 +949,7 @@ struct CalculateInertialModes<Tags::BondiJ> {
       const gsl::not_null<DataBoxType*> box,
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> cauchy_j,
       const ComplexDataVector& /*view_y*/) noexcept {
-    const size_t l_max = db::get<Tags::LMax>(*box);
+    const size_t l_max = db::get<Spectral::Swsh::Tags::LMax>(*box);
 
     Scalar<SpinWeighted<ComplexDataVector, 2>> inertial_j;
     ComputeGaugeAdjustedBoundaryValue<Tags::BondiJ>::apply(
@@ -958,8 +957,7 @@ struct CalculateInertialModes<Tags::BondiJ> {
         db::get<Tags::GaugeD>(*box), db::get<Tags::GaugeOmegaCD>(*box),
         db::get<Tags::CauchyAngularCoords>(*box), l_max);
     auto goldberg_modes = Spectral::Swsh::libsharp_to_goldberg_modes(
-        Spectral::Swsh::swsh_transform(make_not_null(&get(inertial_j)), l_max),
-        l_max);
+        Spectral::Swsh::swsh_transform(l_max, 1, get(inertial_j)), l_max);
     // TEST
     // auto goldberg_modes = Spectral::Swsh::libsharp_to_goldberg_modes(
     // Spectral::Swsh::swsh_transform(make_not_null(&get(*cauchy_j)), l_max),
