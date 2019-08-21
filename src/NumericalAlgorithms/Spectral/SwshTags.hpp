@@ -47,22 +47,21 @@ struct EthbarEthbar {};
 /// no derivative is taken.
 struct NoDerivative {};
 
-namespace detail {
-
 // utility function for determining the change of spin after a spin-weighted
 // derivative has been applied.
 template <typename DerivativeKind>
-constexpr int derivative_spin_weight_adjustment = 0;
+constexpr int derivative_spin_weight = 0;
 
 template <>
-constexpr int derivative_spin_weight_adjustment<Eth> = 1;
+constexpr int derivative_spin_weight<Eth> = 1;
 template <>
-constexpr int derivative_spin_weight_adjustment<Ethbar> = -1;
+constexpr int derivative_spin_weight<Ethbar> = -1;
 template <>
-constexpr int derivative_spin_weight_adjustment<EthEth> = 2;
+constexpr int derivative_spin_weight<EthEth> = 2;
 template <>
-constexpr int derivative_spin_weight_adjustment<EthbarEthbar> = -2;
+constexpr int derivative_spin_weight<EthbarEthbar> = -2;
 
+namespace detail {
 // The below tags are used to find the new type represented by the spin-weighted
 // derivative of a spin-weighted quantity. The derivatives alter the spin
 // weights, and so the utility `adjust_spin_weight_t<Tag, DerivativeKind>` is a
@@ -74,15 +73,14 @@ constexpr int derivative_spin_weight_adjustment<EthbarEthbar> = -2;
 template <typename DataType, typename DerivativeKind>
 struct adjust_spin_weight {
   using type =
-      Scalar<SpinWeighted<DataType,
-                          derivative_spin_weight_adjustment<DerivativeKind>>>;
+      Scalar<SpinWeighted<DataType, derivative_spin_weight<DerivativeKind>>>;
 };
 
 // case for if there is a `Tag::type::spin`
 template <typename DataType, int Spin, typename DerivativeKind>
 struct adjust_spin_weight<SpinWeighted<DataType, Spin>, DerivativeKind> {
-  using type = Scalar<SpinWeighted<
-      DataType, Spin + derivative_spin_weight_adjustment<DerivativeKind>>>;
+  using type = Scalar<
+      SpinWeighted<DataType, Spin + derivative_spin_weight<DerivativeKind>>>;
 };
 
 template <typename Tag, typename DerivativeKind>
@@ -192,6 +190,16 @@ template <typename PrefixTag, typename S>
 struct wrapped_has_spin : has_spin<typename PrefixTag::tag, S> {};
 
 }  // namespace detail
+
+/// \ingroup SwshGroup
+/// \brief A metafunction for determining the coefficient buffers needed by
+/// `compute_swsh_derivatives()` to avoid large allocations.
+/// \note Using these buffers is required to use the batch
+/// `compute_swsh_derivatives()` rather than the individual `swsh_derivative()`.
+template <typename DerivativeTag>
+using coefficient_buffer_tags_for_derivative_tag =
+    tmpl::list<Spectral::Swsh::Tags::SwshTransform<typename DerivativeTag::tag>,
+               Spectral::Swsh::Tags::SwshTransform<DerivativeTag>>;
 
 /// \ingroup SwshGroup
 /// \brief Extract from `TagList` the subset of those tags that have a static
