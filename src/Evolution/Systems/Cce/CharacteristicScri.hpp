@@ -184,6 +184,10 @@ struct CharacteristicScri {
       tmpl::list<Actions::InitializeCharacteristicScri,
                  Parallel::Actions::TerminatePhase>;
 
+  using initialization_tags =
+      Parallel::get_initialization_tags<initialize_action_list>;
+
+
   using registration_action_list = tmpl::list<
       ::observers::Actions::RegisterSingletonWithObservers<RegistrationHelper>,
       Parallel::Actions::TerminatePhase>;

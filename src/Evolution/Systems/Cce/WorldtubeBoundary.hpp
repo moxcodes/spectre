@@ -70,6 +70,8 @@ struct H5WorldtubeBoundary {
   using add_options_to_databox = typename Parallel::AddNoOptionsToDataBox;
   using initialize_action_list = tmpl::list<InitializeH5WorldtubeBoundary,
                                             Parallel::Actions::TerminatePhase>;
+  using initialization_tags =
+      Parallel::get_initialization_tags<initialize_action_list>;
 
   using worldtube_boundary_computation_steps = tmpl::list<>;
 

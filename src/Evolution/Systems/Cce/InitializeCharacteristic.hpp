@@ -22,6 +22,51 @@ struct BoundaryTime : db::SimpleTag {
   using type = double;
   static std::string name() noexcept { return "BoundaryTime"; }
 };
+
+// initialization tags
+struct LMax : db::SimpleTag, Spectral::Swsh::Tags::LMax {
+  using type = double;
+  static std::string name() noexcept { return "LMax"; }
+  using option_tags = tmpl::list<OptionTags::LMax>;
+
+  static double create_from_options(const double l_max) noexcept {
+    return l_max;
+  }
+};
+
+struct NumberOfRadialPoints : db::SimpleTag,
+                              Spectral::Swsh::Tags::NumberOfRadialPoints {
+  using type = double;
+  static std::string name() noexcept { return "LMax"; }
+  using option_tags = tmpl::list<OptionTags::NumberOfRadialPoints>;
+
+  static double create_from_options(
+      const double number_of_radial_points) noexcept {
+    return number_of_radial_points;
+  }
+};
+
+struct EndTime : db::SimpleTag {
+  using type = double;
+  static std::string name() noexcept { return "EndTime"; }
+  using option_tags = tmpl::list<OptionTags::EndTime, OptionTags::LMax,
+                                 OptionTags::BoundaryDataFilename>;
+
+  static double create_from_options(double end_time, const size_t l_max,
+                                    const std::string filename) {
+    if (std::isnan(end_time)) {
+      // optimization note: this would be faster if we separated out the
+      // inspection of the times from the data manager to avoid allocating
+      // internal member variables we don't need for this simple lookup.
+      CceH5BoundaryDataManager<CubicInterpolator> h5_boundary_data_manager{
+          filename, l_max, 1};
+      const auto& time_buffer = h5_boundary_data_manager.get_time_buffer();
+      end_time = time_buffer[time_buffer.size() - 1];
+    }
+    return end_time;
+  }
+};
+
 }  // namespace Tags
 
 namespace Actions {
@@ -55,20 +100,11 @@ struct PopulateCharacteristicInitialHypersurface {
 };
 
 struct InitializeCharacteristic {
-  /* Options are being updated. The correct way to store options will be to put
-   * the option tag list in the initialization action (here), and they'll be
-   * automatically extracted and parsed from any action placed in the special
-   * "Initialization" phase*/
-  // TODO
-  static constexpr double start_time = 1000.0;
-  static constexpr double end_time_input =
-      std::numeric_limits<double>::quiet_NaN();
-  // static constexpr double end_time_input = 2000.0;
-  static constexpr double target_step_size = 1.0;
 
-  using interpolator = CubicInterpolator;
-  static std::string input_filename() noexcept { return "CceR0100"; }
-  // \TODO
+  using initialization_tags =
+      tmpl::list<Tags::LMax, Tags::NumberOfRadialPoints, Tags::EndTime>;
+  using const_global_cache_tags =
+      tmpl::list<OptionTags::StartTime, OptionTags::TargetStepSize>;
 
   template <typename Metavariables>
   struct EvolutionTags {
@@ -88,9 +124,11 @@ struct InitializeCharacteristic {
     template <typename TagList>
     static auto initialize(
         db::DataBox<TagList>&& box,
-        const Parallel::ConstGlobalCache<Metavariables>& cache,
-        const double initial_time_value, const double /*end_time_value*/,
-        const double step_size) noexcept {
+        const Parallel::ConstGlobalCache<Metavariables>& cache) noexcept {
+      const double initial_time_value =
+          Parallel::get<OptionTags::StartTime>(cache);
+      const double step_size = Parallel::get<OptionTags::TargetStepSize>(cache);
+
       // currently hard-coded to fixed step size
       const Slab single_step_slab{initial_time_value,
                                   initial_time_value + step_size};
@@ -114,8 +152,9 @@ struct InitializeCharacteristic {
           typename Metavariables::evolved_swsh_dt_tag>>
           swsh_history;
 
-      return db::create_from<db::RemoveTags<>, evolution_simple_tags,
-                             evolution_compute_tags>(
+      return Initialization::merge_into_databox<
+          InitializeCharacteristic, evolution_simple_tags,
+          evolution_compute_tags, Initialization::MergePolicy::Overwrite>(
           std::move(box), initial_time_id, second_time_id, fixed_time_step,
           std::move(coordinate_history), std::move(swsh_history));
     }
@@ -149,16 +188,19 @@ struct InitializeCharacteristic {
     template <typename TagList>
     static auto initialize(
         db::DataBox<TagList>&& box,
-        const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
-        const size_t l_max, const size_t number_of_radial_points) noexcept {
+        const Parallel::ConstGlobalCache<Metavariables>& cache) noexcept {
+      const size_t l_max =  Parallel::get<OptionTags::LMax>(cache);
+      const size_t number_of_radial_points =
+          Parallel::get<OptionTags::NumberOfRadialPoints>(cache);
       const size_t boundary_size =
           Spectral::Swsh::number_of_swsh_collocation_points(l_max);
       const size_t volume_size = boundary_size * number_of_radial_points;
       const size_t transform_buffer_size =
           number_of_radial_points *
           Spectral::Swsh::size_of_libsharp_coefficient_vector(l_max);
-      return db::create_from<
-          db::RemoveTags<>,
+
+      return Initialization::merge_into_databox<
+          InitializeCharacteristic,
           db::AddSimpleTags<
               boundary_value_variables_tag, coordinate_variables_tag,
               dt_coordinate_variables_tag, angular_coordinates_variables_tag,
@@ -185,41 +227,30 @@ struct InitializeCharacteristic {
       typename EvolutionTags<Metavariables>::evolution_simple_tags,
       typename EvolutionTags<Metavariables>::evolution_compute_tags>;
 
-  template <typename DbTags, typename... InboxTags, typename Metavariables,
-            typename ArrayIndex, typename ActionList,
-            typename ParallelComponent>
-  static auto apply(db::DataBox<DbTags>& /*box*/,
+  template <
+      typename DbTags, typename... InboxTags, typename Metavariables,
+      typename ArrayIndex, typename ActionList, typename ParallelComponent>
+  static auto apply(db::DataBox<DbTags>& box,
                     const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
                     const Parallel::ConstGlobalCache<Metavariables>& cache,
                     const ArrayIndex& /*array_index*/,
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
     // Evolution quantity initialization
-    double end_time = end_time_input;
     const size_t l_max = Parallel::get<OptionTags::LMax>(cache);
     const size_t number_of_radial_points =
         Parallel::get<OptionTags::NumberOfRadialPoints>(cache);
 
-    if (std::isnan(end_time)) {
-      CceH5BoundaryDataManager<interpolator> h5_boundary_data_manager{
-          input_filename() + ".h5", l_max, 100};
-      const auto& time_buffer = h5_boundary_data_manager.get_time_buffer();
-      end_time = time_buffer[time_buffer.size() - 1];
-    }
-    // clear out the box first
-    auto initialize_box =
-        db::create<db::AddSimpleTags<Spectral::Swsh::Tags::LMax,
-                                     Spectral::Swsh::Tags::NumberOfRadialPoints,
-                                     Tags::BoundaryTime, Tags::EndTime>,
-                   db::AddComputeTags<>>(
-            l_max, number_of_radial_points,
-            std::numeric_limits<double>::quiet_NaN(), end_time);
+    auto initialize_box = Initialization::merge_into_databox<
+        InitializeCharacteristic, db::AddSimpleTags<Tags::BoundaryTime>,
+        db::AddComputeTags<>>(std::move(box),
+                              std::numeric_limits<double>::quiet_NaN());
+
     auto evolution_box = EvolutionTags<Metavariables>::initialize(
-        std::move(initialize_box), cache, start_time, end_time,
-        target_step_size);
+        std::move(initialize_box), cache);
     auto characteristic_evolution_box =
-        CharacteristicTags<Metavariables>::initialize(
-            std::move(evolution_box), cache, l_max, number_of_radial_points);
+        CharacteristicTags<Metavariables>::initialize(std::move(evolution_box),
+                                                      cache);
     return std::make_tuple(std::move(characteristic_evolution_box));
   }
 };

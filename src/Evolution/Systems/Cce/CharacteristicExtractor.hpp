@@ -271,16 +271,9 @@ struct ReceiveWorldtubeData<tmpl::list<BoundaryTags...>> {
 template <class Metavariables>
 struct CharacteristicExtractor {
   using chare_type = Parallel::Algorithms::Singleton;
-  using const_global_cache_tag_list = tmpl::list<>;
   using metavariables = Metavariables;
-  // TODO this should probably actually add LMax and the radial resolution
-  // to the databox, and possibly other things?
-  using add_options_to_databox = typename Parallel::AddNoOptionsToDataBox;
 
-  // using initial_databox =
-  //     db::compute_databox_type<typename InitializeCharacteristic::
-  //                                  template return_tag_list<Metavariables>
-  // >;
+  using add_options_to_databox = typename Parallel::AddNoOptionsToDataBox;
 
   struct RegistrationHelper {
     template <typename ParallelComponent, typename DbTagsList,
@@ -308,6 +301,9 @@ struct CharacteristicExtractor {
                  Actions::BlockUntilBoundaryDataReceived,
                  Actions::PopulateCharacteristicInitialHypersurface,
                  Parallel::Actions::TerminatePhase>;
+
+  using initialization_tags =
+      Parallel::get_initialization_tags<initialize_action_list>;
 
   template <typename BondiTag>
   using hypersurface_computation = tmpl::list<
@@ -382,9 +378,9 @@ struct CharacteristicExtractor {
                              Metavariables::Phase::Extraction,
                              extract_action_list>>;
 
-  // TODO options changes in progress, decide what to do with the options
-  // type alias when determined
-  using options = tmpl::list<>;
+  using const_global_cache_tag_list =
+      Parallel::get_const_global_cache_tags_from_pdal<
+          phase_dependent_action_list>;
 
   static void initialize(
       Parallel::CProxy_ConstGlobalCache<Metavariables>& global_cache) noexcept {

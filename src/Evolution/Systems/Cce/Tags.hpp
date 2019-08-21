@@ -224,11 +224,6 @@ struct U0 : db::SimpleTag {
   static std::string name() noexcept { return "U0"; }
 };
 
-struct EndTime : db::SimpleTag {
-  using type = double;
-  static std::string name() noexcept { return "EndTime"; }
-};
-
 // prefix tags associated with the integrands which are used as input to solvers
 // for the CCE equations
 
