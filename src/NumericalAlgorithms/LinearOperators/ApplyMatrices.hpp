@@ -62,7 +62,7 @@ size_t result_size(const std::array<MatrixType, Dim>& matrices,
 /// the case of acting on a vector of complex values, the matrix is treated as
 /// having zero imaginary part. This is chosen for efficiency in all
 /// use-cases for spectral matrix arithmetic so far encountered.
-@{
+// @{
 template <typename VariableTags, typename MatrixType, size_t Dim>
 void apply_matrices(const gsl::not_null<Variables<VariableTags>*> result,
                     const std::array<MatrixType, Dim>& matrices,
@@ -129,4 +129,4 @@ ResultType apply_matrices(const std::array<MatrixType, Dim>& matrices,
   apply_matrices(make_not_null(&result), matrices, u, extents);
   return result;
 }
-//@}
+// @}
