@@ -26,8 +26,8 @@ struct InterpolationManager : db::SimpleTag {
 namespace Actions {
 
 struct InitializeCharacteristicScri {
-  // TODO options tags
-  const size_t number_of_required_scri_points = 5;
+  using const_global_cache_tags =
+      tmpl::list<OptionTags::ScriInterpolationPoints>;
 
   template <typename DbTags, typename... InboxTags, typename Metavariables,
             typename ArrayIndex, typename ActionList,
@@ -39,12 +39,15 @@ struct InitializeCharacteristicScri {
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
     const size_t l_max = Parallel::get<OptionTags::LMax>(cache);
+    const size_t number_of_scri_interpolation_points =
+        Parallel::get<OptionTags::ScriInterpolationPoints>(cache);
     auto initialize_box =
         db::create<db::AddSimpleTags<Tags::InterpolationManager<
                        ComplexDataVector, Tags::News>>,
                    db::AddComputeTags<>>(
             ScriPlusInterpolationManager<ComplexDataVector>{
-                5, Spectral::Swsh::number_of_swsh_collocation_points(l_max),
+                number_of_scri_interpolation_points,
+                Spectral::Swsh::number_of_swsh_collocation_points(l_max),
                 FlexibleBarycentricInterpolator{}});
     return std::make_tuple(std::move(initialize_box));
   }

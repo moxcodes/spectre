@@ -16,17 +16,16 @@ namespace Cce {
 
 namespace Tags {
 
-struct H5WorldtubeBoundaryDataManager : db::SimpleTag{
+struct H5WorldtubeBoundaryDataManager : db::SimpleTag {
   using type = CceH5BoundaryDataManager;
   static std::string name() noexcept {
     return "H5WorldtubeBoundaryDataManager";
   }
 };
+}  // namespace Tags
 
-// initialization tags
-struct H5WorldtubeBoundaryDataManagerInitialization
-    : db::SimpleTag,
-      H5WorldtubeBoundaryDataManager {
+namespace InitializationTags {
+struct H5WorldtubeBoundaryDataManager : db::SimpleTag {
   using type = CceH5BoundaryDataManager;
   using option_tags =
       tmpl::list<OptionTags::LMax, OptionTags::BoundaryDataFilename,
@@ -41,15 +40,20 @@ struct H5WorldtubeBoundaryDataManagerInitialization
   }
 };
 
-}  // namespace Tags
+}  // namespace InitializationTags
 
 struct InitializeH5WorldtubeBoundary {
-  using initialization_tags =
-      tmpl::list<Tags::H5WorldtubeBoundaryDataManagerInitialization>;
+  using initialization_tags = tmpl::list<>;
+
+  using const_global_cache_tags =
+      tmpl::list<OptionTags::LMax, OptionTags::BoundaryDataFilename,
+                 OptionTags::H5LookaheadPoints, OptionTags::H5Interpolator>;
 
   template <class Metavariables>
-  using h5_boundary_manager_simple_tags = db::AddSimpleTags<::Tags::Variables<
-      typename Metavariables::cce_boundary_communication_tags>>;
+  using h5_boundary_manager_simple_tags = db::AddSimpleTags<
+      ::Tags::Variables<
+          typename Metavariables::cce_boundary_communication_tags>,
+      Tags::H5WorldtubeBoundaryDataManager>;
 
   template <class Metavariables>
   using return_tag_list =
@@ -65,13 +69,24 @@ struct InitializeH5WorldtubeBoundary {
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
     const auto& l_max = Parallel::get<OptionTags::LMax>(cache);
+    const std::string filename =
+        Parallel::get<OptionTags::BoundaryDataFilename>(cache);
+    const size_t number_of_lookahead_points =
+        Parallel::get<OptionTags::H5LookaheadPoints>(cache);
+    const std::unique_ptr<Interpolator> interpolator =
+        Parallel::get<OptionTags::H5Interpolator>(cache).clone_unique();
     Variables<typename Metavariables::cce_boundary_communication_tags>
         boundary_variables{
             Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
+
     auto initial_box = Initialization::merge_into_databox<
         InitializeH5WorldtubeBoundary,
-        h5_boundary_manager_simple_tags<Metavariables>, db::AddComputeTags<>>(
-        std::move(box), std::move(boundary_variables));
+        h5_boundary_manager_simple_tags<Metavariables>, db::AddComputeTags<>,
+        Initialization::MergePolicy::Overwrite>(
+        std::move(box), std::move(boundary_variables),
+        CceH5BoundaryDataManager{filename, l_max, number_of_lookahead_points,
+                                 *interpolator});
+
     return std::make_tuple(std::move(initial_box));
   }
 };

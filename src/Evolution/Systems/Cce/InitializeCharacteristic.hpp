@@ -230,9 +230,11 @@ struct InitializeCharacteristic {
       typename EvolutionTags<Metavariables>::evolution_simple_tags,
       typename EvolutionTags<Metavariables>::evolution_compute_tags>;
 
-  template <
-      typename DbTags, typename... InboxTags, typename Metavariables,
-      typename ArrayIndex, typename ActionList, typename ParallelComponent>
+  template <typename DbTags, typename... InboxTags, typename Metavariables,
+            typename ArrayIndex, typename ActionList,
+            typename ParallelComponent,
+            Requires<tmpl::list_contains_v<DbTags, InitializationTags::LMax>> =
+                nullptr>
   static auto apply(db::DataBox<DbTags>& box,
                     const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
                     const Parallel::ConstGlobalCache<Metavariables>& cache,
@@ -267,6 +269,20 @@ struct InitializeCharacteristic {
         db::get<InitializationTags::EndTime>(characteristic_evolution_box));
 
     return std::make_tuple(std::move(initialization_moved_box));
+  }
+
+  template <
+      typename DbTags, typename... InboxTags, typename Metavariables,
+      typename ArrayIndex, typename ActionList, typename ParallelComponent,
+      Requires<not tmpl::list_contains_v<DbTags, InitializationTags::LMax>> =
+          nullptr>
+  static auto apply(db::DataBox<DbTags>& box,
+                    const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
+                    const Parallel::ConstGlobalCache<Metavariables>& cache,
+                    const ArrayIndex& /*array_index*/,
+                    const ActionList /*meta*/,
+                    const ParallelComponent* const /*meta*/) noexcept {
+    return std::make_tuple(std::move(box));
   }
 };
 }  // namespace Actions

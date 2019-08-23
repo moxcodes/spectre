@@ -5,6 +5,7 @@
 
 #include "DataStructures/Tensor/TensorData.hpp"
 #include "Evolution/EventsAndTriggers/Event.hpp"
+#include "Evolution/Systems/Cce/CharacteristicExtractor.hpp"
 #include "IO/Observer/ObserverComponent.hpp"
 #include "IO/Observer/ReductionActions.hpp"
 #include "IO/Observer/Tags.hpp"
@@ -88,6 +89,13 @@ class ObserveBoundarySwshModes<tmpl::list<ToObserve...>, EventRegistrars>
     const size_t observation_l_max =
         Parallel::get<OptionTags::ObservationLMax>(cache);
     const size_t l_max = Parallel::get<OptionTags::LMax>(cache);
+
+    // kick off the observation for the same time at scri+, because current
+    // volume outputs have to be synchronized.
+    Parallel::simple_action<Actions::AddTargetInterpolationTime>(
+        Parallel::get_parallel_component<CharacteristicScri<Metavariables>>(
+            cache),
+        time_id.time().value());
 
     std::vector<std::string> file_legend;
     file_legend.push_back("times, sim lmax: " + std::to_string(l_max));

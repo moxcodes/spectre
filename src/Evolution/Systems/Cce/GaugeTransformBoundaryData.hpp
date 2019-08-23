@@ -1208,11 +1208,9 @@ struct InitializeGauge {
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> d,
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> omega_cd,
       const size_t l_max) noexcept {
-    Parallel::printf("HUH?\n");
     const auto& collocation = Spectral::Swsh::cached_collocation_metadata<
         Spectral::Swsh::ComplexRepresentation::Interleaved>(l_max);
     for (const auto& collocation_point : collocation) {
-      Parallel::printf("segfault? %zu\n", collocation_point.offset);
       get<0>(*x_of_x_tilde)[collocation_point.offset] = collocation_point.theta;
       get<1>(*x_of_x_tilde)[collocation_point.offset] = collocation_point.phi;
       // TEST nonunity conformal factor

@@ -62,10 +62,14 @@ struct H5Interpolator {
   using type = std::unique_ptr<Interpolator>;
   static constexpr OptionString help{
       "The interpolator for imported h5 worldtube data."};
-  // default values are hard for the factory mechanism :(
-  // static std::unique_ptr<Interpolator> default_value() noexcept {
-  // return std::unique_ptr<Interpolator>{new FixedBarycentricInterpolator{5}};
-  // }
+};
+
+struct ScriInterpolationPoints {
+  static std::string name() noexcept { return "ScriInterpolationPoints"; }
+  using type = size_t;
+  static constexpr OptionString help{
+      "Number of points to interpolate for values at scri+."};
+  static size_t default_value() noexcept { return 5; }
 };
 
 }  // namespace OptionTags

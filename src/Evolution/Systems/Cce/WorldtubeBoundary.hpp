@@ -9,6 +9,7 @@
 #include "Parallel/Actions/TerminatePhase.hpp"
 #include "Parallel/AddOptionsToDataBox.hpp"
 #include "Parallel/ConstGlobalCache.hpp"
+#include "ParallelAlgorithms/Initialization/Actions/RemoveOptionsAndTerminatePhase.hpp"
 #include "Parallel/Info.hpp"
 #include "Parallel/Invoke.hpp"
 
@@ -66,8 +67,9 @@ struct H5WorldtubeBoundary {
   using chare_type = Parallel::Algorithms::Singleton;
   using metavariables = Metavariables;
   using add_options_to_databox = typename Parallel::AddNoOptionsToDataBox;
-  using initialize_action_list = tmpl::list<InitializeH5WorldtubeBoundary,
-                                            Parallel::Actions::TerminatePhase>;
+  using initialize_action_list =
+      tmpl::list<InitializeH5WorldtubeBoundary,
+                 Initialization::Actions::RemoveOptionsAndTerminatePhase>;
   using initialization_tags =
       Parallel::get_initialization_tags<initialize_action_list>;
 

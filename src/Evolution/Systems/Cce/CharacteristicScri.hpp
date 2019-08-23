@@ -11,6 +11,7 @@
 #include "IO/Observer/ObserverComponent.hpp"
 #include "IO/Observer/VolumeActions.hpp"
 #include "NumericalAlgorithms/Spectral/SwshTransform.hpp"
+#include "ParallelAlgorithms/Initialization/Actions/RemoveOptionsAndTerminatePhase.hpp"
 #include "Utilities/TMPL.hpp"
 
 namespace Cce {
@@ -67,7 +68,7 @@ struct ObserveInertialNews {
         observer_proxy,
         observers::ObservationId(
             interpolation.second,
-            typename Metavariables::swsh_inertial_scri_observation_type{}),
+            typename Metavariables::swsh_boundary_observation_type{}),
         std::string{"/cce_scri_data"},
         // what could go wrong?
         observers::ArrayComponentId{
@@ -148,7 +149,6 @@ struct AddTargetInterpolationTime {
 template <class Metavariables>
 struct CharacteristicScri {
   using chare_type = Parallel::Algorithms::Singleton;
-  using const_global_cache_tag_list = tmpl::list<>;
   using metavariables = Metavariables;
 
   using add_options_to_databox = typename Parallel::AddNoOptionsToDataBox;
@@ -160,7 +160,7 @@ struct CharacteristicScri {
     register_info(const db::DataBox<DbTagsList>& /*box*/,
                   const ArrayIndex& /*array_index*/) noexcept {
       observers::ObservationId fake_initial_observation_id{
-          0., typename Metavariables::swsh_inertial_scri_observation_type{}};
+          0., typename Metavariables::swsh_boundary_observation_type{}};
 
       Parallel::printf("debug array id check %zu, %s\n",
                        observers::ArrayComponentId{
@@ -175,7 +175,7 @@ struct CharacteristicScri {
 
   using initialize_action_list =
       tmpl::list<Actions::InitializeCharacteristicScri,
-                 Parallel::Actions::TerminatePhase>;
+                 Initialization::Actions::RemoveOptionsAndTerminatePhase>;
 
   using initialization_tags =
       Parallel::get_initialization_tags<initialize_action_list>;
@@ -197,7 +197,11 @@ struct CharacteristicScri {
       Parallel::PhaseActions<typename Metavariables::Phase,
                              Metavariables::Phase::Extraction,
                              extract_action_list>>;
-  using options = tmpl::list<>;
+
+  using const_global_cache_tag_list =
+      tmpl::list<OptionTags::ScriInterpolationPoints>;
+  // Parallel::get_const_global_cache_tags_from_pdal<
+  // phase_dependent_action_list>;
 
   static void initialize(
       Parallel::CProxy_ConstGlobalCache<Metavariables>& global_cache) noexcept {

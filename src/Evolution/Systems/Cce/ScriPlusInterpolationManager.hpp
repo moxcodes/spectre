@@ -173,7 +173,8 @@ struct ScriPlusInterpolationManager {
     // pop times we no longer need because their maxes are too far in the past
     auto time_it = u_bondi_ranges_.begin();
     size_t times_counter = 0;
-    while ((*time_it).second < target_times_.front()) {
+    while (time_it < u_bondi_ranges_.end() and
+           (*time_it).second < target_times_.front()) {
       if (times_counter > target_number_of_points_ and
           u_bondi_ranges_.size() >= 2 * target_number_of_points_) {
         u_bondi_ranges_.pop_front();
