@@ -11,6 +11,7 @@
 #include "NumericalAlgorithms/Spectral/SwshFiltering.hpp"
 #include "NumericalAlgorithms/Spectral/SwshInterpolation.hpp"
 #include "Utilities/MakeArray.hpp"
+#include "Parallel/Printf.hpp"
 
 namespace Cce {
 // TOOD most of these computations require intermediate quantities that could be
@@ -944,17 +945,18 @@ struct GaugeUpdateAngularFromCartesian {
                                   square(get<1>(*cartesian_coords)) +
                                   square(get<2>(*cartesian_coords)));
 
+
     // FIXME this brutal renormalization will probably do bad things for the
     // time stepper.
     // TRY: no renormalization, because we use atan2 for both angular
     // coordinates, which shouldn't care whether we are actually on the sphere.
     // In principle, the drift should be minor anyways.
 
-    // printf("cartesian r check\n");
+    // Parallel::printf("cartesian r check\n");
     // for (auto val : cartesian_r) {
-    // printf("%e\n", 1.0 - val);
+      // Parallel::printf("%e\n", 1.0 - val);
     // }
-    // printf("done\n");
+    // Parallel::printf("done\n");
 
     get<0>(*cartesian_coords) /= cartesian_r;
     get<1>(*cartesian_coords) /= cartesian_r;

@@ -22,9 +22,10 @@ struct BoundaryTime : db::SimpleTag {
   using type = double;
   static std::string name() noexcept { return "BoundaryTime"; }
 };
+}  // namespace Tags
 
-// initialization tags
-struct LMax : db::SimpleTag, Spectral::Swsh::Tags::LMax {
+namespace InitializationTags {
+struct LMax : db::SimpleTag {
   using type = double;
   static std::string name() noexcept { return "LMax"; }
   using option_tags = tmpl::list<OptionTags::LMax>;
@@ -34,10 +35,9 @@ struct LMax : db::SimpleTag, Spectral::Swsh::Tags::LMax {
   }
 };
 
-struct NumberOfRadialPoints : db::SimpleTag,
-                              Spectral::Swsh::Tags::NumberOfRadialPoints {
+struct NumberOfRadialPoints : db::SimpleTag {
   using type = double;
-  static std::string name() noexcept { return "LMax"; }
+  static std::string name() noexcept { return "NumberOfRadialPoints"; }
   using option_tags = tmpl::list<OptionTags::NumberOfRadialPoints>;
 
   static double create_from_options(
@@ -67,7 +67,7 @@ struct EndTime : db::SimpleTag {
   }
 };
 
-}  // namespace Tags
+}  // namespace InitializationTags
 
 namespace Actions {
 
@@ -100,9 +100,10 @@ struct PopulateCharacteristicInitialHypersurface {
 };
 
 struct InitializeCharacteristic {
-
   using initialization_tags =
-      tmpl::list<Tags::LMax, Tags::NumberOfRadialPoints, Tags::EndTime>;
+      tmpl::list<InitializationTags::LMax,
+                 InitializationTags::NumberOfRadialPoints,
+                 InitializationTags::EndTime>;
   using const_global_cache_tags =
       tmpl::list<OptionTags::StartTime, OptionTags::TargetStepSize>;
 
@@ -251,7 +252,19 @@ struct InitializeCharacteristic {
     auto characteristic_evolution_box =
         CharacteristicTags<Metavariables>::initialize(std::move(evolution_box),
                                                       cache);
-    return std::make_tuple(std::move(characteristic_evolution_box));
+    auto initialization_moved_box = Initialization::merge_into_databox<
+        InitializeCharacteristic,
+        db::AddSimpleTags<Spectral::Swsh::Tags::LMax,
+                          Spectral::Swsh::Tags::NumberOfRadialPoints,
+                          Tags::EndTime>,
+        db::AddComputeTags<>>(
+        std::move(characteristic_evolution_box),
+        db::get<InitializationTags::LMax>(characteristic_evolution_box),
+        db::get<InitializationTags::NumberOfRadialPoints>(
+            characteristic_evolution_box),
+        db::get<InitializationTags::EndTime>(characteristic_evolution_box));
+
+    return std::make_tuple(std::move(initialization_moved_box));
   }
 };
 }  // namespace Actions
