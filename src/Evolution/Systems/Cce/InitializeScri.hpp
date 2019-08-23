@@ -16,10 +16,9 @@ namespace Cce {
 
 namespace Tags {
 
-template <typename Interpolator, typename ToInterpolate,
-          typename ObservationTag>
+template <typename ToInterpolate, typename ObservationTag>
 struct InterpolationManager : db::SimpleTag {
-  using type = ScriPlusInterpolationManager<Interpolator, ToInterpolate>;
+  using type = ScriPlusInterpolationManager<ToInterpolate>;
   static std::string name() noexcept { return "InterpolationManager"; }
 };
 }  // namespace Tags
@@ -28,7 +27,6 @@ namespace Actions {
 
 struct InitializeCharacteristicScri {
   // TODO options tags
-  using interpolator = FlexibleBarycentricInterpolator;
   const size_t number_of_required_scri_points = 5;
 
   template <typename DbTags, typename... InboxTags, typename Metavariables,
@@ -41,13 +39,13 @@ struct InitializeCharacteristicScri {
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
     const size_t l_max = Parallel::get<OptionTags::LMax>(cache);
-    auto initialize_box = db::create<
-        db::AddSimpleTags<Tags::InterpolationManager<
-            FlexibleBarycentricInterpolator, ComplexDataVector, Tags::News>>,
-        db::AddComputeTags<>>(
-        ScriPlusInterpolationManager<FlexibleBarycentricInterpolator,
-                                     ComplexDataVector>{
-            5, Spectral::Swsh::number_of_swsh_collocation_points(l_max)});
+    auto initialize_box =
+        db::create<db::AddSimpleTags<Tags::InterpolationManager<
+                       ComplexDataVector, Tags::News>>,
+                   db::AddComputeTags<>>(
+            ScriPlusInterpolationManager<ComplexDataVector>{
+                5, Spectral::Swsh::number_of_swsh_collocation_points(l_max),
+                FlexibleBarycentricInterpolator{}});
     return std::make_tuple(std::move(initialize_box));
   }
 };

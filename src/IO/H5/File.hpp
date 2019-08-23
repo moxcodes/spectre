@@ -59,6 +59,10 @@ namespace h5 {
 template <AccessType Access_t>
 class H5File {
  public:
+  // empty constructor for classes which store an H5File and need to be
+  // PuP-compatible.
+  H5File() noexcept {};
+
   /*!
    * \requires `file_name` is a valid path and ends in `.h5`.
    * \effects On object creation opens the HDF5 file at `file_name`

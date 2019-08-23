@@ -28,7 +28,7 @@ struct System {
 }  // namespace Cce
 
 struct EvolutionMetavars {
-  // TODO consider making these system tags?
+  // TODO consider making all of the generalizable ones system tags?
   using system = Cce::System;
 
   using evolved_swsh_tag = Cce::Tags::BondiJ;
@@ -131,6 +131,7 @@ struct EvolutionMetavars {
 static const std::vector<void (*)()> charm_init_node_funcs{
     &setup_error_handling,
     &Parallel::register_derived_classes_with_charm<TimeStepper>,
+    &Parallel::register_derived_classes_with_charm<Cce::Interpolator>,
     &Parallel::register_derived_classes_with_charm<
         Event<EvolutionMetavars::events>>,
     &Parallel::register_derived_classes_with_charm<

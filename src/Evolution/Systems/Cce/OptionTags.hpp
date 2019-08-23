@@ -4,9 +4,10 @@
 #pragma once
 
 #include "Options/Options.hpp"
+#include "ReadBoundaryDataH5.hpp"
 
 namespace Cce {
-namespace OptionTags{
+namespace OptionTags {
 
 struct LMax {
   using type = size_t;
@@ -16,8 +17,7 @@ struct LMax {
 
 struct ObservationLMax {
   using type = size_t;
-  static constexpr OptionString help{
-    "maximum l value for swsh output"};
+  static constexpr OptionString help{"maximum l value for swsh output"};
 };
 
 struct NumberOfRadialPoints {
@@ -48,6 +48,24 @@ struct BoundaryDataFilename {
   using type = std::string;
   static constexpr OptionString help{
       "h5 file to read the wordltube data from."};
+};
+
+struct H5LookaheadPoints {
+  using type = size_t;
+  static constexpr OptionString help{
+      "Number of points to cache on each file read operation."};
+  static size_t default_value() noexcept { return 200; }
+};
+
+struct H5Interpolator {
+  static std::string name() noexcept { return "H5Interpolator"; }
+  using type = std::unique_ptr<Interpolator>;
+  static constexpr OptionString help{
+      "The interpolator for imported h5 worldtube data."};
+  // default values are hard for the factory mechanism :(
+  // static std::unique_ptr<Interpolator> default_value() noexcept {
+  // return std::unique_ptr<Interpolator>{new FixedBarycentricInterpolator{5}};
+  // }
 };
 
 }  // namespace OptionTags

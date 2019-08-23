@@ -69,8 +69,8 @@ struct CalculateIntegrandInputsForTag {
                     const ArrayIndex& /*array_index*/,
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
-    // Parallel::printf("starting hypersurface computation for %s\n",
-    // BondiTag::name());
+    Parallel::printf("starting hypersurface computation for %s\n",
+                     BondiTag::name());
     mutate_all_pre_swsh_derivatives_for_tag<BondiTag>(make_not_null(&box));
     mutate_all_swsh_derivatives_for_tag<BondiTag>(make_not_null(&box));
     return std::forward_as_tuple(std::move(box));
@@ -216,7 +216,7 @@ struct PrecomputeGlobalCceDependencies {
                     const ArrayIndex& /*array_index*/,
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
-    // Parallel::printf("global dependencies\n");
+    Parallel::printf("global dependencies\n");
     tmpl::for_each<compute_gauge_adjustments_setup_tags>([&box](auto tag_v) {
       using tag = typename decltype(tag_v)::type;
       db::mutate_apply<ComputeGaugeAdjustedBoundaryValue<tag>>(
@@ -242,6 +242,7 @@ struct ReceiveWorldtubeData<tmpl::list<BoundaryTags...>> {
       Parallel::ConstGlobalCache<Metavariables>& cache,
       const ArrayIndex& /*array_index*/, const double time,
       const db::item_type<BoundaryTags>&... boundary_data) noexcept {
+    Parallel::printf("receiving worldtube data...\n");
     db::mutate<Tags::BoundaryTime, BoundaryTags...>(
         make_not_null(&box),
         [](const gsl::not_null<double*> databox_boundary_time,
@@ -258,6 +259,7 @@ struct ReceiveWorldtubeData<tmpl::list<BoundaryTags...>> {
     Parallel::get_parallel_component<CharacteristicExtractor<Metavariables>>(
         cache)
         .perform_algorithm();
+    Parallel::printf("done\n");
   }
 
  private:

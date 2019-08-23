@@ -18,6 +18,7 @@
 #include "IO/H5/Dat.hpp"
 #include "IO/H5/File.hpp"
 #include "IO/H5/Version.hpp"
+#include "Parallel/CharmPupable.hpp"
 
 namespace Cce {
 
@@ -64,29 +65,97 @@ namespace Cce {
 //   - abstact base class
 
 // Abstract base class for interpolators
-class Interpolator {
-  static constexpr size_t required_number_of_points_before_and_after = 0;
-  static double interpolate(const DataVector& points, const DataVector& values,
-                            const double target) noexcept;
+class LinearInterpolator;
+class CubicInterpolator;
+class FlexibleBarycentricInterpolator;
+class FixedBarycentricInterpolator;
+
+class Interpolator : public PUP::able {
+ public:
+  using creatable_classes =
+      tmpl::list<LinearInterpolator, CubicInterpolator,
+                 FlexibleBarycentricInterpolator, FixedBarycentricInterpolator>;
+
+  WRAPPED_PUPable_abstract(Interpolator);  // NOLINT
+
+  virtual std::unique_ptr<Interpolator> clone_unique() const noexcept = 0;
+
+  virtual double interpolate(const DataVector& points, const DataVector& values,
+                             const double target) const noexcept = 0;
+  virtual std::complex<double> interpolate(const DataVector& points,
+                                           const ComplexDataVector& values,
+                                           const double target) const
+      noexcept = 0;
+  virtual size_t required_number_of_points_before_and_after() const
+      noexcept = 0;
 };
 
 // iterpolates linearly
-class LinearInterpolator : Interpolator {
+class LinearInterpolator : public Interpolator {
  public:
-  static constexpr size_t required_number_of_points_before_and_after = 1;
-  static double interpolate(const DataVector& points, const DataVector& values,
-                            const double target) {
+  using options = tmpl::list<>;
+  static constexpr OptionString help = {"Linear interpolator."};
+
+  LinearInterpolator() = default;
+  LinearInterpolator(const LinearInterpolator&) noexcept = default;
+  LinearInterpolator& operator=(const LinearInterpolator&) noexcept = default;
+  LinearInterpolator(LinearInterpolator&&) noexcept = default;
+  LinearInterpolator& operator=(LinearInterpolator&&) noexcept = default;
+  ~LinearInterpolator() noexcept override = default;
+
+  WRAPPED_PUPable_decl_template(LinearInterpolator);  // NOLINT
+
+  explicit LinearInterpolator(CkMigrateMessage* /*unused*/) noexcept {}
+
+  // clang-tidy: do not pass by non-const reference
+  void pup(PUP::er& p) noexcept override {}
+
+  std::unique_ptr<Interpolator> clone_unique() const noexcept {
+    return std::make_unique<LinearInterpolator>(*this);
+  }
+
+  double interpolate(const DataVector& points, const DataVector& values,
+                     const double target) const noexcept {
     return values[0] + (values[1] - values[0]) / (points[1] - points[0]) *
                            (target - points[0]);
+  }
+  std::complex<double> interpolate(const DataVector& points,
+                                   const ComplexDataVector& values,
+                                   const double target) const noexcept {
+    return std::complex<double>{interpolate(points, real(values), target),
+          interpolate(points, imag(values), target)};
+  }
+  size_t required_number_of_points_before_and_after() const noexcept {
+    return 1;
   }
 };
 
 // copied from SpEC for diagnostics
-class CubicInterpolator : Interpolator {
+class CubicInterpolator : public Interpolator {
  public:
-  static constexpr size_t required_number_of_points_before_and_after = 2;
-  static double interpolate(const DataVector& points, const DataVector& values,
-                            const double T) {
+  using options = tmpl::list<>;
+  static constexpr OptionString help = {"Cubic interpolator."};
+
+  CubicInterpolator() = default;
+  CubicInterpolator(const CubicInterpolator&) noexcept = default;
+  CubicInterpolator& operator=(const CubicInterpolator&) noexcept = default;
+  CubicInterpolator(CubicInterpolator&&) noexcept = default;
+  CubicInterpolator& operator=(CubicInterpolator&&) noexcept = default;
+  ~CubicInterpolator() noexcept override = default;
+
+  explicit CubicInterpolator(CkMigrateMessage* /*unused*/) noexcept {}
+
+  WRAPPED_PUPable_decl_template(CubicInterpolator);  // NOLINT
+
+  // clang-tidy: do not pass by non-const reference
+  void pup(PUP::er& p) noexcept override {}
+
+  std::unique_ptr<Interpolator> clone_unique() const noexcept {
+    return std::make_unique<CubicInterpolator>(*this);
+  }
+
+  double interpolate(const DataVector& points, const DataVector& values,
+                     const double T) const noexcept {
     double t0 = points[0];
     double t1 = points[1];
     double t2 = points[2];
@@ -107,16 +176,48 @@ class CubicInterpolator : Interpolator {
            ((t0 - t1) * (t0 - t2) * (t1 - t2) * (t0 - t3) * (t1 - t3) *
             (t2 - t3));
   }
+  std::complex<double> interpolate(const DataVector& points,
+                                   const ComplexDataVector& values,
+                                   const double target) const noexcept {
+    return std::complex<double>{interpolate(points, real(values), target),
+          interpolate(points, imag(values), target)};
+  }
+  size_t required_number_of_points_before_and_after() const noexcept {
+    return 2;
+  }
 };
 
-// TODO: explore the possibility of moving this number to runtime and maybe
-// making it non-fixed?
-
-class FlexibleBarycentricInterpolator : Interpolator {
+class FlexibleBarycentricInterpolator : public Interpolator {
  public:
-  static constexpr size_t required_number_of_points_before_and_after = 1;
-  static double interpolate(const DataVector& points, const DataVector& values,
-                            const double target) {
+  using options = tmpl::list<>;
+  static constexpr OptionString help = {
+      "Barycentric interpolator of arbitrary order."};
+
+  FlexibleBarycentricInterpolator() = default;
+  FlexibleBarycentricInterpolator(
+      const FlexibleBarycentricInterpolator&) noexcept = default;
+  FlexibleBarycentricInterpolator& operator=(
+      const FlexibleBarycentricInterpolator&) noexcept = default;
+  FlexibleBarycentricInterpolator(FlexibleBarycentricInterpolator&&) noexcept =
+      default;
+  FlexibleBarycentricInterpolator& operator=(
+      FlexibleBarycentricInterpolator&&) noexcept = default;
+  ~FlexibleBarycentricInterpolator() noexcept override = default;
+
+  explicit FlexibleBarycentricInterpolator(
+      CkMigrateMessage* /*unused*/) noexcept {}
+
+  WRAPPED_PUPable_decl_template(FlexibleBarycentricInterpolator);  // NOLINT
+
+  // clang-tidy: do not pass by non-const reference
+  void pup(PUP::er& p) noexcept override {}
+
+  std::unique_ptr<Interpolator> clone_unique() const noexcept {
+    return std::make_unique<FlexibleBarycentricInterpolator>(*this);
+  }
+
+  double interpolate(const DataVector& points, const DataVector& values,
+                     const double target) const noexcept {
     if (UNLIKELY(points.size() < 2)) {
       ERROR("provided independent values for interpolation too small.");
     }
@@ -127,34 +228,91 @@ class FlexibleBarycentricInterpolator : Interpolator {
         points.data(), values.data(), points.size(), points.size() / 2);
     return interpolant(target);
   }
-  static std::complex<double> interpolate(const DataVector& points,
-                                          const ComplexDataVector& values,
-                                          const double target) {
+  std::complex<double> interpolate(const DataVector& points,
+                                   const ComplexDataVector& values,
+                                   const double target) const noexcept {
     return std::complex<double>{interpolate(points, real(values), target),
                                 interpolate(points, imag(values), target)};
-    }
+  }
+  size_t required_number_of_points_before_and_after() const noexcept {
+    return 1;
+  }
 };
 
 // A barycentric interpolator with a fixed, compile-time number of points. This
 // allows for an easier time ensuring the right amount of data is loaded in the
 // data manager
-template <size_t N>
-class BarycentricInterpolator : Interpolator {
+class FixedBarycentricInterpolator : public Interpolator {
  public:
-  static constexpr size_t required_number_of_points_before_and_after = N;
-  static double interpolate(const DataVector& points, const DataVector& values,
-                            const double target) {
-    if (UNLIKELY(points.size() < 2 * N)) {
+  struct Order {
+    using type = size_t;
+    static constexpr OptionString help = {"Order of barycentric interpolation"};
+  };
+
+  using options = tmpl::list<Order>;
+  static constexpr OptionString help = {
+      "Barycentric interpolator of fixed order."};
+
+  explicit FixedBarycentricInterpolator(CkMigrateMessage* /*unused*/) noexcept {
+  }
+
+  WRAPPED_PUPable_decl_template(FixedBarycentricInterpolator);  // NOLINT
+
+  // clang-tidy: do not pass by non-const reference
+  void pup(PUP::er& p) noexcept override {  // NOLINT
+    p | order_;
+  }
+
+  FixedBarycentricInterpolator() = default;
+  FixedBarycentricInterpolator(
+      const FixedBarycentricInterpolator&) noexcept = default;
+  FixedBarycentricInterpolator& operator=(
+      const FixedBarycentricInterpolator&) noexcept = default;
+  FixedBarycentricInterpolator(FixedBarycentricInterpolator&&) noexcept =
+      default;
+  FixedBarycentricInterpolator& operator=(
+      FixedBarycentricInterpolator&&) noexcept = default;
+  ~FixedBarycentricInterpolator() noexcept override = default;
+
+  FixedBarycentricInterpolator(size_t order) noexcept : order_{order} {}
+
+  std::unique_ptr<Interpolator> clone_unique() const noexcept {
+    return std::make_unique<FixedBarycentricInterpolator>(*this);
+  }
+
+  double interpolate(const DataVector& points, const DataVector& values,
+                     const double target) const noexcept {
+    if (UNLIKELY(points.size() < 2 * order_)) {
       ERROR("provided independent values for interpolation too small.");
     }
-    if (UNLIKELY(values.size() < 2 * N)) {
+    if (UNLIKELY(values.size() < 2 * order_)) {
       ERROR("provided dependent values for interpolation too small.");
     }
     boost::math::barycentric_rational<double> interpolant(
-        points.data(), values.data(), 2 * N, N);
+        points.data(), values.data(), 2 * order_, order_);
     return interpolant(target);
   }
+  std::complex<double> interpolate(const DataVector& points,
+                                   const ComplexDataVector& values,
+                                   const double target) const noexcept {
+    return std::complex<double>{interpolate(points, real(values), target),
+          interpolate(points, imag(values), target)};
+  }
+  size_t required_number_of_points_before_and_after() const noexcept {
+    return order_;
+  }
+
+ private:
+  size_t order_;
 };
+
+/// \cond
+PUP::able::PUP_ID Cce::LinearInterpolator::my_PUP_ID = 0;
+PUP::able::PUP_ID Cce::CubicInterpolator::my_PUP_ID = 0;
+PUP::able::PUP_ID Cce::FlexibleBarycentricInterpolator::my_PUP_ID = 0;
+PUP::able::PUP_ID Cce::FixedBarycentricInterpolator::my_PUP_ID = 0;
+/// \endcond
+
 
 namespace InputTags {
 struct SpatialMetric {
@@ -201,7 +359,6 @@ using cce_input_tags =
 
 // Caches a target amount of data provided by the Cauchy simulation, and when
 // ready provides the interpolated data to a running characteristic evolution
-template <class Interp>
 class CceCauchyBoundaryDataManager {
  public:
   CceCauchyBoundaryDataManager(const double extraction_radius,
@@ -310,8 +467,8 @@ class CceCauchyBoundaryDataManager {
                   ++index;
                 }
                 get<tag>(interpolated_coefficients_).get(i, j)[offset] =
-                    Interp::interpolate(interpolation_times, interpolation_data,
-                                        time);
+                    interpolator_->interpolate(interpolation_times,
+                                               interpolation_data, time);
               });
         }
         tmpl::for_each<
@@ -327,8 +484,8 @@ class CceCauchyBoundaryDataManager {
                 ++index;
               }
               get<tag>(interpolated_coefficients_).get(i)[offset] =
-                  Interp::interpolate(interpolation_times, interpolation_data,
-                                      time);
+                  interpolator_->interpolate(interpolation_times,
+                                             interpolation_data, time);
             });
       }
 
@@ -345,8 +502,8 @@ class CceCauchyBoundaryDataManager {
               ++index;
             }
             get(get<tag>(interpolated_coefficients_))[offset] =
-                Interp::interpolate(interpolation_times, interpolation_data,
-                                    time);
+                interpolator_->interpolate(interpolation_times,
+                                           interpolation_data, time);
           });
     }
 
@@ -391,10 +548,10 @@ class CceCauchyBoundaryDataManager {
   double extraction_radius_;
   size_t l_max_;
   size_t spherepack_l_max_;
+  std::unique_ptr<Interpolator> interpolator_;
 };
 
 /// takes data as needed from a specified H5 file.
-template <class Interp>
 class CceH5BoundaryDataManager {
  public:
   template <typename... T>
@@ -405,18 +562,25 @@ class CceH5BoundaryDataManager {
     return base_name;
   }
 
+  // charm needs an empty constructor.
+  CceH5BoundaryDataManager() noexcept
+      : cce_data_file_{}, spherical_harmonic_{2, 2} {};
+
   // we have to explicitly initialized the spherical harmonic object, but it
   // will be immediately overwritten in the true constructor with a better
   // version with the spherical harmonic l_max determined by reading in the
   // file.
   CceH5BoundaryDataManager(std::string cce_data_filename, size_t l_max,
-                           size_t buffer_depth) noexcept
+                           size_t buffer_depth,
+                           const Interpolator& interpolator) noexcept
       : cce_data_file_{cce_data_filename},
+        filename_{cce_data_filename},
         time_span_start_{0},
         time_span_end_{0},
         l_max_{l_max},
         spherical_harmonic_{2, 2},
-        buffer_depth_{buffer_depth} {
+        buffer_depth_{buffer_depth},
+        interpolator_{interpolator.clone_unique()} {
     get<InputTags::DataSet<InputTags::SpatialMetric>>(dataset_names_) = "/g";
     get<InputTags::DataSet<InputTags::Dr<InputTags::SpatialMetric>>>(
         dataset_names_) = "/Drg";
@@ -448,9 +612,10 @@ class CceH5BoundaryDataManager {
     auto& lapse_data = cce_data_file_.get<h5::Dat>("/Lapse");
 
     auto data_table_dimensions = lapse_data.get_dimensions();
-    if (UNLIKELY(data_table_dimensions[0] <
-                 2 * Interp::required_number_of_points_before_and_after +
-                     buffer_depth)) {
+    if (UNLIKELY(
+            data_table_dimensions[0] <
+            2 * interpolator_->required_number_of_points_before_and_after() +
+                buffer_depth)) {
       ERROR(
           "The specified file doesn't have enough time points to supply the "
           "requested interpolation buffer. This almost certainly indicates "
@@ -477,7 +642,8 @@ class CceH5BoundaryDataManager {
 
     size_t size_of_buffer =
         number_of_coefficients *
-        (buffer_depth + 2 * Interp::required_number_of_points_before_and_after);
+        (buffer_depth +
+         2 * interpolator_->required_number_of_points_before_and_after());
     coefficients_buffers_ = Variables<cce_input_tags>{size_of_buffer};
     // create and store a YlmSpherepack object to pass into the boundary data
     // generation
@@ -514,7 +680,7 @@ class CceH5BoundaryDataManager {
               DataVector{data + column * (buffer_span_size) +
                              (interpolation_time_span.first - time_span_start_),
                          interpolation_span_size};
-          auto interp_val = Interp::interpolate(
+          auto interp_val = interpolator_->interpolate(
               time_points,
               DataVector{data + column * (buffer_span_size) +
                              (interpolation_time_span.first - time_span_start_),
@@ -608,19 +774,20 @@ class CceH5BoundaryDataManager {
         get<InputTags::Dr<InputTags::Lapse>>(interpolated_coefficients_),
         extraction_radius_, l_max_, spherical_harmonic_,
         radial_derivatives_need_renormalization_);
-
     return true;
   }
 
   double update_buffers_for_time(double time) noexcept {
-    if (time_span_end_ > Interp::required_number_of_points_before_and_after and
+    if (time_span_end_ >
+            interpolator_->required_number_of_points_before_and_after() and
         time_buffer_[time_span_end_ -
-                     Interp::required_number_of_points_before_and_after + 1] >
-            time) {
+                     interpolator_
+                         ->required_number_of_points_before_and_after() +
+                     1] > time) {
       // the next time an update will be required
-      return time_buffer_[time_span_end_ -
-                          Interp::required_number_of_points_before_and_after +
-                          1];
+      return time_buffer_
+          [time_span_end_ -
+           interpolator_->required_number_of_points_before_and_after() + 1];
     }
     // find the time spans that are needed
     auto new_span_pair =
@@ -664,8 +831,9 @@ class CceH5BoundaryDataManager {
       cce_data_file_.close_current_object();
     });
     // the next time an update will be required
-    return time_buffer_[time_span_end_ -
-                        Interp::required_number_of_points_before_and_after + 1];
+    return time_buffer_
+        [time_span_end_ -
+         interpolator_->required_number_of_points_before_and_after() + 1];
   }
 
   std::pair<size_t, size_t> create_span_for_time_value(
@@ -683,25 +851,30 @@ class CceH5BoundaryDataManager {
     // always keep the difference between start and end the same, even when
     // the interpolations starts to get worse
     size_t span_start = lower_bound;
-    size_t span_end =
-        std::min(Interp::required_number_of_points_before_and_after * 2 + pad +
-                     lower_bound,
-                 upper_bound);
-    if (range_end + Interp::required_number_of_points_before_and_after + pad >
+    size_t span_end = std::min(
+        interpolator_->required_number_of_points_before_and_after() * 2 + pad +
+            lower_bound,
+        upper_bound);
+    if (range_end +
+            interpolator_->required_number_of_points_before_and_after() + pad >
         upper_bound) {
       span_start = std::max(
           upper_bound -
-              (Interp::required_number_of_points_before_and_after * 2 + pad),
+              (interpolator_->required_number_of_points_before_and_after() * 2 +
+               pad),
           lower_bound);
       span_end = upper_bound;
     } else if (range_start >
                lower_bound +
-                   Interp::required_number_of_points_before_and_after - 1) {
-      span_start =
-          range_start - Interp::required_number_of_points_before_and_after + 1;
+                   interpolator_->required_number_of_points_before_and_after() -
+                   1) {
+      span_start = range_start -
+                   interpolator_->required_number_of_points_before_and_after() +
+                   1;
 
-      span_end =
-          range_end + Interp::required_number_of_points_before_and_after + pad;
+      span_end = range_end +
+                 interpolator_->required_number_of_points_before_and_after() +
+                 pad;
     }
 
     return std::make_pair(span_start, span_end);
@@ -720,6 +893,35 @@ class CceH5BoundaryDataManager {
 
   std::pair<size_t, size_t> get_time_span() const noexcept {
     return std::make_pair(time_span_start_, time_span_end_);
+  }
+
+  /// Serialization for Charm++.
+  void pup(PUP::er& p) noexcept {
+    p | time_buffer_;
+    p | filename_;
+    p | radial_derivatives_need_renormalization_;
+    p | time_span_start_;
+    p | time_span_end_;
+    p | l_max_;
+    p | extraction_radius_;
+    p | spherepack_l_max_;
+    p | buffer_depth_;
+    p | dataset_names_;
+    p | interpolator_;
+    if (p.isUnpacking()) {
+      spherical_harmonic_ = YlmSpherepack{spherepack_l_max_, spherepack_l_max_};
+      size_t number_of_coefficients =
+          SpherepackIterator(spherepack_l_max_, spherepack_l_max_)
+          .spherepack_array_size();
+      size_t size_of_buffer =
+          number_of_coefficients *
+          (buffer_depth_ +
+           2 * interpolator_->required_number_of_points_before_and_after());
+      coefficients_buffers_ = Variables<cce_input_tags>{size_of_buffer};
+      interpolated_coefficients_ =
+          Variables<cce_input_tags>{number_of_coefficients};
+      cce_data_file_ = h5::H5File<h5::AccessType::ReadOnly>{filename_};
+    }
   }
 
  private:
@@ -746,6 +948,7 @@ class CceH5BoundaryDataManager {
   }
 
   h5::H5File<h5::AccessType::ReadOnly> cce_data_file_;
+  std::string filename_;
 
   // stores all the times in the input file
   DataVector time_buffer_;
@@ -772,5 +975,7 @@ class CceH5BoundaryDataManager {
   tuples::tagged_tuple_from_typelist<
       db::wrap_tags_in<InputTags::DataSet, cce_input_tags>>
       dataset_names_;
+
+  std::unique_ptr<Interpolator> interpolator_;
 };
 }  // namespace Cce

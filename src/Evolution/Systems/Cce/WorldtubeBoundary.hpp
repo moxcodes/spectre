@@ -28,16 +28,15 @@ struct BoundaryComputeAndSendToExtractor {
                     Parallel::ConstGlobalCache<Metavariables>& cache,
                     const ArrayIndex& /*array_index*/,
                     const double time) noexcept {
-    db::mutate<Tags::H5WorldtubeBoundaryDataManager<CubicInterpolator>,
+    db::mutate<Tags::H5WorldtubeBoundaryDataManager,
                ::Tags::Variables<
                    typename Metavariables::cce_boundary_communication_tags>>(
         make_not_null(&box),
-        [&time](
-            const gsl::not_null<CceH5BoundaryDataManager<CubicInterpolator>*>
-                boundary_data_manager,
-            const gsl::not_null<Variables<
-                typename Metavariables::cce_boundary_communication_tags>*>
-                boundary_variables_to_populate) noexcept {
+        [&time](const gsl::not_null<CceH5BoundaryDataManager*>
+                    boundary_data_manager,
+                const gsl::not_null<Variables<
+                    typename Metavariables::cce_boundary_communication_tags>*>
+                    boundary_variables_to_populate) noexcept {
           boundary_data_manager->populate_hypersurface_boundary_data(
               boundary_variables_to_populate, time);
         });
@@ -65,7 +64,6 @@ struct BoundaryComputeAndSendToExtractor {
 template <class Metavariables>
 struct H5WorldtubeBoundary {
   using chare_type = Parallel::Algorithms::Singleton;
-  using const_global_cache_tag_list = tmpl::list<>;
   using metavariables = Metavariables;
   using add_options_to_databox = typename Parallel::AddNoOptionsToDataBox;
   using initialize_action_list = tmpl::list<InitializeH5WorldtubeBoundary,
@@ -82,6 +80,10 @@ struct H5WorldtubeBoundary {
                  Parallel::PhaseActions<typename Metavariables::Phase,
                                         Metavariables::Phase::Extraction,
                                         worldtube_boundary_computation_steps>>;
+
+  using const_global_cache_tag_list =
+      Parallel::get_const_global_cache_tags_from_pdal<
+    phase_dependent_action_list>;
 
   using options = tmpl::list<>;
 

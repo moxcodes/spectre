@@ -58,8 +58,8 @@ struct EndTime : db::SimpleTag {
       // optimization note: this would be faster if we separated out the
       // inspection of the times from the data manager to avoid allocating
       // internal member variables we don't need for this simple lookup.
-      CceH5BoundaryDataManager<CubicInterpolator> h5_boundary_data_manager{
-          filename, l_max, 1};
+      CceH5BoundaryDataManager h5_boundary_data_manager{filename, l_max, 1,
+                                                        CubicInterpolator{}};
       const auto& time_buffer = h5_boundary_data_manager.get_time_buffer();
       end_time = time_buffer[time_buffer.size() - 1];
     }
@@ -84,6 +84,7 @@ struct PopulateCharacteristicInitialHypersurface {
     // J on the first hypersurface
     db::mutate_apply<InitializeJ<Tags::BoundaryValue>>(make_not_null(&box));
     // Gauge quantities - maybe do this with the action list
+    Parallel::printf("segfault?\n");
     db::mutate_apply<InitializeGauge>(make_not_null(&box));
     db::mutate_apply<GaugeUpdateAngularFromCartesian<
         Tags::CauchyAngularCoords, Tags::CauchyCartesianCoords>>(
@@ -95,6 +96,7 @@ struct PopulateCharacteristicInitialHypersurface {
     db::mutate_apply<GaugeUpdateOmegaCD>(make_not_null(&box));
     db::mutate_apply<InitializeScriPlusValue<Tags::InertialRetardedTime>>(
         make_not_null(&box), db::get<::Tags::Time>(box).value());
+    Parallel::printf("nope\n");
     return std::forward_as_tuple(std::move(box));
   }
 };

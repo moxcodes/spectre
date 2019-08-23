@@ -8,14 +8,18 @@
 
 #include "Evolution/Systems/Cce/ReadBoundaryDataH5.hpp"
 
+namespace Cce {
+
 // currently assumes ToInterpolate is a vector type
-template <typename Interpolator, typename ToInterpolate>
+template <typename ToInterpolate>
 struct ScriPlusInterpolationManager {
  public:
   ScriPlusInterpolationManager(const size_t target_number_of_points,
-                               const size_t vector_size) noexcept
+                               const size_t vector_size,
+                               const Interpolator& interpolator) noexcept
       : vector_size_{vector_size},
-        target_number_of_points_{target_number_of_points} {}
+        target_number_of_points_{target_number_of_points},
+        interpolator_{interpolator.clone_unique()} {}
 
   void insert_data(const DataVector& u_bondi,
                    const ToInterpolate& to_interpolate) noexcept {
@@ -139,7 +143,7 @@ struct ScriPlusInterpolationManager {
         interpolation_values[vector_position] = (*value_it)[i];
         interpolation_times[vector_position] = (*time_it)[i];
       }
-      result[i] = Interpolator::interpolate(
+      result[i] = interpolator_->interpolate(
           interpolation_times, interpolation_values, target_times_.front());
     }
     return std::make_pair(result, target_times_.front());
@@ -188,6 +192,7 @@ struct ScriPlusInterpolationManager {
   std::deque<double> target_times_;
   size_t vector_size_;
   size_t target_number_of_points_;
+  std::unique_ptr<Interpolator> interpolator_;
 };
 
 // // this can probably be merged with the above interpolator, as much of the
@@ -383,3 +388,5 @@ struct ScriPlusInterpolationManager {
 //   size_t vector_size_;
 //   size_t target_number_of_points_;
 // };
+
+}  // namespace Cce

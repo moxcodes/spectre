@@ -32,13 +32,11 @@ struct ObserveInertialNews {
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
     std::pair<ComplexDataVector, double> interpolation;
-    db::mutate<Tags::InterpolationManager<FlexibleBarycentricInterpolator,
-                                          ComplexDataVector, Tags::News>>(
+    db::mutate<Tags::InterpolationManager<ComplexDataVector, Tags::News>>(
         make_not_null(&box),
-        [&interpolation](
-            const gsl::not_null<ScriPlusInterpolationManager<
-                FlexibleBarycentricInterpolator, ComplexDataVector>*>
-                interpolation_manager) {
+        [&interpolation](const gsl::not_null<
+                         ScriPlusInterpolationManager<ComplexDataVector>*>
+                             interpolation_manager) {
           interpolation =
               interpolation_manager->interpolate_and_pop_first_time();
         });
@@ -87,8 +85,7 @@ struct ObserveInertialNews {
       const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
       const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
       const ArrayIndex& /*array_index*/) noexcept {
-    return db::get<Tags::InterpolationManager<FlexibleBarycentricInterpolator,
-                                              ComplexDataVector, Tags::News>>(
+    return db::get<Tags::InterpolationManager<ComplexDataVector, Tags::News>>(
                box)
         .first_time_is_ready_to_interpolate();
   }
@@ -100,20 +97,18 @@ struct ReceiveNonInertialNews {
       typename ArrayIndex,
       Requires<tmpl::list_contains_v<
           tmpl::list<DbTags...>,
-          Tags::InterpolationManager<FlexibleBarycentricInterpolator,
-                                     ComplexDataVector, Tags::News>>> = nullptr>
+          Tags::InterpolationManager<ComplexDataVector, Tags::News>>> = nullptr>
   static void apply(
       db::DataBox<tmpl::list<DbTags...>>& box,
       Parallel::ConstGlobalCache<Metavariables>& cache,
       const ArrayIndex& /*array_index*/,
       const Scalar<DataVector>& inertial_retarded_time,
       const Scalar<SpinWeighted<ComplexDataVector, 2>>& news) noexcept {
-    db::mutate<Tags::InterpolationManager<FlexibleBarycentricInterpolator,
-                                          ComplexDataVector, Tags::News>>(
+    db::mutate<Tags::InterpolationManager<ComplexDataVector, Tags::News>>(
         make_not_null(&box),
         [&inertial_retarded_time,
-         &news](const gsl::not_null<ScriPlusInterpolationManager<
-                    FlexibleBarycentricInterpolator, ComplexDataVector>*>
+         &news](const gsl::not_null<
+                ScriPlusInterpolationManager<ComplexDataVector>*>
                     interpolation_manager) {
           interpolation_manager->insert_data(get(inertial_retarded_time),
                                             get(news).data());
@@ -130,17 +125,15 @@ struct AddTargetInterpolationTime {
       typename ArrayIndex,
       Requires<tmpl::list_contains_v<
           tmpl::list<DbTags...>,
-          Tags::InterpolationManager<FlexibleBarycentricInterpolator,
-                                     ComplexDataVector, Tags::News>>> = nullptr>
+          Tags::InterpolationManager<ComplexDataVector, Tags::News>>> = nullptr>
   static void apply(db::DataBox<tmpl::list<DbTags...>>& box,
                     Parallel::ConstGlobalCache<Metavariables>& cache,
                     const ArrayIndex& /*array_index*/,
                     const double time) noexcept {
-    db::mutate<Tags::InterpolationManager<FlexibleBarycentricInterpolator,
-                                          ComplexDataVector, Tags::News>>(
+    db::mutate<Tags::InterpolationManager<ComplexDataVector, Tags::News>>(
         make_not_null(&box),
-        [&time](const gsl::not_null<ScriPlusInterpolationManager<
-                    FlexibleBarycentricInterpolator, ComplexDataVector>*>
+        [&time](const gsl::not_null<
+                ScriPlusInterpolationManager<ComplexDataVector>*>
                     interpolation_manager) {
           interpolation_manager->insert_target_time(time);
         });
