@@ -25,11 +25,6 @@
 namespace Cce {
 namespace TestHelpers {
 
-// explicit power method avoids some troublesome Blaze behavior with powers of
-// complex
-ComplexDataVector power(const ComplexDataVector& val,
-                        const size_t exponent) noexcept;
-
 // For representing a primitive series of powers in inverse r for diagnostic
 // computations
 template <typename T>
@@ -55,11 +50,11 @@ struct AngularCollocationsFor : db::SimpleTag {
 // given the separated angular dependence and the vector of polynomial modes,
 // this assembles the volume data that the separation represents.
 void generate_volume_data_from_separated_values(
-    const gsl::not_null<ComplexDataVector*> volume_data,
-    const gsl::not_null<ComplexDataVector*> one_divided_by_r,
+    gsl::not_null<ComplexDataVector*> volume_data,
+    gsl::not_null<ComplexDataVector*> one_divided_by_r,
     const ComplexDataVector& angular_collocation,
-    const ComplexModalVector& radial_coefficients, const size_t l_max,
-    const size_t number_of_radial_grid_points) noexcept;
+    const ComplexModalVector& radial_coefficients, size_t l_max,
+    size_t number_of_radial_grid_points) noexcept;
 
 // A utility for separately verifying the values in several computation
 // routines in the Cce quantity derivations. These are an independent
@@ -376,5 +371,14 @@ struct CopyDataBoxTags {
         db::get<Tags>(from_data_box)...);
   }
 };
+
+void compute_one_minus_y(
+    gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> one_minus_y,
+    size_t l_max) noexcept;
+
+// needed due to an internal trouble for blaze powers of complex values
+ComplexDataVector power(const ComplexDataVector& value,
+                        size_t exponent) noexcept;
+
 }  // namespace TestHelpers
 }  // namespace Cce

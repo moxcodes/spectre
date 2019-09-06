@@ -10,6 +10,7 @@ set(LIBRARY_SOURCES
   Test_ComputeSwshDerivatives.cpp
   Test_InitializeCce.cpp
   Test_LinearOperators.cpp
+  Test_LinearSolve.cpp
   Test_PrecomputeCceDependencies.cpp
   )
 

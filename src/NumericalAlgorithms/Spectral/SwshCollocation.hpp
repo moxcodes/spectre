@@ -7,7 +7,9 @@
 #include <memory>
 #include <sharp_cxx.h>
 
+#include "Domain/Mesh.hpp"
 #include "NumericalAlgorithms/Spectral/ComplexDataView.hpp"
+#include "NumericalAlgorithms/Spectral/Spectral.hpp"
 #include "Utilities/ForceInline.hpp"
 #include "Utilities/Gsl.hpp"
 
@@ -47,6 +49,22 @@ number_of_swsh_theta_collocation_points(const size_t l_max) noexcept {
 constexpr SPECTRE_ALWAYS_INLINE size_t
 number_of_swsh_phi_collocation_points(const size_t l_max) noexcept {
   return (2 * l_max + 1);
+}
+
+/// \ingroup SwshGroup
+/// \brief Obtain the three-dimensional mesh associated with a
+/// libsharp-compatible sequence of spherical nodal shells.
+/// \warning This is to be used only for operations in the radial direction! The
+/// angular collocation points should not be regarded as having a useful product
+/// representation for e.g. taking derivatives in just the theta direction.
+/// Instead, use spin-weighted utilities for all angular operations.
+SPECTRE_ALWAYS_INLINE Mesh<3> swsh_volume_mesh_for_radial_operations(
+    const size_t l_max, const size_t number_of_radial_points) {
+  return Mesh<3>{{{number_of_swsh_phi_collocation_points(l_max),
+                   number_of_swsh_theta_collocation_points(l_max),
+                   number_of_radial_points}},
+                 Spectral::Basis::Legendre,
+                 Spectral::Quadrature::GaussLobatto};
 }
 
 // In the static caching mechanism, we permit an l_max up to this macro
