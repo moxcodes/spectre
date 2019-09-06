@@ -13,6 +13,7 @@ set(LIBRARY_SOURCES
     SwshCoefficients.cpp
     SwshCollocation.cpp
     SwshDerivatives.cpp
+    SwshFiltering.cpp
     SwshTags.cpp
     SwshTransform.cpp
     )
