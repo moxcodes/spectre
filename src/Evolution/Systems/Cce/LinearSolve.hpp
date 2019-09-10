@@ -143,12 +143,6 @@ struct RadialIntegrateBondi {
   }
 };
 
-template <>
-struct RadialIntegrateBondi<Tags::BondiQ> {
-  using boundary_tags = tmpl::list<Tags::BoundaryValue<Tags::BondiQ>>;
-  using integrand_tags = tmpl::list<Tags::PoleOfIntegrand<Tags::BondiQ>,
-                                    Tags::RegularIntegrand<Tags::BondiQ>>;
-
 template <template <typename> class BoundaryPrefix>
 struct RadialIntegrateBondi<BoundaryPrefix, Tags::BondiQ> {
   using boundary_tags = tmpl::list<BoundaryPrefix<Tags::BondiQ>>;

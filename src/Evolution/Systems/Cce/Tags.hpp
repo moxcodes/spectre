@@ -8,6 +8,7 @@
 #include "DataStructures/Tensor/Tensor.hpp"
 #include "DataStructures/Tensor/TypeAliases.hpp"
 #include "NumericalAlgorithms/Spectral/SwshTags.hpp"
+#include "Evolution/Systems/Cce/OptionTags.hpp"
 
 namespace Cce {
 
@@ -386,5 +387,64 @@ struct BondiR : db::SimpleTag {
   using type = Scalar<SpinWeighted<ComplexDataVector, 0>>;
   static std::string name() noexcept { return "R"; }
 };
+
+struct LMax : ::Spectral::Swsh::Tags::LMax {
+  using type = size_t;
+  using option_tags = tmpl::list<OptionTags::LMax>;
+
+  static size_t create_from_options(const size_t l_max) noexcept {
+    return l_max;
+  }
+};
+
+struct ObservationLMax {
+  using type = size_t;
+  using option_tags = tmpl::list<OptionTags::ObservationLMax>;
+
+  static size_t create_from_options(const size_t observation_l_max) noexcept {
+    return observation_l_max;
+  }
+};
+
+struct NumberOfRadialPoints {
+  using type = size_t;
+  using option_tags = tmpl::list<OptionTags::NumberOfRadialPoints>;
+
+  static size_t create_from_options(
+      const size_t number_of_radial_points) noexcept {
+    return number_of_radial_points;
+  }
+};
+
+struct StartTime {
+  using type = double;
+  using option_tags = tmpl::list<OptionTags::StartTime>;
+
+  static size_t create_from_options(const double start_time) noexcept {
+    return start_time;
+  }
+};
+
+struct TargetStepSize {
+  using type = double;
+  using option_tags = tmpl::list<OptionTags::TargetStepSize>;
+
+  static size_t create_from_options(const double target_step_size) noexcept {
+    return target_step_size;
+  }
+};
+
+struct ScriInterpolationPoints {
+  using type = size_t;
+  using option_tags = tmpl::list<OptionTags::ScriInterpolationPoints>;
+
+  static size_t create_from_options(
+      const size_t scri_interpolation_points) noexcept {
+    return scri_interpolation_points;
+  }
+};
+
+
 }  // namespace Tags
 }  // namespace Cce
+

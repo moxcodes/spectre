@@ -26,8 +26,7 @@ struct InterpolationManager : db::SimpleTag {
 namespace Actions {
 
 struct InitializeCharacteristicScri {
-  using const_global_cache_tags =
-      tmpl::list<OptionTags::ScriInterpolationPoints>;
+  using const_global_cache_tags = tmpl::list<Tags::ScriInterpolationPoints>;
 
   template <typename DbTags, typename... InboxTags, typename Metavariables,
             typename ArrayIndex, typename ActionList,
@@ -38,9 +37,9 @@ struct InitializeCharacteristicScri {
                     const ArrayIndex& /*array_index*/,
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
-    const size_t l_max = Parallel::get<OptionTags::LMax>(cache);
+    const size_t l_max = Parallel::get<Tags::LMax>(cache);
     const size_t number_of_scri_interpolation_points =
-        Parallel::get<OptionTags::ScriInterpolationPoints>(cache);
+        Parallel::get<Tags::ScriInterpolationPoints>(cache);
     auto initialize_box =
         db::create<db::AddSimpleTags<Tags::InterpolationManager<
                        ComplexDataVector, Tags::News>>,

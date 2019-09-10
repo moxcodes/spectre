@@ -12,6 +12,7 @@
 #include "Parallel/Info.hpp"
 #include "ParallelAlgorithms/Initialization/MergeIntoDataBox.hpp"
 #include "Time/Tags.hpp"
+#include "Time/TimeSteppers/TimeStepper.hpp"
 #include "Utilities/NoSuchType.hpp"
 #include "Utilities/Rational.hpp"
 
@@ -107,7 +108,7 @@ struct InitializeCharacteristic {
                  InitializationTags::NumberOfRadialPoints,
                  InitializationTags::EndTime>;
   using const_global_cache_tags =
-      tmpl::list<OptionTags::StartTime, OptionTags::TargetStepSize>;
+      tmpl::list<Tags::StartTime, Tags::TargetStepSize>;
 
   template <typename Metavariables>
   struct EvolutionTags {
@@ -128,9 +129,8 @@ struct InitializeCharacteristic {
     static auto initialize(
         db::DataBox<TagList>&& box,
         const Parallel::ConstGlobalCache<Metavariables>& cache) noexcept {
-      const double initial_time_value =
-          Parallel::get<OptionTags::StartTime>(cache);
-      const double step_size = Parallel::get<OptionTags::TargetStepSize>(cache);
+      const double initial_time_value = Parallel::get<Tags::StartTime>(cache);
+      const double step_size = Parallel::get<Tags::TargetStepSize>(cache);
 
       // currently hard-coded to fixed step size
       const Slab single_step_slab{initial_time_value,
@@ -141,7 +141,7 @@ struct InitializeCharacteristic {
       const TimeId initial_time_id{true, 0, initial_time};
       Parallel::printf("initial time %zu\n", initial_time_id.substep());
       const auto& time_stepper =
-          Parallel::get<::OptionTags::TimeStepper>(cache);
+          Parallel::get<::Tags::TimeStepper<TimeStepper>>(cache);
       const TimeId second_time_id =
           time_stepper.next_time_id(initial_time_id, fixed_time_step);
       Parallel::printf("next time %zu\n", second_time_id.substep());
@@ -192,9 +192,9 @@ struct InitializeCharacteristic {
     static auto initialize(
         db::DataBox<TagList>&& box,
         const Parallel::ConstGlobalCache<Metavariables>& cache) noexcept {
-      const size_t l_max =  Parallel::get<OptionTags::LMax>(cache);
+      const size_t l_max =  Parallel::get<Tags::LMax>(cache);
       const size_t number_of_radial_points =
-          Parallel::get<OptionTags::NumberOfRadialPoints>(cache);
+          Parallel::get<Tags::NumberOfRadialPoints>(cache);
       const size_t boundary_size =
           Spectral::Swsh::number_of_swsh_collocation_points(l_max);
       const size_t volume_size = boundary_size * number_of_radial_points;
@@ -242,9 +242,9 @@ struct InitializeCharacteristic {
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
     // Evolution quantity initialization
-    const size_t l_max = Parallel::get<OptionTags::LMax>(cache);
-    const size_t number_of_radial_points =
-        Parallel::get<OptionTags::NumberOfRadialPoints>(cache);
+    // const size_t l_max = Parallel::get<OptionTags::LMax>(cache);
+    // const size_t number_of_radial_points =
+        // Parallel::get<OptionTags::NumberOfRadialPoints>(cache);
 
     auto initialize_box = Initialization::merge_into_databox<
         InitializeCharacteristic, db::AddSimpleTags<Tags::BoundaryTime>,
@@ -258,12 +258,10 @@ struct InitializeCharacteristic {
                                                       cache);
     auto initialization_moved_box = Initialization::merge_into_databox<
         InitializeCharacteristic,
-        db::AddSimpleTags<Spectral::Swsh::Tags::LMax,
-                          Spectral::Swsh::Tags::NumberOfRadialPoints,
+        db::AddSimpleTags<Spectral::Swsh::Tags::NumberOfRadialPoints,
                           Tags::EndTime>,
         db::AddComputeTags<>>(
         std::move(characteristic_evolution_box),
-        db::get<InitializationTags::LMax>(characteristic_evolution_box),
         db::get<InitializationTags::NumberOfRadialPoints>(
             characteristic_evolution_box),
         db::get<InitializationTags::EndTime>(characteristic_evolution_box));
@@ -278,7 +276,7 @@ struct InitializeCharacteristic {
           nullptr>
   static auto apply(db::DataBox<DbTags>& box,
                     const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
-                    const Parallel::ConstGlobalCache<Metavariables>& cache,
+                    const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
                     const ArrayIndex& /*array_index*/,
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {

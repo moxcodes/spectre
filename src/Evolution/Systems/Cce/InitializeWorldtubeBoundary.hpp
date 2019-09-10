@@ -38,16 +38,18 @@ struct H5WorldtubeBoundaryDataManager : db::SimpleTag {
     return CceH5BoundaryDataManager(filename, l_max, number_of_lookahead_points,
                                     *interpolator);
   }
+  static std::string name() noexcept {
+    return "H5WorldtubeBoundaryDataManager";
+  }
 };
 
 }  // namespace InitializationTags
 
 struct InitializeH5WorldtubeBoundary {
-  using initialization_tags = tmpl::list<>;
+  using initialization_tags =
+      tmpl::list<InitializationTags::H5WorldtubeBoundaryDataManager>;
 
-  using const_global_cache_tags =
-      tmpl::list<OptionTags::LMax, OptionTags::BoundaryDataFilename,
-                 OptionTags::H5LookaheadPoints, OptionTags::H5Interpolator>;
+  using const_global_cache_tags = tmpl::list<Tags::LMax>;
 
   template <class Metavariables>
   using h5_boundary_manager_simple_tags = db::AddSimpleTags<
@@ -61,33 +63,51 @@ struct InitializeH5WorldtubeBoundary {
 
   template <typename DbTags, typename... InboxTags, typename Metavariables,
             typename ArrayIndex, typename ActionList,
-            typename ParallelComponent>
+            typename ParallelComponent,
+            Requires<tmpl::list_contains_v<
+                DbTags, InitializationTags::H5WorldtubeBoundaryDataManager>> =
+                nullptr>
   static auto apply(db::DataBox<DbTags>& box,
                     const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
                     Parallel::ConstGlobalCache<Metavariables>& cache,
                     const ArrayIndex& /*array_index*/,
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
-    const auto& l_max = Parallel::get<OptionTags::LMax>(cache);
-    const std::string filename =
-        Parallel::get<OptionTags::BoundaryDataFilename>(cache);
-    const size_t number_of_lookahead_points =
-        Parallel::get<OptionTags::H5LookaheadPoints>(cache);
-    const std::unique_ptr<Interpolator> interpolator =
-        Parallel::get<OptionTags::H5Interpolator>(cache).clone_unique();
+    const auto& l_max = Parallel::get<Tags::LMax>(cache);
     Variables<typename Metavariables::cce_boundary_communication_tags>
         boundary_variables{
             Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
 
+    CceH5BoundaryDataManager boundary_data_manager;
+    db::mutate<InitializationTags::H5WorldtubeBoundaryDataManager>(
+        make_not_null(&box),
+        [&boundary_data_manager](const gsl::not_null<CceH5BoundaryDataManager*>
+                                     initialization_data_manager) {
+          boundary_data_manager = std::move(*initialization_data_manager);
+        });
     auto initial_box = Initialization::merge_into_databox<
         InitializeH5WorldtubeBoundary,
         h5_boundary_manager_simple_tags<Metavariables>, db::AddComputeTags<>,
         Initialization::MergePolicy::Overwrite>(
         std::move(box), std::move(boundary_variables),
-        CceH5BoundaryDataManager{filename, l_max, number_of_lookahead_points,
-                                 *interpolator});
+        std::move(boundary_data_manager));
 
     return std::make_tuple(std::move(initial_box));
+  }
+
+  template <typename DbTags, typename... InboxTags, typename Metavariables,
+            typename ArrayIndex, typename ActionList,
+            typename ParallelComponent,
+            Requires<not tmpl::list_contains_v<
+                DbTags, InitializationTags::H5WorldtubeBoundaryDataManager>> =
+                nullptr>
+  static auto apply(db::DataBox<DbTags>& box,
+                    const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
+                    const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
+                    const ArrayIndex& /*array_index*/,
+                    const ActionList /*meta*/,
+                    const ParallelComponent* const /*meta*/) noexcept {
+    return std::make_tuple(std::move(box));
   }
 };
 }  // namespace Cce

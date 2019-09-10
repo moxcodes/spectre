@@ -4,9 +4,12 @@
 #pragma once
 
 #include "Options/Options.hpp"
-#include "ReadBoundaryDataH5.hpp"
 
 namespace Cce {
+/// \cond
+class Interpolator;
+/// \endcond
+
 namespace OptionTags {
 
 struct LMax {

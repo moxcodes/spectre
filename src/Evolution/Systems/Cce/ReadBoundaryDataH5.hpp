@@ -108,24 +108,25 @@ class LinearInterpolator : public Interpolator {
   explicit LinearInterpolator(CkMigrateMessage* /*unused*/) noexcept {}
 
   // clang-tidy: do not pass by non-const reference
-  void pup(PUP::er& p) noexcept override {}
+  void pup(PUP::er& /*p*/) noexcept override {}
 
-  std::unique_ptr<Interpolator> clone_unique() const noexcept {
+  std::unique_ptr<Interpolator> clone_unique() const noexcept override {
     return std::make_unique<LinearInterpolator>(*this);
   }
 
   double interpolate(const DataVector& points, const DataVector& values,
-                     const double target) const noexcept {
+                     const double target) const noexcept override {
     return values[0] + (values[1] - values[0]) / (points[1] - points[0]) *
                            (target - points[0]);
   }
   std::complex<double> interpolate(const DataVector& points,
                                    const ComplexDataVector& values,
-                                   const double target) const noexcept {
+                                   const double target) const
+      noexcept override {
     return std::complex<double>{interpolate(points, real(values), target),
-          interpolate(points, imag(values), target)};
+                                interpolate(points, imag(values), target)};
   }
-  size_t required_number_of_points_before_and_after() const noexcept {
+  size_t required_number_of_points_before_and_after() const noexcept override {
     return 1;
   }
 };
@@ -148,14 +149,14 @@ class CubicInterpolator : public Interpolator {
   WRAPPED_PUPable_decl_template(CubicInterpolator);  // NOLINT
 
   // clang-tidy: do not pass by non-const reference
-  void pup(PUP::er& p) noexcept override {}
+  void pup(PUP::er& /*p*/) noexcept override {}
 
-  std::unique_ptr<Interpolator> clone_unique() const noexcept {
+  std::unique_ptr<Interpolator> clone_unique() const noexcept override {
     return std::make_unique<CubicInterpolator>(*this);
   }
 
   double interpolate(const DataVector& points, const DataVector& values,
-                     const double T) const noexcept {
+                     const double T) const noexcept override {
     double t0 = points[0];
     double t1 = points[1];
     double t2 = points[2];
@@ -178,11 +179,12 @@ class CubicInterpolator : public Interpolator {
   }
   std::complex<double> interpolate(const DataVector& points,
                                    const ComplexDataVector& values,
-                                   const double target) const noexcept {
+                                   const double target) const
+      noexcept override {
     return std::complex<double>{interpolate(points, real(values), target),
-          interpolate(points, imag(values), target)};
+                                interpolate(points, imag(values), target)};
   }
-  size_t required_number_of_points_before_and_after() const noexcept {
+  size_t required_number_of_points_before_and_after() const noexcept override {
     return 2;
   }
 };
@@ -210,14 +212,14 @@ class FlexibleBarycentricInterpolator : public Interpolator {
   WRAPPED_PUPable_decl_template(FlexibleBarycentricInterpolator);  // NOLINT
 
   // clang-tidy: do not pass by non-const reference
-  void pup(PUP::er& p) noexcept override {}
+  void pup(PUP::er& /*p*/) noexcept override {}
 
-  std::unique_ptr<Interpolator> clone_unique() const noexcept {
+  std::unique_ptr<Interpolator> clone_unique() const noexcept override {
     return std::make_unique<FlexibleBarycentricInterpolator>(*this);
   }
 
   double interpolate(const DataVector& points, const DataVector& values,
-                     const double target) const noexcept {
+                     const double target) const noexcept override {
     if (UNLIKELY(points.size() < 2)) {
       ERROR("provided independent values for interpolation too small.");
     }
@@ -230,11 +232,12 @@ class FlexibleBarycentricInterpolator : public Interpolator {
   }
   std::complex<double> interpolate(const DataVector& points,
                                    const ComplexDataVector& values,
-                                   const double target) const noexcept {
+                                   const double target) const
+      noexcept override {
     return std::complex<double>{interpolate(points, real(values), target),
                                 interpolate(points, imag(values), target)};
   }
-  size_t required_number_of_points_before_and_after() const noexcept {
+  size_t required_number_of_points_before_and_after() const noexcept override {
     return 1;
   }
 };
@@ -264,8 +267,8 @@ class FixedBarycentricInterpolator : public Interpolator {
   }
 
   FixedBarycentricInterpolator() = default;
-  FixedBarycentricInterpolator(
-      const FixedBarycentricInterpolator&) noexcept = default;
+  FixedBarycentricInterpolator(const FixedBarycentricInterpolator&) noexcept =
+      default;
   FixedBarycentricInterpolator& operator=(
       const FixedBarycentricInterpolator&) noexcept = default;
   FixedBarycentricInterpolator(FixedBarycentricInterpolator&&) noexcept =
@@ -276,12 +279,12 @@ class FixedBarycentricInterpolator : public Interpolator {
 
   FixedBarycentricInterpolator(size_t order) noexcept : order_{order} {}
 
-  std::unique_ptr<Interpolator> clone_unique() const noexcept {
+  std::unique_ptr<Interpolator> clone_unique() const noexcept override {
     return std::make_unique<FixedBarycentricInterpolator>(*this);
   }
 
   double interpolate(const DataVector& points, const DataVector& values,
-                     const double target) const noexcept {
+                     const double target) const noexcept override {
     if (UNLIKELY(points.size() < 2 * order_)) {
       ERROR("provided independent values for interpolation too small.");
     }
@@ -294,11 +297,12 @@ class FixedBarycentricInterpolator : public Interpolator {
   }
   std::complex<double> interpolate(const DataVector& points,
                                    const ComplexDataVector& values,
-                                   const double target) const noexcept {
+                                   const double target) const
+      noexcept override {
     return std::complex<double>{interpolate(points, real(values), target),
-          interpolate(points, imag(values), target)};
+                                interpolate(points, imag(values), target)};
   }
-  size_t required_number_of_points_before_and_after() const noexcept {
+  size_t required_number_of_points_before_and_after() const noexcept override {
     return order_;
   }
 
@@ -312,7 +316,6 @@ PUP::able::PUP_ID Cce::CubicInterpolator::my_PUP_ID = 0;
 PUP::able::PUP_ID Cce::FlexibleBarycentricInterpolator::my_PUP_ID = 0;
 PUP::able::PUP_ID Cce::FixedBarycentricInterpolator::my_PUP_ID = 0;
 /// \endcond
-
 
 namespace InputTags {
 struct SpatialMetric {
@@ -365,11 +368,11 @@ class CceCauchyBoundaryDataManager {
                                const size_t cce_l_max,
                                const size_t spherepack_l_max,
                                const size_t target_buffer_pad) noexcept
-      : extraction_radius_{extraction_radius},
+      : target_buffer_pad_{target_buffer_pad},
         spherical_harmonic_{spherepack_l_max, spherepack_l_max},
+        extraction_radius_{extraction_radius},
         l_max_{cce_l_max},
-        spherepack_l_max_{spherepack_l_max},
-        target_buffer_pad_{target_buffer_pad} {}
+        spherepack_l_max_{spherepack_l_max} {}
   // This currently assumes that it will receive data in ascending time order
   template <typename TagList>
   void append_cauchy_worldtube_data_to_buffer(
@@ -757,7 +760,7 @@ class CceH5BoundaryDataManager {
     // coefficients. This is what the boundary data calculation utility takes
     // as an input, so we now hand off the control flow to the boundary and
     // gauge transform utility
-    Parallel::printf("requested time %f\n", time);
+    // Parallel::printf("requested time %f\n", time);
 
     create_bondi_boundary_data_from_cauchy(
         boundary_data,
@@ -912,7 +915,7 @@ class CceH5BoundaryDataManager {
       spherical_harmonic_ = YlmSpherepack{spherepack_l_max_, spherepack_l_max_};
       size_t number_of_coefficients =
           SpherepackIterator(spherepack_l_max_, spherepack_l_max_)
-          .spherepack_array_size();
+              .spherepack_array_size();
       size_t size_of_buffer =
           number_of_coefficients *
           (buffer_depth_ +

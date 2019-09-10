@@ -84,11 +84,11 @@ class ObserveBoundarySwshModes<tmpl::list<ToObserve...>, EventRegistrars>
   void operator()(const TimeId& time_id,
                   const db::item_type<ToObserve>&... boundary_swsh_scalars,
                   Parallel::ConstGlobalCache<Metavariables>& cache,
-                  const ArrayIndex& array_index,
+                  const ArrayIndex& /*array_index*/,
                   const ParallelComponent* const /*meta*/) const noexcept {
     const size_t observation_l_max =
-        Parallel::get<OptionTags::ObservationLMax>(cache);
-    const size_t l_max = Parallel::get<OptionTags::LMax>(cache);
+        Parallel::get<Tags::ObservationLMax>(cache);
+    const size_t l_max = Parallel::get<Spectral::Swsh::Tags::LMax>(cache);
 
     // kick off the observation for the same time at scri+, because current
     // volume outputs have to be synchronized.

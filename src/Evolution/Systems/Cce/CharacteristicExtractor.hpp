@@ -19,7 +19,6 @@
 #include "IO/Observer/ObserverComponent.hpp"
 #include "IO/Observer/RegisterObservers.hpp"
 #include "Parallel/Actions/TerminatePhase.hpp"
-#include "Parallel/AddOptionsToDataBox.hpp"
 #include "Parallel/Info.hpp"
 #include "Parallel/Invoke.hpp"
 #include "ParallelAlgorithms/Actions/MutateApply.hpp"
@@ -66,7 +65,7 @@ struct CalculateIntegrandInputsForTag {
             typename ParallelComponent>
   static auto apply(db::DataBox<DbTags>& box,
                     const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
-                    Parallel::ConstGlobalCache<Metavariables>& cache,
+                    Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
                     const ArrayIndex& /*array_index*/,
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
@@ -85,7 +84,7 @@ struct FilterSwshVolumeQuantity {
             typename ParallelComponent>
   static auto apply(db::DataBox<DbTags>& box,
                     const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
-                    Parallel::ConstGlobalCache<Metavariables>& cache,
+                    Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
                     const ArrayIndex& /*array_index*/,
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
@@ -129,7 +128,7 @@ struct ExitIfEndTimeReached {
             typename ParallelComponent>
   static auto apply(db::DataBox<DbTags>& box,
                     const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
-                    Parallel::ConstGlobalCache<Metavariables>& cache,
+                    Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
                     const ArrayIndex& /*array_index*/,
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
@@ -208,8 +207,8 @@ struct PrecomputeGlobalCceDependencies {
             typename ArrayIndex, typename ActionList,
             typename ParallelComponent>
   static auto apply(db::DataBox<tmpl::list<DbTags...>>& box,
-                    const tuples::TaggedTuple<InboxTags...>& inboxes,
-                    const Parallel::ConstGlobalCache<Metavariables>& cache,
+                    const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
+                    const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
                     const ArrayIndex& /*array_index*/,
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
@@ -271,8 +270,6 @@ template <class Metavariables>
 struct CharacteristicExtractor {
   using chare_type = Parallel::Algorithms::Singleton;
   using metavariables = Metavariables;
-
-  using add_options_to_databox = typename Parallel::AddNoOptionsToDataBox;
 
   struct RegistrationHelper {
     template <typename ParallelComponent, typename DbTagsList,
@@ -381,9 +378,8 @@ struct CharacteristicExtractor {
       Parallel::get_const_global_cache_tags_from_pdal<
           phase_dependent_action_list>;
 
-  static void initialize(
-      Parallel::CProxy_ConstGlobalCache<Metavariables>& global_cache) noexcept {
-  }
+  static void initialize(Parallel::CProxy_ConstGlobalCache<
+                         Metavariables>& /*global_cache*/) noexcept {}
 
   static void execute_next_phase(
       const typename Metavariables::Phase next_phase,

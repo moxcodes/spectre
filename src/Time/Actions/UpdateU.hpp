@@ -97,7 +97,7 @@ struct UpdateUSingleTensor {
                  const gsl::not_null<db::item_type<history_tag>*> histories,
                  const db::item_type<Tags::TimeStep>& time_step) noexcept {
           const auto& time_stepper =
-              Parallel::get<OptionTags::TimeStepper>(cache);
+              Parallel::get<Tags::TimeStepperBase>(cache);
           // debug
           std::for_each(
               boost::make_zip_iterator(

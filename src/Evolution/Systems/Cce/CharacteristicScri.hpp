@@ -42,9 +42,9 @@ struct ObserveInertialNews {
               interpolation_manager->interpolate_and_pop_first_time();
         });
     // swsh transform
-    const size_t l_max = Parallel::get<OptionTags::LMax>(cache);
+    const size_t l_max = Parallel::get<Tags::LMax>(cache);
     const size_t observation_l_max =
-        Parallel::get<OptionTags::ObservationLMax>(cache);
+        Parallel::get<Tags::ObservationLMax>(cache);
     auto to_transform = SpinWeighted<ComplexDataVector, 2>{interpolation.first};
     ComplexModalVector goldberg_modes =
         Spectral::Swsh::libsharp_to_goldberg_modes(
@@ -112,7 +112,7 @@ struct ReceiveNonInertialNews {
                 ScriPlusInterpolationManager<ComplexDataVector>*>
                     interpolation_manager) {
           interpolation_manager->insert_data(get(inertial_retarded_time),
-                                            get(news).data());
+                                             get(news).data());
         });
     // continue observing if there's points that are now ready
     Parallel::get_parallel_component<CharacteristicScri<Metavariables>>(cache)
@@ -151,8 +151,6 @@ struct CharacteristicScri {
   using chare_type = Parallel::Algorithms::Singleton;
   using metavariables = Metavariables;
 
-  using add_options_to_databox = typename Parallel::AddNoOptionsToDataBox;
-
   struct RegistrationHelper {
     template <typename ParallelComponent, typename DbTagsList,
               typename ArrayIndex>
@@ -180,7 +178,6 @@ struct CharacteristicScri {
   using initialization_tags =
       Parallel::get_initialization_tags<initialize_action_list>;
 
-
   using registration_action_list = tmpl::list<
       ::observers::Actions::RegisterSingletonWithObservers<RegistrationHelper>,
       Parallel::Actions::TerminatePhase>;
@@ -198,14 +195,12 @@ struct CharacteristicScri {
                              Metavariables::Phase::Extraction,
                              extract_action_list>>;
 
-  using const_global_cache_tag_list =
-      tmpl::list<OptionTags::ScriInterpolationPoints>;
+  using const_global_cache_tag_list = tmpl::list<Tags::ScriInterpolationPoints>;
   // Parallel::get_const_global_cache_tags_from_pdal<
   // phase_dependent_action_list>;
 
-  static void initialize(
-      Parallel::CProxy_ConstGlobalCache<Metavariables>& global_cache) noexcept {
-  }
+  static void initialize(Parallel::CProxy_ConstGlobalCache<
+                         Metavariables>& /*global_cache*/) noexcept {}
 
   static void execute_next_phase(
       const typename Metavariables::Phase next_phase,

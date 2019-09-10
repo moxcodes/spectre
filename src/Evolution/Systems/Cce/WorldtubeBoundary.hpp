@@ -7,7 +7,6 @@
 #include "Evolution/Systems/Cce/CharacteristicExtractor.hpp"
 #include "Evolution/Systems/Cce/InitializeWorldtubeBoundary.hpp"
 #include "Parallel/Actions/TerminatePhase.hpp"
-#include "Parallel/AddOptionsToDataBox.hpp"
 #include "Parallel/ConstGlobalCache.hpp"
 #include "ParallelAlgorithms/Initialization/Actions/RemoveOptionsAndTerminatePhase.hpp"
 #include "Parallel/Info.hpp"
@@ -66,7 +65,6 @@ template <class Metavariables>
 struct H5WorldtubeBoundary {
   using chare_type = Parallel::Algorithms::Singleton;
   using metavariables = Metavariables;
-  using add_options_to_databox = typename Parallel::AddNoOptionsToDataBox;
   using initialize_action_list =
       tmpl::list<InitializeH5WorldtubeBoundary,
                  Initialization::Actions::RemoveOptionsAndTerminatePhase>;

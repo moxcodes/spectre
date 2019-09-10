@@ -87,10 +87,9 @@ struct EvolutionMetavars {
   using triggers = Triggers::time_triggers;
 
   using const_global_cache_tag_list =
-      tmpl::list<OptionTags::TypedTimeStepper<TimeStepper>,
-                 Cce::OptionTags::LMax, Cce::OptionTags::ObservationLMax,
-                 Cce::OptionTags::NumberOfRadialPoints,
-                 OptionTags::EventsAndTriggers<events, triggers>>;
+      tmpl::list<Tags::TimeStepper<TimeStepper>, Cce::Tags::LMax,
+                 Cce::Tags::ObservationLMax, Cce::Tags::NumberOfRadialPoints,
+                 Tags::EventsAndTriggers<events, triggers>>;
 
   struct BoundaryObservationType {};
   struct InertialObservationType {};
