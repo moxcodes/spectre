@@ -506,6 +506,17 @@ std::ostream& operator<<(std::ostream& os,
   return os << d.data();
 }
 
+template <typename SpinWeightedType,
+          Requires<is_any_spin_weighted_v<SpinWeightedType> and
+                   is_derived_of_vector_impl_v<
+                       typename SpinWeightedType::value_type>> = nullptr>
+const SpinWeightedType make_const_view(const SpinWeightedType& spin_weighted,
+                                       const size_t offset,
+                                       const size_t extent) noexcept {
+  return SpinWeightedType{
+      make_const_view(spin_weighted.data(), offset, extent)};
+}
+
 namespace MakeWithValueImpls {
 template <int Spin1, int Spin2, typename SpinWeightedType1,
           typename SpinWeightedType2>

@@ -22,7 +22,8 @@ struct CalculateScriPlusValue<Tags::News> {
       tmpl::list<Tags::SpecH, Tags::Dy<Tags::BondiJ>, Tags::BondiBeta,
                  Tags::EvolutionGaugeBoundaryValue<Tags::BondiR>,
                  Tags::EvolutionGaugeBoundaryValue<Tags::DuRDividedByR>,
-                 Spectral::Swsh::Tags::LMax>;
+                 Spectral::Swsh::Tags::LMax,
+                 Spectral::Swsh::Tags::NumberOfRadialPoints>;
   using return_tags = tmpl::list<Tags::News, Tags::U0>;
 
   static void apply(
@@ -33,71 +34,32 @@ struct CalculateScriPlusValue<Tags::News> {
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& beta,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& r,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& /*du_r_divided_by_r*/,
-      const size_t l_max) noexcept {
-    size_t number_of_angular_points =
+      const size_t l_max, const size_t number_of_radial_points) noexcept {
+    const size_t number_of_angular_points =
         Spectral::Swsh::number_of_swsh_collocation_points(l_max);
-    size_t number_of_radial_points = get(h).size() / number_of_angular_points;
     Scalar<SpinWeighted<ComplexDataVector, 2>> dy_h{get(h).size()};
 
     ComputePreSwshDerivatives<Tags::Dy<Tags::BondiH>>::apply(
         make_not_null(&dy_h), h, l_max);
-    auto dy_h_at_scri = ComplexDataVector{
+    const auto dy_h_at_scri = ComplexDataVector{
         get(dy_h).data().data() +
-            (number_of_radial_points - 1) *
-                Spectral::Swsh::number_of_swsh_collocation_points(l_max),
-        Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
+            (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points};
 
     ComplexDataVector beta_buffer = get(beta).data();
-    SpinWeighted<ComplexDataVector, 0> beta_at_scri;
-    beta_at_scri.data() = ComplexDataVector{
-        beta_buffer.data() +
-            (number_of_radial_points - 1) *
-                Spectral::Swsh::number_of_swsh_collocation_points(l_max),
-        Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
+    const auto beta_at_scri = make_const_view(
+        get(beta), (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
 
     // in other contexts, it is worth worrying about whether these are at fixed
     // numerical radius or fixed Bondi radius, but those are equivalent at
     // scri+, so don't worry about it.
-    auto eth_beta_at_scri =
+    const auto eth_beta_at_scri =
         Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
             l_max, 1, beta_at_scri);
-    auto eth_eth_beta_at_scri =
+    const auto eth_eth_beta_at_scri =
         Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::EthEth>(
             l_max, 1, beta_at_scri);
-
-    ComplexDataVector dy_j_buffer = get(dy_j).data();
-    SpinWeighted<ComplexDataVector, 2> dy_j_at_scri;
-    dy_j_at_scri.data() = ComplexDataVector{
-        dy_j_buffer.data() +
-            (number_of_radial_points - 1) *
-                Spectral::Swsh::number_of_swsh_collocation_points(l_max),
-        Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
-
-    auto ethbar_u0 =
-        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
-            l_max, 1, get(*u_0));
-    SpinWeighted<ComplexDataVector, 0> r_buffer = get(r);
-    SpinWeighted<ComplexDataVector, 1> u0bar_dy_j =
-        conj(get(*u_0)) * dy_j_at_scri;
-    SpinWeighted<ComplexDataVector, 2> u0bar_eth_dy_j =
-        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(l_max, 1,
-                                                                   u0bar_dy_j) -
-        dy_j_at_scri *
-            conj(Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
-                l_max, 1, get(*u_0))) +
-        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(l_max, 1,
-                                                                   r_buffer) /
-            r_buffer * u0bar_dy_j;
-    SpinWeighted<ComplexDataVector, 1> ethbar_dy_j =
-        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
-            l_max, 1, dy_j_at_scri) +
-        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
-            l_max, 1, r_buffer) /
-            r_buffer * dy_j_at_scri;
-    // TEST
-    SpinWeighted<ComplexDataVector, 2> u_term =
-        0.5 * u0bar_eth_dy_j + 0.5 * get(*u_0) * ethbar_dy_j +
-        .75 * dy_j_at_scri * conj(ethbar_u0) - 0.25 * ethbar_u0 * dy_j_at_scri;
 
     // additional phase factor delta set to zero.
     // Note: -2 * r extra factor due to derivative l to y
@@ -105,9 +67,407 @@ struct CalculateScriPlusValue<Tags::News> {
     /// TODO currently using SpecH for this computation
     get(*news).data() =
         2.0 *
-        ((-get(r).data() * exp(-2.0 * beta_at_scri.data()) *
-          (dy_h_at_scri /*+0.0 * u_term.data()*/)) +
+        (-get(r).data() * exp(-2.0 * beta_at_scri.data()) * dy_h_at_scri +
          eth_eth_beta_at_scri.data() + 2.0 * square(eth_beta_at_scri.data()));
+  }
+};
+
+template <>
+struct CalculateScriPlusValue<Tags::TimeIntegral<Tags::ScriPlus<Tags::Psi4>>> {
+  using argument_tags =
+      tmpl::list<Tags::Exp2Beta, Tags::Dy<Tags::BondiU>, Tags::Dy<Tags::BondiJ>,
+                 Tags::BondiH, Tags::BondiR, Tags::EthRDividedByR,
+                 Tags::DuRDividedByR, Spectral::Swsh::Tags::LMax,
+                 Spectral::Swsh::Tags::NumberOfRadialPoints>;
+  using return_tags =
+      tmpl::list<Tags::TimeIntegral<Tags::ScriPlus<Tags::Psi4>>>;
+  static void apply(
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, -2>>*>
+          integral_of_psi_4,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& exp_2_beta,
+      const Scalar<SpinWeighted<ComplexDataVector, 1>>& dy_u,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& dy_j,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& h,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& r,
+      const Scalar<SpinWeighted<ComplexDataVector, 1>>& eth_r_divided_by_r,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& du_r_divided_by_r,
+      const size_t l_max, const size_t number_of_radial_points) noexcept {
+    const size_t number_of_angular_points =
+        Spectral::Swsh::number_of_swsh_collocation_points(l_max);
+
+    const auto exp_2_beta_at_scri = make_const_view(
+        get(exp_2_beta),
+        (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+
+    const auto dy_u_at_scri = make_const_view(
+        get(dy_u), (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+    const auto eth_dy_u_at_scri =
+        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
+            l_max, 1, dy_u_at_scri);
+
+    const auto dy_j_at_scri = make_const_view(
+        get(dy_j), (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+
+    const auto r_view = make_const_view(
+        get(r), (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+    const auto eth_r_divided_by_r_view = make_const_view(
+        get(eth_r_divided_by_r),
+        (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+    const auto du_r_divided_by_r_view = make_const_view(
+        get(du_r_divided_by_r),
+        (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+
+    Scalar<SpinWeighted<ComplexDataVector, 2>> dy_h{get(h).size()};
+    ComputePreSwshDerivatives<Tags::Dy<Tags::BondiH>>::apply(
+        make_not_null(&dy_h), h, l_max);
+    const auto dy_h_at_scri = make_const_view(
+        get(dy_h), (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+
+    get(*integral_of_psi_4) =
+        -2.0 * r_view *
+        ((conj(eth_dy_u_at_scri) +
+          conj(eth_r_divided_by_r_view) * conj(dy_u_at_scri)) -
+         (conj(dy_h_at_scri) + du_r_divided_by_r_view * conj(dy_j_at_scri))) /
+        exp_2_beta_at_scri;
+  }
+};
+
+template <>
+struct CalculateScriPlusValue<Tags::ScriPlusFactor<Tags::Psi4>> {
+  using argument_tags = tmpl::list<Tags::Exp2Beta, Spectral::Swsh::Tags::LMax,
+                                   Spectral::Swsh::Tags::NumberOfRadialPoints>;
+  using return_tags = tmpl::list<Tags::ScriPlusFactor<Tags::Psi4>>;
+  static void apply(
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*>
+          scri_plus_factor,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& exp_2_beta,
+      const size_t l_max, const size_t number_of_radial_points) noexcept {
+    const size_t number_of_angular_points =
+        Spectral::Swsh::number_of_swsh_collocation_points(l_max);
+    const auto exp_2_beta_at_scri = make_const_view(
+        get(exp_2_beta),
+        (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+
+    get(*scri_plus_factor) = -0.5 / exp_2_beta_at_scri;
+  }
+};
+
+template <>
+struct CalculateScriPlusValue<Tags::ScriPlus<Tags::Psi3>> {
+  using argument_tags =
+      tmpl::list<Tags::Exp2Beta,
+                 Spectral::Swsh::Tags::Derivative<Tags::BondiBeta,
+                                                  Spectral::Swsh::Tags::Eth>,
+                 Tags::Dy<Tags::BondiU>, Tags::Dy<Tags::BondiJ>, Tags::BondiH,
+                 Tags::Dy<Tags::BondiW>, Tags::BondiR, Tags::EthRDividedByR,
+                 Tags::DuRDividedByR, Spectral::Swsh::Tags::LMax,
+                 Spectral::Swsh::Tags::NumberOfRadialPoints>;
+  using return_tags = tmpl::list<Tags::ScriPlus<Tags::Psi3>>;
+  static void apply(
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, -1>>*> psi_3,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& exp_2_beta,
+      const Scalar<SpinWeighted<ComplexDataVector, 1>>& eth_beta,
+      const Scalar<SpinWeighted<ComplexDataVector, 1>>& dy_u,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& dy_j,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& h,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& dy_w,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& r,
+      const Scalar<SpinWeighted<ComplexDataVector, 1>>& eth_r_divided_by_r,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& du_r_divided_by_r,
+      const size_t l_max, const size_t number_of_radial_points) noexcept {
+    const size_t number_of_angular_points =
+        Spectral::Swsh::number_of_swsh_collocation_points(l_max);
+
+    Scalar<SpinWeighted<ComplexDataVector, 2>> dy_h{get(h).size()};
+    ComputePreSwshDerivatives<Tags::Dy<Tags::BondiH>>::apply(
+        make_not_null(&dy_h), h, l_max);
+    const auto dy_h_at_scri = make_const_view(
+        get(dy_h), (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+
+    const auto exp_2_beta_at_scri = make_const_view(
+        get(exp_2_beta),
+        (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+
+    const auto eth_beta_at_scri = make_const_view(
+        get(eth_beta), (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+
+    const auto dy_u_at_scri = make_const_view(
+        get(dy_u), (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+    const auto eth_dy_u_at_scri =
+        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
+            l_max, 1, dy_u_at_scri);
+
+    const auto dy_w_at_scri = make_const_view(
+        get(dy_w), (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+    const auto ethbar_dy_w_at_scri =
+        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
+            l_max, 1, dy_w_at_scri);
+
+    const auto dy_j_at_scri = make_const_view(
+        get(dy_j), (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+
+    const auto r_view = make_const_view(
+        get(r), (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+    const auto eth_r_divided_by_r_view = make_const_view(
+        get(eth_r_divided_by_r),
+        (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+    const auto du_r_divided_by_r_view = make_const_view(
+        get(du_r_divided_by_r),
+        (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+
+    SpinWeighted<ComplexDataVector, -2> linear_du_j_bar_at_scri =
+        -2.0 * r_view *
+        (conj(dy_h_at_scri) + du_r_divided_by_r_view * conj(dy_j_at_scri));
+    const auto eth_linear_du_j_bar_at_scri =
+        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
+            l_max, 1, linear_du_j_bar_at_scri);
+
+    get(*psi_3) = (2.0 * exp_2_beta_at_scri * conj(eth_beta_at_scri) -
+                   2.0 * r_view * eth_beta_at_scri *
+                       (conj(eth_dy_u_at_scri) +
+                        conj(eth_r_divided_by_r_view) * conj(dy_u_at_scri)) +
+                   r_view * (ethbar_dy_w_at_scri +
+                             conj(eth_r_divided_by_r_view) * dy_w_at_scri) +
+                   eth_beta_at_scri * linear_du_j_bar_at_scri -
+                   eth_linear_du_j_bar_at_scri -
+                   eth_r_divided_by_r_view * linear_du_j_bar_at_scri) /
+                  (sqrt(2.0) * exp_2_beta_at_scri);
+  }
+};
+
+template <>
+struct CalculateScriPlusValue<Tags::ScriPlus<Tags::Psi2>> {
+  using argument_tags =
+      tmpl::list<Tags::Exp2Beta, Tags::Dy<Tags::BondiQ>, Tags::Dy<Tags::BondiU>,
+                 Tags::Dy<Tags::BondiJ>, Tags::BondiH, Tags::BondiR,
+                 Tags::EthRDividedByR, Tags::DuRDividedByR,
+                 Spectral::Swsh::Tags::LMax,
+                 Spectral::Swsh::Tags::NumberOfRadialPoints>;
+  using return_tags = tmpl::list<Tags::ScriPlus<Tags::Psi2>>;
+
+  static void apply(
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*> psi_2,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& exp_2_beta,
+      const Scalar<SpinWeighted<ComplexDataVector, 1>>& dy_q,
+      const Scalar<SpinWeighted<ComplexDataVector, 1>>& dy_u,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& dy_j,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& h,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& r,
+      const Scalar<SpinWeighted<ComplexDataVector, 1>>& eth_r_divided_by_r,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& du_r_divided_by_r,
+      const size_t l_max, const size_t number_of_radial_points) noexcept {
+    const size_t number_of_angular_points =
+        Spectral::Swsh::number_of_swsh_collocation_points(l_max);
+
+    Scalar<SpinWeighted<ComplexDataVector, 2>> dy_h{get(h).size()};
+    ComputePreSwshDerivatives<Tags::Dy<Tags::BondiH>>::apply(
+        make_not_null(&dy_h), h, l_max);
+    const auto dy_h_at_scri = make_const_view(
+        get(dy_h), (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+
+    const auto dy_j_at_scri = make_const_view(
+        get(dy_j), (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+
+    const auto dy_q_at_scri = make_const_view(
+        get(dy_q), (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+    const auto ethbar_dy_q_at_scri =
+        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
+            l_max, 1, dy_q_at_scri);
+
+    const auto dy_u_at_scri = make_const_view(
+        get(dy_u), (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+    const auto eth_dy_u_at_scri =
+        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
+            l_max, 1, dy_u_at_scri);
+
+    const auto exp_2_beta_at_scri = make_const_view(
+        get(exp_2_beta),
+        (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+
+    const auto r_view = make_const_view(
+        get(r), (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+    const auto eth_r_divided_by_r_view = make_const_view(
+        get(eth_r_divided_by_r),
+        (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+    const auto du_r_divided_by_r_view = make_const_view(
+        get(du_r_divided_by_r),
+        (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+
+    get(*psi_2) =
+        -0.5 * r_view *
+        (-exp_2_beta_at_scri * (conj(ethbar_dy_q_at_scri) +
+                                eth_r_divided_by_r_view * conj(dy_q_at_scri)) +
+         2.0 * r_view * dy_j_at_scri *
+             (conj(eth_dy_u_at_scri) +
+              conj(eth_r_divided_by_r_view) * conj(dy_u_at_scri)) +
+         2.0 * r_view * dy_j_at_scri *
+             (conj(dy_h_at_scri) +
+              du_r_divided_by_r_view * conj(dy_j_at_scri))) /
+        exp_2_beta_at_scri;
+  }
+};
+
+template <>
+struct CalculateScriPlusValue<Tags::ScriPlus<Tags::Psi1>> {
+  using argument_tags =
+      tmpl::list<Tags::Dy<Tags::Dy<Tags::BondiBeta>>, Tags::Dy<Tags::BondiJ>,
+                 Tags::Dy<Tags::BondiQ>, Tags::Dy<Tags::Dy<Tags::BondiQ>>,
+                 Tags::BondiR, Tags::EthRDividedByR, Spectral::Swsh::Tags::LMax,
+                 Spectral::Swsh::Tags::NumberOfRadialPoints>;
+  using return_tags = tmpl::list<Tags::ScriPlus<Tags::Psi1>>;
+
+  static void apply(
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> psi_1,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& dy_dy_beta,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& dy_j,
+      const Scalar<SpinWeighted<ComplexDataVector, 1>>& dy_q,
+      const Scalar<SpinWeighted<ComplexDataVector, 1>>& dy_dy_q,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& r,
+      const Scalar<SpinWeighted<ComplexDataVector, 1>>& eth_r_divided_by_r,
+      const size_t l_max, const size_t number_of_radial_points) noexcept {
+    const size_t number_of_angular_points =
+        Spectral::Swsh::number_of_swsh_collocation_points(l_max);
+
+    const auto dy_dy_beta_at_scri = make_const_view(
+        get(dy_dy_beta),
+        (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+    const auto eth_dy_dy_beta_at_scri =
+        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
+            l_max, 1, dy_dy_beta_at_scri);
+
+    const auto dy_j_at_scri = make_const_view(
+        get(dy_j), (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+    const auto dy_q_at_scri = make_const_view(
+        get(dy_q), (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+    const auto dy_dy_q_at_scri = make_const_view(
+        get(dy_dy_q), (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+
+    const auto r_view = make_const_view(
+        get(r), (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+    const auto eth_r_divided_by_r_view = make_const_view(
+        get(eth_r_divided_by_r),
+        (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+
+    get(*psi_1) = 0.5 * sqrt(2.0) * square(r_view) *
+                  (6.0 * eth_dy_dy_beta_at_scri +
+                   12.0 * eth_r_divided_by_r_view * dy_dy_beta_at_scri -
+                   dy_j_at_scri * conj(dy_q_at_scri) - dy_dy_q_at_scri);
+  }
+};
+
+template <>
+struct CalculateScriPlusValue<Tags::ScriPlus<Tags::Psi0>> {
+  using argument_tags =
+      tmpl::list<Tags::Dy<Tags::Dy<Tags::BondiBeta>>, Tags::Dy<Tags::BondiJ>,
+                 Tags::Dy<Tags::Dy<Tags::BondiJ>>, Tags::BondiR,
+                 Spectral::Swsh::Tags::LMax,
+                 Spectral::Swsh::Tags::NumberOfRadialPoints>;
+  using return_tags = tmpl::list<Tags::ScriPlus<Tags::Psi0>>;
+
+  static void apply(
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> psi_0,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& dy_dy_beta,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& dy_j,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& dy_dy_j,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& r, const size_t l_max,
+      const size_t number_of_radial_points) noexcept {
+    const size_t number_of_angular_points =
+        Spectral::Swsh::number_of_swsh_collocation_points(l_max);
+
+    Scalar<SpinWeighted<ComplexDataVector, 2>> dy_dy_dy_j{get(dy_dy_j).size()};
+
+    ComputePreSwshDerivatives<Tags::Dy<Tags::Dy<Tags::Dy<Tags::BondiJ>>>>::
+        apply(make_not_null(&dy_dy_dy_j), dy_dy_j, l_max);
+    const auto dy_dy_dy_j_at_scri = make_const_view(
+        get(dy_dy_dy_j),
+        (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+
+    const auto dy_j_at_scri = make_const_view(
+        get(dy_j), (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+
+    const auto dy_dy_beta_at_scri = make_const_view(
+        get(dy_dy_beta),
+        (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+
+    const auto r_view = make_const_view(
+        get(r), (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+
+    get(*psi_0) =
+        -4.0 * pow<3>(r_view) *
+        (2.0 * dy_dy_beta_at_scri * dy_j_at_scri +
+         conj(dy_j_at_scri) * square(dy_j_at_scri) - dy_dy_dy_j_at_scri);
+  }
+};
+
+template <>
+struct CalculateScriPlusValue<Tags::ScriPlus<Tags::Strain>> {
+  using argument_tags =
+      tmpl::list<Tags::Dy<Tags::BondiJ>, Tags::InertialRetardedTime,
+                 Tags::BondiR, Spectral::Swsh::Tags::LMax,
+                 Spectral::Swsh::Tags::NumberOfRadialPoints>;
+  using return_tags = tmpl::list<Tags::ScriPlus<Tags::Strain>>;
+
+  static void apply(
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> strain,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& dy_j,
+      const Scalar<DataVector>& inertial_retarded_time,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& r, const size_t l_max,
+      const size_t number_of_radial_points) noexcept {
+    const size_t number_of_angular_points =
+        Spectral::Swsh::number_of_swsh_collocation_points(l_max);
+
+    SpinWeighted<ComplexDataVector, 0> complex_inertial_retarded_time;
+    complex_inertial_retarded_time.data() =
+        std::complex<double>(1.0, 0.0) * get(inertial_retarded_time);
+
+    const auto eth_eth_retarded_time =
+        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::EthEth>(
+            l_max, 1, complex_inertial_retarded_time);
+
+    const auto dy_j_at_scri = make_const_view(
+        get(dy_j), (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+
+    const auto r_view = make_const_view(
+        get(r), (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+
+    get(*strain) = -2.0 * r_view * dy_j_at_scri + eth_eth_retarded_time;
   }
 };
 

@@ -40,7 +40,9 @@ struct CharacteristicScri;
 
 namespace Actions {
 struct BoundaryComputeAndSendToExtractor;
-struct ReceiveNonInertialNews;
+template <typename Tag>
+struct ReceiveNonInertial;
+template <typename Tag>
 struct AddTargetInterpolationTime;
 }
 
@@ -102,7 +104,8 @@ struct FilterSwshVolumeQuantity {
   }
 };
 
-struct SendNewsToScri {
+template <typename Tag>
+struct SendToScri {
   template <typename DbTags, typename... InboxTags, typename Metavariables,
             typename ArrayIndex, typename ActionList,
             typename ParallelComponent>
@@ -113,10 +116,77 @@ struct SendNewsToScri {
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
     if (db::get<::Tags::TimeId>(box).substep() == 0) {
-      Parallel::simple_action<Actions::ReceiveNonInertialNews>(
+      Parallel::simple_action<Actions::ReceiveNonInertial<Tag>>(
           Parallel::get_parallel_component<CharacteristicScri<Metavariables>>(
               cache),
-          db::get<Tags::InertialRetardedTime>(box), db::get<Tags::News>(box));
+          db::get<Tags::InertialRetardedTime>(box), db::get<Tag>(box));
+    }
+    return std::forward_as_tuple(std::move(box));
+  }
+};
+
+template <typename Tag>
+struct SendToScri<Tags::Du<Tag>> {
+  template <typename DbTags, typename... InboxTags, typename Metavariables,
+            typename ArrayIndex, typename ActionList,
+            typename ParallelComponent>
+  static auto apply(db::DataBox<DbTags>& box,
+                    const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
+                    Parallel::ConstGlobalCache<Metavariables>& cache,
+                    const ArrayIndex& /*array_index*/,
+                    const ActionList /*meta*/,
+                    const ParallelComponent* const /*meta*/) noexcept {
+    if (db::get<::Tags::TimeId>(box).substep() == 0) {
+      Parallel::simple_action<Actions::ReceiveNonInertial<Tags::Du<Tag>>>(
+          Parallel::get_parallel_component<CharacteristicScri<Metavariables>>(
+              cache),
+          db::get<Tags::InertialRetardedTime>(box), db::get<Tag>(box));
+    }
+    return std::forward_as_tuple(std::move(box));
+  }
+};
+
+template <typename LhsTag, typename RhsTag>
+struct SendToScri<::Tags::Multiplies<LhsTag, RhsTag>> {
+  template <typename DbTags, typename... InboxTags, typename Metavariables,
+            typename ArrayIndex, typename ActionList,
+            typename ParallelComponent>
+  static auto apply(db::DataBox<DbTags>& box,
+                    const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
+                    Parallel::ConstGlobalCache<Metavariables>& cache,
+                    const ArrayIndex& /*array_index*/,
+                    const ActionList /*meta*/,
+                    const ParallelComponent* const /*meta*/) noexcept {
+    if (db::get<::Tags::TimeId>(box).substep() == 0) {
+      Parallel::simple_action<
+          Actions::ReceiveNonInertial<::Tags::Multiplies<LhsTag, RhsTag>>>(
+          Parallel::get_parallel_component<CharacteristicScri<Metavariables>>(
+              cache),
+          db::get<Tags::InertialRetardedTime>(box), db::get<LhsTag>(box),
+          db::get<RhsTag>(box));
+    }
+    return std::forward_as_tuple(std::move(box));
+  }
+};
+
+template <typename LhsTagArgument, typename RhsTag>
+struct SendToScri<::Tags::Multiplies<Tags::Du<LhsTagArgument>, RhsTag>> {
+  template <typename DbTags, typename... InboxTags, typename Metavariables,
+            typename ArrayIndex, typename ActionList,
+            typename ParallelComponent>
+      static auto apply(db::DataBox<DbTags>& box,
+                        const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
+                        Parallel::ConstGlobalCache<Metavariables>& cache,
+                        const ArrayIndex& /*array_index*/,
+                        const ActionList /*meta*/,
+                        const ParallelComponent* const /*meta*/) noexcept {
+    if (db::get<::Tags::TimeId>(box).substep() == 0) {
+      Parallel::simple_action<Actions::ReceiveNonInertial<
+          ::Tags::Multiplies<Tags::Du<LhsTagArgument>, RhsTag>>>(
+          Parallel::get_parallel_component<CharacteristicScri<Metavariables>>(
+              cache),
+          db::get<Tags::InertialRetardedTime>(box),
+          db::get<LhsTagArgument>(box), db::get<RhsTag>(box));
     }
     return std::forward_as_tuple(std::move(box));
   }
@@ -338,7 +408,11 @@ struct CharacteristicExtractor {
           CalculateScriPlusValue<::Tags::dt<Tags::InertialRetardedTime>>>,
       ::Actions::MutateApply<ComputePreSwshDerivatives<Cce::Tags::SpecH>>,
       ::Actions::MutateApply<CalculateScriPlusValue<Tags::News>>,
-      Actions::SendNewsToScri,
+      tmpl::transform<typename metavariables::cce_scri_tags,
+                      tmpl::bind<::Actions::MutateApply,
+                                 tmpl::bind<CalculateScriPlusValue, tmpl::_1>>>,
+      tmpl::transform<typename metavariables::scri_values_to_observe,
+                      tmpl::bind<Actions::SendToScri, tmpl::_1>>,
       ::Actions::RecordTimeStepperData<
           typename Metavariables::evolved_coordinates_variables_tag>,
       ::Actions::RecordTimeStepperDataSingleTensor<

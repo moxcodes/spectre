@@ -51,7 +51,24 @@ struct EvolutionMetavars {
       Spectral::Swsh::Tags::Derivative<Cce::Tags::GaugeOmegaCD,
                                        Spectral::Swsh::Tags::Eth>>>;
 
-  using cce_scri_tags = tmpl::list<Cce::Tags::News>;
+  using scri_values_to_observe =
+      tmpl::list<Cce::Tags::News, Cce::Tags::ScriPlus<Cce::Tags::Strain>,
+                 Cce::Tags::ScriPlus<Cce::Tags::Psi0>,
+                 Cce::Tags::ScriPlus<Cce::Tags::Psi1>,
+                 Cce::Tags::ScriPlus<Cce::Tags::Psi2>,
+                 Cce::Tags::ScriPlus<Cce::Tags::Psi3>,
+                 Tags::Multiplies<Cce::Tags::Du<Cce::Tags::TimeIntegral<
+                                      Cce::Tags::ScriPlus<Cce::Tags::Psi4>>>,
+                                  Cce::Tags::ScriPlusFactor<Cce::Tags::Psi4>>>;
+
+  using cce_scri_tags =
+      tmpl::list<Cce::Tags::News, Cce::Tags::ScriPlus<Cce::Tags::Strain>,
+                 Cce::Tags::ScriPlus<Cce::Tags::Psi0>,
+                 Cce::Tags::ScriPlus<Cce::Tags::Psi1>,
+                 Cce::Tags::ScriPlus<Cce::Tags::Psi2>,
+                 Cce::Tags::ScriPlus<Cce::Tags::Psi3>,
+                 Cce::Tags::TimeIntegral<Cce::Tags::ScriPlus<Cce::Tags::Psi4>>,
+                 Cce::Tags::ScriPlusFactor<Cce::Tags::Psi4>>;
   using cce_integrand_tags = tmpl::flatten<tmpl::transform<
       Cce::bondi_hypersurface_step_tags,
       tmpl::bind<Cce::integrand_terms_to_compute_for_bondi_variable,
@@ -67,6 +84,7 @@ struct EvolutionMetavars {
       tmpl::list<Cce::Tags::CauchyAngularCoords>;
 
   using cce_boundary_component = Cce::H5WorldtubeBoundary<EvolutionMetavars>;
+
   // TODO select between input interpolators
   template <typename ToObserve>
   using observation_type = typename db::item_type<

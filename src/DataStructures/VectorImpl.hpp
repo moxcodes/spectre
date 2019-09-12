@@ -672,3 +672,10 @@ using is_derived_of_vector_impl =
 template <typename T>
 constexpr bool is_derived_of_vector_impl_v =
     is_derived_of_vector_impl<T>::value;
+
+template <typename VectorType,
+          Requires<is_derived_of_vector_impl_v<VectorType>> = nullptr>
+const VectorType make_const_view(const VectorType& vector, const size_t offset,
+                                 const size_t extent) noexcept {
+  return VectorType{const_cast<VectorType&>(vector).data() + offset, extent};
+}

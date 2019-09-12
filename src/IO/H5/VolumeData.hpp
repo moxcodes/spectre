@@ -93,7 +93,7 @@ class VolumeData : public h5::Object {
   /// `GRID_NAME/TENSOR_NAME_COMPONENT`, e.g. `Element0/T_xx`
   void write_volume_data(
       size_t observation_id, double observation_value,
-      const std::vector<ExtentsAndTensorVolumeData>& elements) noexcept;
+       std::vector<ExtentsAndTensorVolumeData> elements) noexcept;
 
   /// List all the integral observation ids in the subfile
   std::vector<size_t> list_observation_ids() const noexcept;

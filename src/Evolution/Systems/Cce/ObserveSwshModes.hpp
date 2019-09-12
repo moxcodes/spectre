@@ -92,10 +92,15 @@ class ObserveBoundarySwshModes<tmpl::list<ToObserve...>, EventRegistrars>
 
     // kick off the observation for the same time at scri+, because current
     // volume outputs have to be synchronized.
-    Parallel::simple_action<Actions::AddTargetInterpolationTime>(
-        Parallel::get_parallel_component<CharacteristicScri<Metavariables>>(
-            cache),
-        time_id.time().value());
+    tmpl::for_each<
+        typename Metavariables::scri_values_to_observe>([&cache,
+                                                         &time_id](auto tag_v) {
+      using tag = typename decltype(tag_v)::type;
+      Parallel::simple_action<Actions::AddTargetInterpolationTime<tag>>(
+          Parallel::get_parallel_component<CharacteristicScri<Metavariables>>(
+              cache),
+          time_id.time().value());
+    });
 
     std::vector<std::string> file_legend;
     file_legend.push_back("times, sim lmax: " + std::to_string(l_max));

@@ -21,6 +21,7 @@
 #include "IO/H5/Helpers.hpp"
 #include "IO/H5/Version.hpp"
 #include "Utilities/Numeric.hpp"
+
 /// \cond HIDDEN_SYMBOLS
 namespace h5 {
 namespace {
@@ -116,7 +117,7 @@ VolumeData::VolumeData(const bool subfile_exists, detail::OpenGroup&& group,
 // an `observation_group` in a `VolumeData` file.
 void VolumeData::write_volume_data(
     const size_t observation_id, const double observation_value,
-    const std::vector<ExtentsAndTensorVolumeData>& elements) noexcept {
+    const std::vector<ExtentsAndTensorVolumeData> elements) noexcept {
   const std::string path = "ObservationId" + std::to_string(observation_id);
   detail::OpenGroup observation_group(volume_data_group_.id(), path,
                                       AccessType::ReadWrite);
@@ -136,11 +137,14 @@ void VolumeData::write_volume_data(
                << component.name << "'.");
     return component.name.substr(component.name.find_last_of('/') + 1);
   };
-  const std::vector<std::string> component_names(
-      boost::make_transform_iterator(elements.front().tensor_components.begin(),
-                                     get_component_name),
-      boost::make_transform_iterator(elements.front().tensor_components.end(),
-                                     get_component_name));
+  std::unordered_set<std::string> component_names;
+  for (auto& element : elements) {
+    component_names.insert(
+        boost::make_transform_iterator(element.tensor_components.begin(),
+                                       get_component_name),
+        boost::make_transform_iterator(element.tensor_components.end(),
+                                       get_component_name));
+  }
 
   // The dimension of the grid is the number of extents per element.
   // Only written once per VolumeData file, as if two observation id's
@@ -158,25 +162,36 @@ void VolumeData::write_volume_data(
   // connectivity after each iteration to be sure each point gets a
   // unique representation in the topology data
   int total_points_so_far = 0;
-  // Loop over tensor componenents
-  for (size_t i = 0; i < component_names.size(); i++) {
-    std::string component_name = component_names[i];
-
+  // Loop over tensor components
+  std::vector<bool> elements_accessed(elements.size(), false);
+  for(auto& component_name : component_names) {
     std::vector<double> contiguous_tensor_data{};
-    for (auto& element : elements) {
-      if (i == 0) {  // True if first tensor component being accessed
-        append_element_name(&grid_names, element);
-        append_element_extents_and_connectivity(
-            &total_extents, &total_connectivity, &total_points_so_far, dim,
-            element);
+    for(size_t i = 0; i < elements.size(); ++i) {
+      size_t component_index = static_cast<size_t>(std::distance(
+          boost::make_transform_iterator(elements[i].tensor_components.begin(),
+                                         get_component_name),
+          std::find(
+              boost::make_transform_iterator(
+                  elements[i].tensor_components.begin(), get_component_name),
+              boost::make_transform_iterator(
+                  elements[i].tensor_components.end(), get_component_name),
+              component_name)));
+      if(component_index != elements[i].tensor_components.size()) {
+        if (not elements_accessed[i]) {  // True if first tensor component being
+                                         // accessed
+          append_element_name(&grid_names, elements[i]);
+          append_element_extents_and_connectivity(
+              &total_extents, &total_connectivity, &total_points_so_far, dim,
+              elements[i]);
+          elements_accessed[i] = true;
+        }
+        const DataVector& tensor_data_on_grid =
+            elements[i].tensor_components[component_index].data;
+        contiguous_tensor_data.insert(contiguous_tensor_data.end(),
+                                      tensor_data_on_grid.begin(),
+                                      tensor_data_on_grid.end());
       }
-      const DataVector& tensor_data_on_grid = element.tensor_components[i].data;
-      contiguous_tensor_data.insert(contiguous_tensor_data.end(),
-                                    tensor_data_on_grid.begin(),
-                                    tensor_data_on_grid.end());
-
     }  // for each element
-
     // Write the data for the tensor component
     if (h5::contains_dataset_or_group(observation_group.id(), "",
                                       component_name)) {

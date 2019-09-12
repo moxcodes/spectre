@@ -68,10 +68,10 @@ struct H5Interpolator {
 };
 
 struct ScriInterpolationPoints {
-  static std::string name() noexcept { return "ScriInterpolationPoints"; }
+  static std::string name() noexcept { return "ScriInterpPoints"; }
   using type = size_t;
   static constexpr OptionString help{
-      "Number of points to interpolate for values at scri+."};
+      "Number of points to interpolate for at scri+."};
   static size_t default_value() noexcept { return 5; }
 };
 

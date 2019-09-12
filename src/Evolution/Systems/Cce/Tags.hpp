@@ -7,8 +7,9 @@
 #include "DataStructures/SpinWeighted.hpp"
 #include "DataStructures/Tensor/Tensor.hpp"
 #include "DataStructures/Tensor/TypeAliases.hpp"
-#include "NumericalAlgorithms/Spectral/SwshTags.hpp"
 #include "Evolution/Systems/Cce/OptionTags.hpp"
+#include "NumericalAlgorithms/Spectral/SwshTags.hpp"
+#include "Utilities/PrettyType.hpp"
 
 namespace Cce {
 
@@ -386,6 +387,57 @@ struct JbarQMinus2EthBeta : db::SimpleTag {
 struct BondiR : db::SimpleTag {
   using type = Scalar<SpinWeighted<ComplexDataVector, 0>>;
   static std::string name() noexcept { return "R"; }
+};
+
+struct Psi0 : db::SimpleTag {
+  using type = Scalar<SpinWeighted<ComplexDataVector, 2>>;
+};
+
+struct Psi1 : db::SimpleTag {
+  using type = Scalar<SpinWeighted<ComplexDataVector, 1>>;
+};
+
+struct Psi2 : db::SimpleTag {
+  using type = Scalar<SpinWeighted<ComplexDataVector, 0>>;
+};
+
+struct Psi3 : db::SimpleTag {
+  using type = Scalar<SpinWeighted<ComplexDataVector, -1>>;
+};
+
+struct Psi4 : db::SimpleTag {
+  using type = Scalar<SpinWeighted<ComplexDataVector, -2>>;
+};
+
+struct Strain : db::SimpleTag {
+  using type = Scalar<SpinWeighted<ComplexDataVector, 2>>;
+};
+
+template <typename Tag>
+struct TimeIntegral : db::PrefixTag, db::SimpleTag {
+  using type = Scalar<SpinWeighted<ComplexDataVector, Tag::type::type::spin>>;
+  using tag = Tag;
+  static std::string name() noexcept {
+    return "TimeIntegral(" + pretty_type::get_name<Tag>() + ")";
+  }
+};
+
+template <typename Tag>
+struct ScriPlus : db::PrefixTag, db::SimpleTag {
+  using type = Scalar<SpinWeighted<ComplexDataVector, Tag::type::type::spin>>;
+  using tag = Tag;
+  static std::string name() noexcept {
+    return "ScriPlus(" + pretty_type::get_name<Tag>() + ")";
+  }
+};
+
+template <typename Tag>
+struct ScriPlusFactor : db::PrefixTag, db::SimpleTag {
+  using type = Scalar<SpinWeighted<ComplexDataVector, 0>>;
+  using tag = Tag;
+  static std::string name() noexcept {
+    return "ScriPlusFactor(" + pretty_type::get_name<Tag>() + ")";
+  }
 };
 
 struct LMax : ::Spectral::Swsh::Tags::LMax {

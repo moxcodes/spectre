@@ -27,8 +27,6 @@
 #include "Utilities/TMPL.hpp"
 #include "Utilities/TaggedTuple.hpp"
 
-#include "Parallel/Printf.hpp"
-
 namespace observers {
 namespace ThreadedActions {
 /// \cond
@@ -72,7 +70,6 @@ struct ContributeVolumeData {
                     const observers::ArrayComponentId& array_component_id,
                     std::vector<TensorComponent>&& in_received_tensor_data,
                     const Index<Dim>& received_extents) noexcept {
-    Parallel::printf("contributing volume data\n");
     db::mutate<Tags::TensorData>(
         make_not_null(&box),
         [
@@ -105,9 +102,6 @@ struct ContributeVolumeData {
                 std::make_move_iterator(received_tensor_data.begin()),
                 std::make_move_iterator(received_tensor_data.end()));
           }
-          Parallel::printf("checking if its time to write : %zu, %zu\n",
-                           volume_data->at(observation_id).size(),
-                           volume_component_ids.size());
           // Check if we have received all "volume" data from the registered
           // elements. If so we copy it to the nodegroup volume writer.
           if (volume_data->at(observation_id).size() ==
@@ -144,7 +138,6 @@ struct ContributeVolumeDataToWriter {
                     std::unordered_map<observers::ArrayComponentId,
                                        ExtentsAndTensorVolumeData>&&
                         in_volume_data) noexcept {
-    Parallel::printf("contributing volume data to writer\n");
     // This is the number of callers that have registered (that are associated
     // with the observation type of this observation_id).
     // We expect that this Action will be called once by each of them.
