@@ -71,7 +71,8 @@ struct ObserveInertialInterpolated {
       // swsh transform
       const size_t l_max = Parallel::get<Tags::LMax>(cache);
       auto to_transform =
-          SpinWeighted<ComplexDataVector, 2>{interpolation.first};
+          SpinWeighted<ComplexDataVector, tag::type::type::spin>{
+              interpolation.first};
       ComplexModalVector goldberg_modes =
           Spectral::Swsh::libsharp_to_goldberg_modes(
               Spectral::Swsh::swsh_transform(l_max, 1, to_transform), l_max)

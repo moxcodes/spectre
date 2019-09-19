@@ -468,22 +468,24 @@ struct NumberOfRadialPoints {
   }
 };
 
-struct StartTime {
+struct StartTime : db::SimpleTag {
   using type = double;
   using option_tags = tmpl::list<OptionTags::StartTime>;
 
-  static size_t create_from_options(const double start_time) noexcept {
+  static double create_from_options(const double start_time) noexcept {
     return start_time;
   }
+  static std::string name() noexcept { return "StartTime"; }
 };
 
-struct TargetStepSize {
+struct TargetStepSize : db::SimpleTag {
   using type = double;
   using option_tags = tmpl::list<OptionTags::TargetStepSize>;
 
-  static size_t create_from_options(const double target_step_size) noexcept {
+  static double create_from_options(const double target_step_size) noexcept {
     return target_step_size;
   }
+  static std::string name() noexcept { return "TargetStepSize"; }
 };
 
 struct ScriInterpolationPoints {

@@ -90,7 +90,7 @@ struct EvolutionMetavars {
   using observation_type = typename db::item_type<
       Spectral::Swsh::Tags::SwshTransform<ToObserve>>::type::value_type;
 
-  using output_cce_scri_scalars = tmpl::list<Cce::Tags::U0, Cce::Tags::News>;
+  using output_cce_scri_scalars = tmpl::list<Cce::Tags::U0>;
   using output_cce_volume_scalars = tmpl::list<Cce::Tags::BondiJ>;
 
   // TODO expand with other outputs

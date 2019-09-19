@@ -69,6 +69,7 @@ inline void Option::set_node(YAML::Node node) noexcept {
 template <typename T, typename Metavariables>
 T Option::parse_as() const {
   try {
+    const std::string value_text = YAML::Dump(node());
     // yaml-cpp's `as` method won't parse empty nodes, so we need to
     // inline a bit of its logic.
     Options_detail::wrap_create_types<T, Metavariables> result{};
@@ -104,7 +105,6 @@ T Option::parse_as() const {
         }
       }
     }
-
     if (tt::is_a_v<std::vector, T> or tt::is_std_array_v<T>) {
       ss << "\n\nNote: For sequences this can happen because the length of the "
             "sequence specified\nin the input file is not equal to the length "
@@ -452,7 +452,6 @@ struct get_impl<Tag, Metavariables, Tag> {
     option.append_context("While parsing option " + label);
 
     auto t = option.parse_as<typename Tag::type, Metavariables>();
-
     opts.template check_lower_bound_on_size<Tag>(t, option.context());
     opts.template check_upper_bound_on_size<Tag>(t, option.context());
     opts.template check_lower_bound<Tag>(t, option.context());

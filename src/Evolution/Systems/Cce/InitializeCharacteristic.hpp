@@ -85,7 +85,6 @@ struct PopulateCharacteristicInitialHypersurface {
     // J on the first hypersurface
     db::mutate_apply<InitializeJ<Tags::BoundaryValue>>(make_not_null(&box));
     // Gauge quantities - maybe do this with the action list
-    Parallel::printf("segfault?\n");
     db::mutate_apply<InitializeGauge>(make_not_null(&box));
     db::mutate_apply<GaugeUpdateAngularFromCartesian<
         Tags::CauchyAngularCoords, Tags::CauchyCartesianCoords>>(
@@ -97,7 +96,6 @@ struct PopulateCharacteristicInitialHypersurface {
     db::mutate_apply<GaugeUpdateOmegaCD>(make_not_null(&box));
     db::mutate_apply<InitializeScriPlusValue<Tags::InertialRetardedTime>>(
         make_not_null(&box), db::get<::Tags::Time>(box).value());
-    Parallel::printf("nope\n");
     return std::forward_as_tuple(std::move(box));
   }
 };
@@ -106,9 +104,9 @@ struct InitializeCharacteristic {
   using initialization_tags =
       tmpl::list<InitializationTags::LMax,
                  InitializationTags::NumberOfRadialPoints,
-                 InitializationTags::EndTime>;
-  using const_global_cache_tags =
-      tmpl::list<Tags::StartTime, Tags::TargetStepSize>;
+                 InitializationTags::EndTime,
+                 Tags::StartTime, Tags::TargetStepSize>;
+  using const_global_cache_tags = tmpl::list<>;
 
   template <typename Metavariables>
   struct EvolutionTags {
@@ -129,8 +127,8 @@ struct InitializeCharacteristic {
     static auto initialize(
         db::DataBox<TagList>&& box,
         const Parallel::ConstGlobalCache<Metavariables>& cache) noexcept {
-      const double initial_time_value = Parallel::get<Tags::StartTime>(cache);
-      const double step_size = Parallel::get<Tags::TargetStepSize>(cache);
+      const double initial_time_value = db::get<Tags::StartTime>(box);
+      const double step_size = db::get<Tags::TargetStepSize>(box);
 
       // currently hard-coded to fixed step size
       const Slab single_step_slab{initial_time_value,
@@ -139,12 +137,10 @@ struct InitializeCharacteristic {
       const TimeDelta fixed_time_step =
           TimeDelta{single_step_slab, Rational{1, 1}};
       const TimeId initial_time_id{true, 0, initial_time};
-      Parallel::printf("initial time %zu\n", initial_time_id.substep());
       const auto& time_stepper =
           Parallel::get<::Tags::TimeStepper<TimeStepper>>(cache);
       const TimeId second_time_id =
           time_stepper.next_time_id(initial_time_id, fixed_time_step);
-      Parallel::printf("next time %zu\n", second_time_id.substep());
 
       typename db::item_type<::Tags::HistoryEvolvedVariables<
           coordinate_variables_tag, dt_coordinate_variables_tag>>
