@@ -18,18 +18,18 @@ struct CalculateScriPlusValue;
 
 template <>
 struct CalculateScriPlusValue<Tags::News> {
-  using argument_tags = tmpl::list<
-      Tags::SpecH, Tags::BondiJ, Tags::Dy<Tags::BondiJ>, Tags::BondiBeta,
-      Tags::EvolutionGaugeBoundaryValue<Tags::BondiR>,
-      Tags::EvolutionGaugeBoundaryValue<Tags::DuRDividedByR>,
-      Spectral::Swsh::Tags::LMax, Spectral::Swsh::Tags::NumberOfRadialPoints>;
+  using argument_tags =
+      tmpl::list<Tags::SpecH, Tags::Dy<Tags::BondiJ>, Tags::BondiBeta,
+                 Tags::EvolutionGaugeBoundaryValue<Tags::BondiR>,
+                 Tags::EvolutionGaugeBoundaryValue<Tags::DuRDividedByR>,
+                 Spectral::Swsh::Tags::LMax,
+                 Spectral::Swsh::Tags::NumberOfRadialPoints>;
   using return_tags = tmpl::list<Tags::News, Tags::U0>;
 
   static void apply(
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> news,
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> u_0,
       const Scalar<SpinWeighted<ComplexDataVector, 2>>& h,
-      const Scalar<SpinWeighted<ComplexDataVector, 2>>& j,
       const Scalar<SpinWeighted<ComplexDataVector, 2>>& dy_j,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& beta,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& r,
@@ -50,65 +50,6 @@ struct CalculateScriPlusValue<Tags::News> {
     const auto beta_at_scri = make_const_view(
         get(beta), (number_of_radial_points - 1) * number_of_angular_points,
         number_of_angular_points);
-
-    ComplexModalVector goldberg_modes_beta =
-        Spectral::Swsh::libsharp_to_goldberg_modes(
-            Spectral::Swsh::swsh_transform(l_max, 1, beta_at_scri), l_max)
-            .data();
-    Parallel::printf("Beta check:\n");
-    Parallel::printf("%e, %e ; %e %e\n", real(goldberg_modes_beta[6]),
-                     imag(goldberg_modes_beta[6]), real(goldberg_modes_beta[8]),
-                     imag(goldberg_modes_beta[8]));
-
-    const auto j_at_scri = make_const_view(
-        get(j), (number_of_radial_points - 1) * number_of_angular_points,
-        number_of_angular_points);
-
-    ComplexModalVector goldberg_modes_j =
-        Spectral::Swsh::libsharp_to_goldberg_modes(
-            Spectral::Swsh::swsh_transform(l_max, 1, j_at_scri), l_max)
-            .data();
-    Parallel::printf("J check:\n");
-    Parallel::printf("%e, %e ; %e %e\n", real(goldberg_modes_j[6]),
-                     imag(goldberg_modes_j[6]), real(goldberg_modes_j[8]),
-                     imag(goldberg_modes_j[8]));
-
-    const auto j_at_boundary =
-        make_const_view(get(j), 0, number_of_angular_points);
-
-    goldberg_modes_j =
-        Spectral::Swsh::libsharp_to_goldberg_modes(
-            Spectral::Swsh::swsh_transform(l_max, 1, j_at_boundary), l_max)
-            .data();
-    Parallel::printf("J boundary check:\n");
-    Parallel::printf("%e, %e ; %e %e\n", real(goldberg_modes_j[6]),
-                     imag(goldberg_modes_j[6]), real(goldberg_modes_j[8]),
-                     imag(goldberg_modes_j[8]));
-
-    const auto h_at_scri = make_const_view(
-        get(h), (number_of_radial_points - 1) * number_of_angular_points,
-        number_of_angular_points);
-
-    ComplexModalVector goldberg_modes_h =
-        Spectral::Swsh::libsharp_to_goldberg_modes(
-            Spectral::Swsh::swsh_transform(l_max, 1, h_at_scri), l_max)
-            .data();
-    Parallel::printf("H check:\n");
-    Parallel::printf("%e, %e ; %e %e\n", real(goldberg_modes_h[6]),
-                     imag(goldberg_modes_h[6]), real(goldberg_modes_h[8]),
-                     imag(goldberg_modes_h[8]));
-
-    const auto h_at_boundary =
-        make_const_view(get(h), 0, number_of_angular_points);
-
-    goldberg_modes_h =
-        Spectral::Swsh::libsharp_to_goldberg_modes(
-            Spectral::Swsh::swsh_transform(l_max, 1, h_at_boundary), l_max)
-            .data();
-    Parallel::printf("H boundary check:\n");
-    Parallel::printf("%e, %e ; %e %e\n", real(goldberg_modes_h[6]),
-                     imag(goldberg_modes_h[6]), real(goldberg_modes_h[8]),
-                     imag(goldberg_modes_h[8]));
 
     // in other contexts, it is worth worrying about whether these are at fixed
     // numerical radius or fixed Bondi radius, but those are equivalent at

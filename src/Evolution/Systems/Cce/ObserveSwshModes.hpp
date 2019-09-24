@@ -128,10 +128,6 @@ class ObserveBoundarySwshModes<tmpl::list<ToObserve...>, EventRegistrars>
               Spectral::Swsh::swsh_transform(l_max, 1, boundary_swsh_copy),
               l_max)
               .data();
-      Parallel::printf("U0 check:\n");
-      Parallel::printf("%e, %e ; %e %e\n", real(goldberg_modes[6]),
-                       imag(goldberg_modes[6]), real(goldberg_modes[8]),
-                       imag(goldberg_modes[8]));
       // suspicious reinterpret cast for making a series of doubles, because
       // that's needed for the h5
       DataVector goldberg_subset{

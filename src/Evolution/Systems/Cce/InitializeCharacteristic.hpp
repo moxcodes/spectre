@@ -214,9 +214,10 @@ struct InitializeCharacteristic {
           db::item_type<angular_coordinates_variables_tag>{boundary_size},
           db::item_type<scri_variables_tag>{boundary_size},
           db::item_type<volume_variables_tag>{volume_size},
-          db::item_type<pre_swsh_derivatives_variables_tag>{volume_size},
-          db::item_type<transform_buffer_variables_tag>{transform_buffer_size},
-          db::item_type<swsh_derivative_variables_tag>{volume_size});
+          db::item_type<pre_swsh_derivatives_variables_tag>{volume_size, 0.0},
+          db::item_type<transform_buffer_variables_tag>{transform_buffer_size,
+                                                        0.0},
+          db::item_type<swsh_derivative_variables_tag>{volume_size, 0.0});
     }
   };
 

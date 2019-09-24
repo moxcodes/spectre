@@ -105,10 +105,8 @@ struct UpdateUSingleTensor {
               boost::make_zip_iterator(
                   boost::make_tuple(tensor->end(), histories->end())),
               [&time_stepper, &time_step](auto component_and_history) {
-                // TODO generalize
                 time_stepper.update_u(
-                    make_not_null(
-                        &component_and_history.template get<0>().data()),
+                    make_not_null(&component_and_history.template get<0>()),
                     make_not_null(&component_and_history.template get<1>()),
                     time_step);
               });

@@ -10,8 +10,8 @@
 #include "NumericalAlgorithms/Spectral/SwshDerivatives.hpp"
 #include "NumericalAlgorithms/Spectral/SwshFiltering.hpp"
 #include "NumericalAlgorithms/Spectral/SwshInterpolation.hpp"
-#include "Parallel/Printf.hpp"
 #include "Utilities/MakeArray.hpp"
+#include "Parallel/Printf.hpp"
 
 namespace Cce {
 // TOOD most of these computations require intermediate quantities that could be
@@ -92,7 +92,6 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::DuRDividedByR> {
         get(evolution_gauge_r) / get(omega_cd);
     auto eth_r = Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
         l_max, 1, r_buffer);
-    // TEST
     get(*evolution_gauge_du_r_divided_by_r) +=
         0.5 * (get(u_0) * conj(eth_r) + conj(get(u_0)) * eth_r) / r_buffer +
         get(du_omega_cd) / get(omega_cd);
@@ -117,14 +116,6 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::BondiJ> {
       const tnsr::i<DataVector, 2>& x_of_x_tilde, const size_t l_max) noexcept {
     // Spectral::Swsh::filter_swsh_boundary_quantity(make_not_null(&get(*j)),
     // l_max, l_max - 2);
-    ComplexModalVector goldberg_modes_j =
-        Spectral::Swsh::libsharp_to_goldberg_modes(
-            Spectral::Swsh::swsh_transform(l_max, 1, get(*j)), l_max)
-            .data();
-    Parallel::printf("J boundary computation check:\n");
-    Parallel::printf("%e, %e ; %e %e\n", real(goldberg_modes_j[6]),
-                     imag(goldberg_modes_j[6]), real(goldberg_modes_j[8]),
-                     imag(goldberg_modes_j[8]));
 
     Spectral::Swsh::SwshInterpolator interpolator{
         get<0>(x_of_x_tilde), get<1>(x_of_x_tilde), 2, l_max};
@@ -227,16 +218,6 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::BondiBeta> {
     get(*evolution_gauge_beta).data() -= 0.5 * log(get(omega_cd).data());
     // Spectral::Swsh::filter_swsh_boundary_quantity(
     // make_not_null(&get(*evolution_gauge_beta)), l_max, l_max - 2);
-    ComplexModalVector goldberg_modes_beta =
-        Spectral::Swsh::libsharp_to_goldberg_modes(
-            Spectral::Swsh::swsh_transform(l_max, 1,
-                                           get(*evolution_gauge_beta)),
-            l_max)
-            .data();
-    Parallel::printf("Beta boundary computation check:\n");
-    Parallel::printf("%e, %e ; %e %e\n", real(goldberg_modes_beta[6]),
-                     imag(goldberg_modes_beta[6]), real(goldberg_modes_beta[8]),
-                     imag(goldberg_modes_beta[8]));
   }
 };
 
@@ -528,15 +509,6 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::BondiW> {
              square(eth_omega_cd) * conj(boundary_j_tilde) -
              2.0 * eth_omega_cd * conj(eth_omega_cd) * k_tilde);
 
-    ComplexModalVector goldberg_modes_w =
-        Spectral::Swsh::libsharp_to_goldberg_modes(
-            Spectral::Swsh::swsh_transform(l_max, 1, *evolution_gauge_w), l_max)
-            .data();
-    Parallel::printf("W boundary computation check:\n");
-    Parallel::printf("%e, %e ; %e %e\n", real(goldberg_modes_w[6]),
-                     imag(goldberg_modes_w[6]), real(goldberg_modes_w[8]),
-                     imag(goldberg_modes_w[8]));
-
     // *evolution_gauge_w =
     // *evolution_gauge_w + 1.0 / r_tilde * (omega_cd - 1.0) -
     // 2.0 * du_omega_cd / omega_cd -
@@ -700,16 +672,6 @@ struct ComputeGaugeAdjustedBoundaryValue<Tags::BondiH> {
                   j_of_x_tilde * conj(h_of_x_tilde)) /
                  k_of_x_tilde) +
         du_r_divided_by_r_tilde * (*r_tilde) * (dr_j_tilde);
-
-    ComplexModalVector goldberg_modes_h =
-        Spectral::Swsh::libsharp_to_goldberg_modes(
-            Spectral::Swsh::swsh_transform(l_max, 1, *h_tilde), l_max)
-            .data();
-    Parallel::printf("H boundary computation check:\n");
-    Parallel::printf("%e, %e ; %e %e\n", real(goldberg_modes_h[6]),
-                     imag(goldberg_modes_h[6]), real(goldberg_modes_h[8]),
-                     imag(goldberg_modes_h[8]));
-
     // TEST
     // *h_tilde =
     // 0.25 / square(omega_cd) *
@@ -763,15 +725,6 @@ struct GaugeUpdateU {
     // RT test
     // get(*u_0).data() = 0.0;
     get(*u_0).data() = u_scri_slice;
-
-    ComplexModalVector goldberg_modes_u0 =
-        Spectral::Swsh::libsharp_to_goldberg_modes(
-            Spectral::Swsh::swsh_transform(l_max, 1, get(*u_0)), l_max)
-            .data();
-    Parallel::printf("U0 check:\n");
-    Parallel::printf("%e, %e ; %e %e\n", real(goldberg_modes_u0[6]),
-                     imag(goldberg_modes_u0[6]), real(goldberg_modes_u0[8]),
-                     imag(goldberg_modes_u0[8]));
 
     // Parallel::printf("debug: u at scri\n");
     // for (auto val : u_scri_slice) {
@@ -867,8 +820,8 @@ struct GaugeUpdateU {
         Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
             l_max, 1, get(*u_0));
     auto inertial_eth_u_0 =
-        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(l_max, 1,
-                                                                   get(*u_0));
+        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
+            l_max, 1, get(*u_0));
 
     // NOTE if we are not transforming u, then the u_0 we have is actually not
     // the 'hatted' version, and is expressed in the noninertial coordinates.
@@ -898,81 +851,79 @@ struct GaugeUpdateU {
 
 // This takes the u_0 from the databox, assuming it has already been set
 // separately.
-// struct GaugeUpdateUManualTransform {
-//   using argument_tags =
-//       tmpl::list<Tags::CauchyCartesianCoords, Tags::GaugeOmegaCD,
-//                  Spectral::Swsh::Tags::Derivative<Tags::GaugeOmegaCD,
-//                                                   Spectral::Swsh::Tags::Eth>,
-//                  Spectral::Swsh::Tags::LMax>;
-//   using return_tags = tmpl::list<Tags::DuCauchyCartesianCoords, Tags::U0,
-//                                  Tags::BondiU, Tags::Du<Tags::GaugeOmegaCD>>;
+struct GaugeUpdateUManualTransform {
+  using argument_tags =
+      tmpl::list<Tags::CauchyCartesianCoords, Tags::GaugeOmegaCD,
+                 Spectral::Swsh::Tags::Derivative<Tags::GaugeOmegaCD,
+                                                  Spectral::Swsh::Tags::Eth>,
+                 Spectral::Swsh::Tags::LMax>;
+  using return_tags = tmpl::list<Tags::DuCauchyCartesianCoords, Tags::U0,
+                                 Tags::BondiU, Tags::Du<Tags::GaugeOmegaCD>>;
 
-//   static void apply(
-//       const gsl::not_null<tnsr::i<DataVector, 3>*> du_x,
-//       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> u_0,
-//       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> u,
-//       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*>
-//           du_omega_cd,
-//       const tnsr::i<DataVector, 3> cartesian_x_of_x_tilde,
-//       const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega_cd,
-//       const Scalar<SpinWeighted<ComplexDataVector, 1>>& eth_omega_cd,
-//       const size_t l_max) noexcept {
-//     size_t number_of_radial_points =
-//         get(*u).size() /
-//         Spectral::Swsh::number_of_swsh_collocation_points(l_max);
-//     // u_hat_0
-//     ComplexDataVector u_scri_slice{
-//         get(*u).data().data() +
-//             (number_of_radial_points - 1) *
-//                 Spectral::Swsh::number_of_swsh_collocation_points(l_max),
-//         Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
+  static void apply(
+      const gsl::not_null<tnsr::i<DataVector, 3>*> du_x,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> u_0,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> u,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*>
+          du_omega_cd,
+      const tnsr::i<DataVector, 3> cartesian_x_of_x_tilde,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& omega_cd,
+      const Scalar<SpinWeighted<ComplexDataVector, 1>>& eth_omega_cd,
+      const size_t l_max) noexcept {
+    size_t number_of_radial_points =
+        get(*u).size() /
+        Spectral::Swsh::number_of_swsh_collocation_points(l_max);
+    // u_hat_0
+    ComplexDataVector u_scri_slice{
+        get(*u).data().data() +
+            (number_of_radial_points - 1) *
+                Spectral::Swsh::number_of_swsh_collocation_points(l_max),
+        Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
 
-//     // subtract u_hat_0 from u
-//     for (size_t i = 0; i < number_of_radial_points; ++i) {
-//       ComplexDataVector angular_view{
-//           get(*u).data().data() +
-//               i * Spectral::Swsh::number_of_swsh_collocation_points(l_max),
-//           Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
-//       angular_view -= get(*u_0).data();
-//     }
+    // subtract u_hat_0 from u
+    for (size_t i = 0; i < number_of_radial_points; ++i) {
+      ComplexDataVector angular_view{
+          get(*u).data().data() +
+              i * Spectral::Swsh::number_of_swsh_collocation_points(l_max),
+          Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
+      angular_view -= get(*u_0).data();
+    }
 
-//     SpinWeighted<ComplexDataVector, 0> x;
-//     x.data() = std::complex<double>(1.0, 0.0) *
-//     get<0>(cartesian_x_of_x_tilde); SpinWeighted<ComplexDataVector, 0> y;
-//     y.data() = std::complex<double>(1.0, 0.0) *
-//     get<1>(cartesian_x_of_x_tilde); SpinWeighted<ComplexDataVector, 0> z;
-//     z.data() = std::complex<double>(1.0, 0.0) *
-//     get<2>(cartesian_x_of_x_tilde);
+    SpinWeighted<ComplexDataVector, 0> x;
+    x.data() = std::complex<double>(1.0, 0.0) * get<0>(cartesian_x_of_x_tilde);
+    SpinWeighted<ComplexDataVector, 0> y;
+    y.data() = std::complex<double>(1.0, 0.0) * get<1>(cartesian_x_of_x_tilde);
+    SpinWeighted<ComplexDataVector, 0> z;
+    z.data() = std::complex<double>(1.0, 0.0) * get<2>(cartesian_x_of_x_tilde);
 
-//     auto eth_x = Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
-//         l_max, 1, x);
-//     auto eth_y = Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
-//         l_max, 1, y);
-//     auto eth_z = Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
-//         l_max, 1, z);
-//     get<0>(*du_x) = real(conj(get(*u_0).data()) * eth_x.data());
-//     get<1>(*du_x) = real(conj(get(*u_0).data()) * eth_y.data());
-//     get<2>(*du_x) = real(conj(get(*u_0).data()) * eth_z.data());
+    auto eth_x = Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
+        l_max, 1, x);
+    auto eth_y = Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
+        l_max, 1, y);
+    auto eth_z = Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
+        l_max, 1, z);
+    get<0>(*du_x) = real(conj(get(*u_0).data()) * eth_x.data());
+    get<1>(*du_x) = real(conj(get(*u_0).data()) * eth_y.data());
+    get<2>(*du_x) = real(conj(get(*u_0).data()) * eth_z.data());
 
-//     // Unfortunately, this is the best way I can think of to guarantee that
-//     // these derivatives are correctly evaluated, and the derivatives are
-//     needed
-//     // for the evolution equations below.
+    // Unfortunately, this is the best way I can think of to guarantee that
+    // these derivatives are correctly evaluated, and the derivatives are needed
+    // for the evolution equations below.
 
-//     auto inertial_ethbar_u_0 =
-//         Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
-//             l_max, 1, get(*u_0));
-//     auto inertial_eth_u_0 =
-//         Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
-//          l_max, 1, get(*u_0));
+    auto inertial_ethbar_u_0 =
+        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
+            l_max, 1, get(*u_0));
+    auto inertial_eth_u_0 =
+        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(l_max, 1,
+                                                                   get(*u_0));
 
-//     get(*du_omega_cd) = 0.25 *
-//                             (inertial_ethbar_u_0 + conj(inertial_ethbar_u_0))
-//                             * get(omega_cd) +
-//                         0.5 * (get(*u_0) * conj(get(eth_omega_cd)) +
-//                                conj(get(*u_0)) * get(eth_omega_cd));
-//   }
-// };
+    get(*du_omega_cd) = 0.25 *
+                            (inertial_ethbar_u_0 + conj(inertial_ethbar_u_0)) *
+                            get(omega_cd) +
+                        0.5 * (get(*u_0) * conj(get(eth_omega_cd)) +
+                               conj(get(*u_0)) * get(eth_omega_cd));
+  }
+};
 
 template <typename AngularTag, typename CartesianTag>
 struct GaugeUpdateAngularFromCartesian {
@@ -986,6 +937,7 @@ struct GaugeUpdateAngularFromCartesian {
                                   square(get<1>(*cartesian_coords)) +
                                   square(get<2>(*cartesian_coords)));
 
+
     // FIXME this brutal renormalization will probably do bad things for the
     // time stepper.
     // TRY: no renormalization, because we use atan2 for both angular
@@ -994,7 +946,7 @@ struct GaugeUpdateAngularFromCartesian {
 
     // Parallel::printf("cartesian r check\n");
     // for (auto val : cartesian_r) {
-    // Parallel::printf("%e\n", 1.0 - val);
+      // Parallel::printf("%e\n", 1.0 - val);
     // }
     // Parallel::printf("done\n");
 

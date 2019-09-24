@@ -66,6 +66,7 @@ struct HistoryEvolvedVariables : db::PrefixTag, db::SimpleTag {
   using type = TimeSteppers::History<db::item_type<Tag>, db::item_type<DtTag>>;
 };
 
+
 /// \ingroup DataBoxTagsGroup
 /// \ingroup TimeGroup
 /// \brief Prefix for TimeStepper history of a single Tensor
@@ -79,11 +80,10 @@ struct HistoryEvolvedTensor : db::PrefixTag, db::SimpleTag {
                 "derivative");
   static std::string name() noexcept { return "HistoryEvolvedTensor"; }
   using tag = Tag;
-  // TODO make a specialization for spin weighted and non
-  using type = std::array<
-      TimeSteppers::History<typename db::item_type<Tag>::type::value_type,
-                            typename db::item_type<DtTag>::type::value_type>,
-      db::item_type<Tag>::size()>;
+  using type =
+      std::array<TimeSteppers::History<typename db::item_type<Tag>::type,
+                                       typename db::item_type<DtTag>::type>,
+                 db::item_type<Tag>::size()>;
 };
 
 /// \ingroup DataBoxTagsGroup

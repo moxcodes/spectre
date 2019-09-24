@@ -107,11 +107,9 @@ struct RecordTimeStepperDataSingleTensor {
               boost::make_zip_iterator(boost::make_tuple(
                   tensor->end(), dt_tensor->end(), histories->end())),
               [&time](auto component_and_history) {
-                // TODO fix this to work with other quantities
-                ComplexDataVector dt_value =
-                    component_and_history.template get<1>().data();
+                auto dt_value = component_and_history.template get<1>();
                 component_and_history.template get<2>().insert(
-                    time, component_and_history.template get<0>().data(),
+                    time, component_and_history.template get<0>(),
                     std::move(dt_value));
               });
         },
