@@ -12,6 +12,7 @@
 #include "IO/Observer/VolumeActions.hpp"
 #include "NumericalAlgorithms/Spectral/SwshTransform.hpp"
 #include "ParallelAlgorithms/Initialization/Actions/RemoveOptionsAndTerminatePhase.hpp"
+#include "Parallel/Printf.hpp"
 #include "Utilities/TMPL.hpp"
 
 namespace Cce {
@@ -70,13 +71,17 @@ struct ObserveInertialInterpolated {
           });
       // swsh transform
       const size_t l_max = Parallel::get<Tags::LMax>(cache);
-      auto to_transform =
-          SpinWeighted<ComplexDataVector, tag::type::type::spin>{
-              interpolation.first};
+      Parallel::printf("lmax : %zu\n", l_max);
+      SpinWeighted<ComplexDataVector, tag::type::type::spin> to_transform;
+      to_transform.data() = interpolation.first;
       ComplexModalVector goldberg_modes =
           Spectral::Swsh::libsharp_to_goldberg_modes(
               Spectral::Swsh::swsh_transform(l_max, 1, to_transform), l_max)
               .data();
+      Parallel::printf("Tag : %s\n", tag::name());
+      Parallel::printf("%e, %e ; %e %e\n", real(goldberg_modes[6]),
+                       imag(goldberg_modes[6]), real(goldberg_modes[8]),
+                       imag(goldberg_modes[8]));
       DataVector goldberg_mode_subset{
           reinterpret_cast<double*>(goldberg_modes.data()),
           2 * square(observation_l_max + 1)};

@@ -399,7 +399,7 @@ struct CharacteristicExtractor {
       tmpl::transform<bondi_hypersurface_step_tags,
                       tmpl::bind<hypersurface_computation, tmpl::_1>>,
       /*TODO we need to do something about options for this*/
-      Actions::FilterSwshVolumeQuantity<Tags::BondiH>,
+      // Actions::FilterSwshVolumeQuantity<Tags::BondiH>,
       // once we're done integrating, we may as well ask for the next step's
       // boundary data
       Actions::RequestNextBoundaryData<
