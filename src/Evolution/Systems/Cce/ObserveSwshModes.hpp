@@ -92,15 +92,14 @@ class ObserveBoundarySwshModes<tmpl::list<ToObserve...>, EventRegistrars>
 
     // kick off the observation for the same time at scri+, because current
     // volume outputs have to be synchronized.
-    tmpl::for_each<
-        typename Metavariables::scri_values_to_observe>([&cache,
-                                                         &time_id](auto tag_v) {
-      using tag = typename decltype(tag_v)::type;
-      Parallel::simple_action<Actions::AddTargetInterpolationTime<tag>>(
-          Parallel::get_parallel_component<CharacteristicScri<Metavariables>>(
-              cache),
-          time_id.time().value());
-    });
+    tmpl::for_each<typename Metavariables::scri_values_to_observe>(
+        [&cache, &time_id](auto tag_v) {
+          using tag = typename decltype(tag_v)::type;
+          Parallel::simple_action<Actions::AddTargetInterpolationTime<tag>>(
+              Parallel::get_parallel_component<
+                  CharacteristicScri<Metavariables>>(cache),
+              time_id.time().value());
+        });
 
     std::vector<std::string> file_legend;
     file_legend.push_back("times, sim lmax: " + std::to_string(l_max));
@@ -150,8 +149,9 @@ class ObserveBoundarySwshModes<tmpl::list<ToObserve...>, EventRegistrars>
     // ToObserve>>::type::value_type...>>::type{
     // time.value(), goldberg_swsh_mode_subset(tmpl::type_<ToObserve>{},
     // boundary_swsh_scalars)...};
-    Parallel::printf("writing boundary data at %f\n", time_id.time().value());
-    // TEST
+    // Parallel::printf("writing boundary data at %f\n",
+    // time_id.time().value());
+
     Parallel::simple_action<observers::Actions::ContributeVolumeData>(
         observer,
         observers::ObservationId(

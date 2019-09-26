@@ -131,9 +131,9 @@ struct CalculateScriPlusValue<Tags::TimeIntegral<Tags::ScriPlus<Tags::Psi4>>> {
         number_of_angular_points);
 
     get(*integral_of_psi_4) =
-        -2.0 * r_view *
+        r_view *
         ((conj(eth_dy_u_at_scri) +
-          conj(eth_r_divided_by_r_view) * conj(dy_u_at_scri)) -
+          conj(eth_r_divided_by_r_view) * conj(dy_u_at_scri)) +
          (conj(dy_h_at_scri) + du_r_divided_by_r_view * conj(dy_j_at_scri))) /
         exp_2_beta_at_scri;
   }

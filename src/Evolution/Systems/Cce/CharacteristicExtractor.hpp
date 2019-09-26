@@ -44,7 +44,7 @@ template <typename Tag>
 struct ReceiveNonInertial;
 template <typename Tag>
 struct AddTargetInterpolationTime;
-}
+}  // namespace Actions
 
 template <typename CollectionTagList, typename SearchTag>
 struct is_member;
@@ -72,7 +72,7 @@ struct CalculateIntegrandInputsForTag {
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
     // Parallel::printf("starting hypersurface computation for %s\n",
-                     // BondiTag::name());
+    // BondiTag::name());
     mutate_all_pre_swsh_derivatives_for_tag<BondiTag>(make_not_null(&box));
     mutate_all_swsh_derivatives_for_tag<BondiTag>(make_not_null(&box));
     return std::forward_as_tuple(std::move(box));
@@ -174,12 +174,12 @@ struct SendToScri<::Tags::Multiplies<Tags::Du<LhsTagArgument>, RhsTag>> {
   template <typename DbTags, typename... InboxTags, typename Metavariables,
             typename ArrayIndex, typename ActionList,
             typename ParallelComponent>
-      static auto apply(db::DataBox<DbTags>& box,
-                        const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
-                        Parallel::ConstGlobalCache<Metavariables>& cache,
-                        const ArrayIndex& /*array_index*/,
-                        const ActionList /*meta*/,
-                        const ParallelComponent* const /*meta*/) noexcept {
+  static auto apply(db::DataBox<DbTags>& box,
+                    const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
+                    Parallel::ConstGlobalCache<Metavariables>& cache,
+                    const ArrayIndex& /*array_index*/,
+                    const ActionList /*meta*/,
+                    const ParallelComponent* const /*meta*/) noexcept {
     if (db::get<::Tags::TimeId>(box).substep() == 0) {
       Parallel::simple_action<Actions::ReceiveNonInertial<
           ::Tags::Multiplies<Tags::Du<LhsTagArgument>, RhsTag>>>(
@@ -202,8 +202,8 @@ struct ExitIfEndTimeReached {
                     const ArrayIndex& /*array_index*/,
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
-    Parallel::printf("Time : %f, End: %f\n", db::get<::Tags::Time>(box).value(),
-                     db::get<Tags::EndTime>(box));
+    // Parallel::printf("Time : %f, End: %f\n",
+    // db::get<::Tags::Time>(box).value(), db::get<Tags::EndTime>(box));
     return std::tuple<db::DataBox<DbTags>&&, bool>(
         std::move(box),
         db::get<::Tags::Time>(box).value() >= db::get<Tags::EndTime>(box));
@@ -349,12 +349,12 @@ struct CharacteristicExtractor {
                   const ArrayIndex& /*array_index*/) noexcept {
       observers::ObservationId fake_initial_observation_id{
           0., typename Metavariables::swsh_boundary_observation_type{}};
-      Parallel::printf("debug array id check %zu, %s\n",
-                       observers::ArrayComponentId{
-                           std::add_pointer_t<ParallelComponent>{nullptr},
-                           Parallel::ArrayIndex<int>(0)}
-                           .component_id(),
-                       pretty_type::get_name<ParallelComponent>().c_str());
+      // Parallel::printf("debug array id check %zu, %s\n",
+      // observers::ArrayComponentId{
+      // std::add_pointer_t<ParallelComponent>{nullptr},
+      // Parallel::ArrayIndex<int>(0)}
+      // .component_id(),
+      // pretty_type::get_name<ParallelComponent>().c_str());
       return {observers::TypeOfObservation::ReductionAndVolume,
               fake_initial_observation_id};
     }
