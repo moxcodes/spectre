@@ -242,23 +242,25 @@ struct CalculateScriPlusValue<Tags::ScriPlus<Tags::Psi3>> {
         Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
             l_max, 1, linear_du_j_bar_at_scri);
 
-    get(*psi_3) = (-2.0 * conj(eth_beta_at_scri) -
-                   4.0 * r_view * eth_beta_at_scri *
-                       (conj(eth_dy_u_at_scri) +
-                        conj(eth_r_divided_by_r_view) * conj(dy_u_at_scri)) -
-                   2.0 * r_view * conj(eth_beta_at_scri) *
-                       (conj(ethbar_dy_u_at_scri) +
-                        eth_r_divided_by_r_view * conj(dy_u_at_scri) +
-                        ethbar_dy_u_at_scri +
-                        conj(eth_r_divided_by_r_view) * dy_u_at_scri) +
-                   2.0 * r_view *
-                       (ethbar_dy_w_at_scri +
-                        conj(eth_r_divided_by_r_view) * dy_w_at_scri) +
-                   2.0 * eth_beta_at_scri * linear_du_j_bar_at_scri -
-                   (eth_linear_du_j_bar_at_scri +
-                    eth_r_divided_by_r_view * linear_du_j_bar_at_scri) +
-                   4.0 * r_view * conj(eth_beta_at_scri) * dy_w_at_scri) /
-                  (2.0 * sqrt(2.0) * exp_2_beta_at_scri);
+    // Attempting the consensus form; math still needs re-examining
+    get(*psi_3) =
+        (/*-2.0 * conj(eth_beta_at_scri)*/ -4.0 * r_view * eth_beta_at_scri *
+             (conj(eth_dy_u_at_scri) +
+              conj(eth_r_divided_by_r_view) * conj(dy_u_at_scri)) /*-
+         2.0 * r_view * conj(eth_beta_at_scri) *
+             (conj(ethbar_dy_u_at_scri) +
+              eth_r_divided_by_r_view * conj(dy_u_at_scri) +
+              ethbar_dy_u_at_scri +
+              conj(eth_r_divided_by_r_view) * dy_u_at_scri)*/
+         +
+         2.0 * r_view *
+             (ethbar_dy_w_at_scri +
+              conj(eth_r_divided_by_r_view) * dy_w_at_scri) +
+         2.0 * eth_beta_at_scri * linear_du_j_bar_at_scri -
+         (eth_linear_du_j_bar_at_scri +
+          eth_r_divided_by_r_view * linear_du_j_bar_at_scri)
+         /*+    4.0 * r_view * conj(eth_beta_at_scri) * dy_w_at_scri*/) /
+        (2.0 * sqrt(2.0) * exp_2_beta_at_scri);
   }
 };
 
