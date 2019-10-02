@@ -70,6 +70,43 @@ struct InitializeJ {
   }
 };
 
+// template <template <typename> class BoundaryPrefix>
+// struct InitializeExponential {
+//   using boundary_tags = tmpl::list<
+// Tags::BoundaryValue<Tags::BondiJ>,
+//                    Tags::BoundaryValue<Tags::Dr<Tags::BondiJ>>,
+//                    Tags::BoundaryValue<Tags::BondiR>>;
+
+//   using return_tags = tmpl::list<Tags::BondiJ>;
+//   using argument_tags = tmpl::append<boundary_tags>;
+
+//   static void apply(
+//       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> j,
+//       const Scalar<SpinWeighted<ComplexDataVector, 2>>& boundary_j,
+//       const Scalar<SpinWeighted<ComplexDataVector, 2>>& boundary_dr_j,
+//       const Scalar<SpinWeighted<ComplexDataVector, 0>>& r) noexcept {
+//     const size_t number_of_radial_points =
+//         get(*j).size() / get(boundary_j).size();
+
+//     const auto& one_minus_y_collocation =
+//         1.0 - Spectral::collocation_points<Spectral::Basis::Legendre,
+//                                    Spectral::Quadrature::GaussLobatto>(
+//                   number_of_radial_points);
+
+//     for (size_t i = 0; i < number_of_radial_points; i++) {
+//       ComplexDataVector angular_view_j{
+//           get(*j).data().data() + get(boundary_j).size() * i,
+//           get(boundary_j).size()};
+//       const auto boundary_B = -get(boundary_dr_j)/get(boundary_j);
+//       const auto boundary_A =
+//           get(boundary_j) * exp(-boundary_B.data() * get(r).data());
+//       angular_view_j =
+//           one_minus_y_collocation[i] * one_minus_y_coefficient +
+//           pow<3>(one_minus_y_collocation[i]) * one_minus_y_cubed_coefficient;
+//     }
+//   }
+// };
+
 struct GaugeAdjustInitialJ {
   using boundary_tags =
       tmpl::list<Tags::GaugeC, Tags::GaugeD, Tags::GaugeOmegaCD,
@@ -103,8 +140,8 @@ struct GaugeAdjustInitialJ {
                                            get<1>(x_of_x_tilde), l_max);
       // finish adjusting the gauge in place
       // ComplexDataVector cd_omega =
-          // 0.5 * sqrt(get(d).data() * conj(get(d).data()) +
-                     // get(c).data() * conj(get(c).data()));
+      // 0.5 * sqrt(get(d).data() * conj(get(d).data()) +
+      // get(c).data() * conj(get(c).data()));
 
       evolution_coords_j_view =
           0.25 * (square(conj(get(d).data())) * evolution_coords_j_view.data() +
@@ -122,29 +159,29 @@ struct GaugeAdjustInitialJ {
       // identity_test_inertial_j.data() = angular_view_j;
 
       // SpinWeighted<ComplexDataVector, 2> cauchy_coords_j_view =
-          // Spectral::Swsh::swsh_interpolate(
-              // make_not_null(&identity_test_inertial_j), get<0>(x_tilde_of_x),
-              // get<1>(x_tilde_of_x), l_max);
+      // Spectral::Swsh::swsh_interpolate(
+      // make_not_null(&identity_test_inertial_j), get<0>(x_tilde_of_x),
+      // get<1>(x_tilde_of_x), l_max);
 
       // SpinWeighted<ComplexDataVector, 2> identity_test_cauchy_j;
       // identity_test_cauchy_j.data() =
-          // 0.25 *
-          // (square(conj(get(b).data())) * cauchy_coords_j_view.data() +
-           // square(get(a).data()) * conj(cauchy_coords_j_view.data()) +
-           // 2.0 * get(a).data() * conj(get(b).data()) *
-               // sqrt(1.0 + cauchy_coords_j_view.data() *
-                              // conj(cauchy_coords_j_view.data())));
+      // 0.25 *
+      // (square(conj(get(b).data())) * cauchy_coords_j_view.data() +
+      // square(get(a).data()) * conj(cauchy_coords_j_view.data()) +
+      // 2.0 * get(a).data() * conj(get(b).data()) *
+      // sqrt(1.0 + cauchy_coords_j_view.data() *
+      // conj(cauchy_coords_j_view.data())));
       // Spectral::Swsh::filter_swsh_boundary_quantity(
-          // make_not_null(&identity_test_cauchy_j), l_max, l_max - 4);
+      // make_not_null(&identity_test_cauchy_j), l_max, l_max - 4);
       // identity_test_cauchy_j.data() /= square(get(omega).data());
 
       // printf("Identity test: J transformation\n");
       // for (size_t i = 0; i < identity_test_cauchy_j.size(); ++i) {
-        // printf("(%e, %e) from (%e, %e)\n",
-               // real(identity_test_cauchy_j.data()[i] - j_view.data()[i]),
-               // imag(identity_test_cauchy_j.data()[i] - j_view.data()[i]),
-               // real(identity_test_cauchy_j.data()[i]),
-               // imag(identity_test_cauchy_j.data()[i]));
+      // printf("(%e, %e) from (%e, %e)\n",
+      // real(identity_test_cauchy_j.data()[i] - j_view.data()[i]),
+      // imag(identity_test_cauchy_j.data()[i] - j_view.data()[i]),
+      // real(identity_test_cauchy_j.data()[i]),
+      // imag(identity_test_cauchy_j.data()[i]));
       // }
       // printf("done\n");
       // TEST
