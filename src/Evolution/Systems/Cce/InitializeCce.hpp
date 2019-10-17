@@ -57,15 +57,16 @@ struct InitializeJ {
       ComplexDataVector angular_view_j{
           get(*j).data().data() + get(boundary_j).size() * i,
           get(boundary_j).size()};
-      const auto one_minus_y_coefficient =
-          0.25 * (3.0 * get(boundary_j).data() +
-                  get(r).data() * get(boundary_dr_j).data());
-      const auto one_minus_y_cubed_coefficient =
-          -0.0625 *
-          (get(boundary_j).data() + get(r).data() * get(boundary_dr_j).data());
-      angular_view_j =
-          one_minus_y_collocation[i] * one_minus_y_coefficient +
-          pow<3>(one_minus_y_collocation[i]) * one_minus_y_cubed_coefficient;
+      // const auto one_minus_y_coefficient =
+      // 0.25 * (3.0 * get(boundary_j).data() +
+      // get(r).data() * get(boundary_dr_j).data());
+      // const auto one_minus_y_cubed_coefficient =
+      // -0.0625 *
+      // (get(boundary_j).data() + get(r).data() * get(boundary_dr_j).data());
+      // angular_view_j =
+      // one_minus_y_collocation[i] * one_minus_y_coefficient +
+      // pow<3>(one_minus_y_collocation[i]) * one_minus_y_cubed_coefficient;
+      angular_view_j = 0.0;
     }
   }
 };
