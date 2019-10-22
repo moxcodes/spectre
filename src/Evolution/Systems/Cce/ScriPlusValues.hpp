@@ -156,7 +156,8 @@ struct CalculateScriPlusValue<Tags::ScriPlusFactor<Tags::Psi4>> {
         (number_of_radial_points - 1) * number_of_angular_points,
         number_of_angular_points);
 
-    get(*scri_plus_factor) = 1.0 / exp_2_beta_at_scri;
+    // extra factor of 2 for tetrad matching to SpEC
+    get(*scri_plus_factor) = 2.0 / exp_2_beta_at_scri;
   }
 };
 
@@ -243,24 +244,17 @@ struct CalculateScriPlusValue<Tags::ScriPlus<Tags::Psi3>> {
             l_max, 1, linear_du_j_bar_at_scri);
 
     // Attempting the consensus form; math still needs re-examining
-    get(*psi_3) =
-        (/*-2.0 * conj(eth_beta_at_scri)*/ -4.0 * r_view * eth_beta_at_scri *
-             (conj(eth_dy_u_at_scri) +
-              conj(eth_r_divided_by_r_view) * conj(dy_u_at_scri)) /*-
-         2.0 * r_view * conj(eth_beta_at_scri) *
-             (conj(ethbar_dy_u_at_scri) +
-              eth_r_divided_by_r_view * conj(dy_u_at_scri) +
-              ethbar_dy_u_at_scri +
-              conj(eth_r_divided_by_r_view) * dy_u_at_scri)*/
-         +
-         2.0 * r_view *
-             (ethbar_dy_w_at_scri +
-              conj(eth_r_divided_by_r_view) * dy_w_at_scri) +
-         2.0 * eth_beta_at_scri * linear_du_j_bar_at_scri -
-         (eth_linear_du_j_bar_at_scri +
-          eth_r_divided_by_r_view * linear_du_j_bar_at_scri)
-         /*+    4.0 * r_view * conj(eth_beta_at_scri) * dy_w_at_scri*/) /
-        (2.0 * sqrt(2.0) * exp_2_beta_at_scri);
+    // extra factor of * sqrt(2) to agree with SpEC tetrad normalization
+    get(*psi_3) = (-4.0 * r_view * eth_beta_at_scri *
+                       (conj(eth_dy_u_at_scri) +
+                        conj(eth_r_divided_by_r_view) * conj(dy_u_at_scri)) +
+                   2.0 * r_view *
+                       (ethbar_dy_w_at_scri +
+                        conj(eth_r_divided_by_r_view) * dy_w_at_scri) +
+                   2.0 * eth_beta_at_scri * linear_du_j_bar_at_scri -
+                   (eth_linear_du_j_bar_at_scri +
+                    eth_r_divided_by_r_view * linear_du_j_bar_at_scri)) /
+                  (2.0 * exp_2_beta_at_scri);
   }
 };
 
@@ -413,9 +407,10 @@ struct CalculateScriPlusValue<Tags::ScriPlus<Tags::Psi1>> {
         (number_of_radial_points - 1) * number_of_angular_points,
         number_of_angular_points);
 
-    get(*psi_1) = 0.5 * sqrt(2.0) * square(r_view) *
-                  (6.0 * eth_dy_dy_beta_at_scri +
-                   12.0 * eth_r_divided_by_r_view * dy_dy_beta_at_scri -
+    // extra 1/sqrt(2) factor to agree with SpEC tetrad normalization
+    get(*psi_1) = 0.5 * square(r_view) *
+                  (6.0 * (eth_dy_dy_beta_at_scri +
+                          eth_r_divided_by_r_view * dy_dy_beta_at_scri) -
                    dy_j_at_scri * conj(dy_q_at_scri) - dy_dy_q_at_scri);
   }
 };
@@ -461,8 +456,9 @@ struct CalculateScriPlusValue<Tags::ScriPlus<Tags::Psi0>> {
         get(r), (number_of_radial_points - 1) * number_of_angular_points,
         number_of_angular_points);
 
+    // extra 1/2 factor to agree with SpEC normalization
     get(*psi_0) =
-        -4.0 * pow<3>(r_view) *
+        -2.0 * pow<3>(r_view) *
         (2.0 * dy_dy_beta_at_scri * dy_j_at_scri +
          conj(dy_j_at_scri) * square(dy_j_at_scri) - dy_dy_dy_j_at_scri);
   }
@@ -477,7 +473,7 @@ struct CalculateScriPlusValue<Tags::ScriPlus<Tags::Strain>> {
   using return_tags = tmpl::list<Tags::ScriPlus<Tags::Strain>>;
 
   static void apply(
-      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> strain,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, -2>>*> strain,
       const Scalar<SpinWeighted<ComplexDataVector, 2>>& dy_j,
       const Scalar<DataVector>& inertial_retarded_time,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& r, const size_t l_max,
@@ -501,7 +497,9 @@ struct CalculateScriPlusValue<Tags::ScriPlus<Tags::Strain>> {
         get(r), (number_of_radial_points - 1) * number_of_angular_points,
         number_of_angular_points);
 
-    get(*strain) = -2.0 * r_view * dy_j_at_scri + eth_eth_retarded_time;
+    // conjugate to retrieve the spin -2 quantity everyone else in the world
+    // uses.
+    get(*strain) = conj(-2.0 * r_view * dy_j_at_scri + eth_eth_retarded_time);
   }
 };
 

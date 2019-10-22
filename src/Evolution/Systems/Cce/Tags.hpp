@@ -410,7 +410,7 @@ struct Psi4 : db::SimpleTag {
 };
 
 struct Strain : db::SimpleTag {
-  using type = Scalar<SpinWeighted<ComplexDataVector, 2>>;
+  using type = Scalar<SpinWeighted<ComplexDataVector, -2>>;
 };
 
 template <typename Tag>
