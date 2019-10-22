@@ -244,16 +244,16 @@ struct CalculateScriPlusValue<Tags::ScriPlus<Tags::Psi3>> {
             l_max, 1, linear_du_j_bar_at_scri);
 
     // Attempting the consensus form; math still needs re-examining
-    // extra factor of * sqrt(2) to agree with SpEC tetrad normalization
-    get(*psi_3) = (-4.0 * r_view * eth_beta_at_scri *
-                       (conj(eth_dy_u_at_scri) +
-                        conj(eth_r_divided_by_r_view) * conj(dy_u_at_scri)) +
-                   2.0 * r_view *
-                       (ethbar_dy_w_at_scri +
-                        conj(eth_r_divided_by_r_view) * dy_w_at_scri) +
-                   2.0 * eth_beta_at_scri * linear_du_j_bar_at_scri -
-                   (eth_linear_du_j_bar_at_scri +
-                    eth_r_divided_by_r_view * linear_du_j_bar_at_scri)) /
+    // extra factor of * -sqrt(2) to agree with SpEC tetrad normalization
+    get(*psi_3) = -(-4.0 * r_view * eth_beta_at_scri *
+                        (conj(eth_dy_u_at_scri) +
+                         conj(eth_r_divided_by_r_view) * conj(dy_u_at_scri)) +
+                    2.0 * r_view *
+                        (ethbar_dy_w_at_scri +
+                         conj(eth_r_divided_by_r_view) * dy_w_at_scri) +
+                    2.0 * eth_beta_at_scri * linear_du_j_bar_at_scri -
+                    (eth_linear_du_j_bar_at_scri +
+                     eth_r_divided_by_r_view * linear_du_j_bar_at_scri)) /
                   (2.0 * exp_2_beta_at_scri);
   }
 };
@@ -407,8 +407,8 @@ struct CalculateScriPlusValue<Tags::ScriPlus<Tags::Psi1>> {
         (number_of_radial_points - 1) * number_of_angular_points,
         number_of_angular_points);
 
-    // extra 1/sqrt(2) factor to agree with SpEC tetrad normalization
-    get(*psi_1) = 0.5 * square(r_view) *
+    // extra -1/sqrt(2) factor to agree with SpEC tetrad normalization
+    get(*psi_1) = -0.5 * square(r_view) *
                   (6.0 * (eth_dy_dy_beta_at_scri +
                           eth_r_divided_by_r_view * dy_dy_beta_at_scri) -
                    dy_j_at_scri * conj(dy_q_at_scri) - dy_dy_q_at_scri);
