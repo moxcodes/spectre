@@ -27,7 +27,7 @@ struct CalculateScriPlusValue<Tags::News> {
   using return_tags = tmpl::list<Tags::News, Tags::U0>;
 
   static void apply(
-      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> news,
+      const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, -2>>*> news,
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*> u_0,
       const Scalar<SpinWeighted<ComplexDataVector, 2>>& h,
       const Scalar<SpinWeighted<ComplexDataVector, 2>>& dy_j,
@@ -67,8 +67,9 @@ struct CalculateScriPlusValue<Tags::News> {
     /// TODO currently using SpecH for this computation
     get(*news).data() =
         2.0 *
-        (-get(r).data() * exp(-2.0 * beta_at_scri.data()) * dy_h_at_scri +
-         eth_eth_beta_at_scri.data() + 2.0 * square(eth_beta_at_scri.data()));
+        conj(-get(r).data() * exp(-2.0 * beta_at_scri.data()) * dy_h_at_scri +
+             eth_eth_beta_at_scri.data() +
+             2.0 * square(eth_beta_at_scri.data()));
   }
 };
 

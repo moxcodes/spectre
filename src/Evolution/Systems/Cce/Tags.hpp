@@ -146,7 +146,7 @@ struct GaugeOmegaCD : db::SimpleTag {
 };
 
 struct News : db::SimpleTag {
-  using type = Scalar<SpinWeighted<ComplexDataVector, 2>>;
+  using type = Scalar<SpinWeighted<ComplexDataVector, -2>>;
   static std::string name() noexcept { return "News"; }
 };
 
