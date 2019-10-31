@@ -168,6 +168,8 @@ struct CalculateScriPlusValue<Tags::ScriPlus<Tags::Psi3>> {
       tmpl::list<Tags::Exp2Beta,
                  Spectral::Swsh::Tags::Derivative<Tags::BondiBeta,
                                                   Spectral::Swsh::Tags::Eth>,
+                 Spectral::Swsh::Tags::Derivative<
+                     Tags::BondiBeta, Spectral::Swsh::Tags::EthEthbar>,
                  Tags::Dy<Tags::BondiU>, Tags::Dy<Tags::BondiJ>, Tags::BondiH,
                  Tags::Dy<Tags::BondiW>, Tags::BondiR, Tags::EthRDividedByR,
                  Tags::DuRDividedByR, Spectral::Swsh::Tags::LMax,
@@ -177,6 +179,7 @@ struct CalculateScriPlusValue<Tags::ScriPlus<Tags::Psi3>> {
       const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, -1>>*> psi_3,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& exp_2_beta,
       const Scalar<SpinWeighted<ComplexDataVector, 1>>& eth_beta,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& eth_ethbar_beta,
       const Scalar<SpinWeighted<ComplexDataVector, 1>>& dy_u,
       const Scalar<SpinWeighted<ComplexDataVector, 2>>& dy_j,
       const Scalar<SpinWeighted<ComplexDataVector, 2>>& h,
@@ -203,6 +206,15 @@ struct CalculateScriPlusValue<Tags::ScriPlus<Tags::Psi3>> {
     const auto eth_beta_at_scri = make_const_view(
         get(eth_beta), (number_of_radial_points - 1) * number_of_angular_points,
         number_of_angular_points);
+
+    const auto eth_ethbar_beta_at_scri = make_const_view(
+        get(eth_ethbar_beta),
+        (number_of_radial_points - 1) * number_of_angular_points,
+        number_of_angular_points);
+
+    const auto ethbar_eth_ethbar_beta_at_scri =
+        Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Ethbar>(
+            l_max, 1, eth_ethbar_beta_at_scri);
 
     const auto dy_u_at_scri = make_const_view(
         get(dy_u), (number_of_radial_points - 1) * number_of_angular_points,
@@ -238,24 +250,24 @@ struct CalculateScriPlusValue<Tags::ScriPlus<Tags::Psi3>> {
         number_of_angular_points);
 
     SpinWeighted<ComplexDataVector, -2> linear_du_j_bar_at_scri =
-        -2.0 * r_view *
         (conj(dy_h_at_scri) + du_r_divided_by_r_view * conj(dy_j_at_scri));
-    const auto eth_linear_du_j_bar_at_scri =
+    auto eth_linear_du_j_bar_at_scri =
         Spectral::Swsh::swsh_derivative<Spectral::Swsh::Tags::Eth>(
             l_max, 1, linear_du_j_bar_at_scri);
+    linear_du_j_bar_at_scri = -2.0 * r_view * linear_du_j_bar_at_scri;
+    eth_linear_du_j_bar_at_scri +=
+        eth_r_divided_by_r_view *
+        (conj(dy_h_at_scri) + du_r_divided_by_r_view * conj(dy_j_at_scri));
+    eth_linear_du_j_bar_at_scri = -2.0 * r_view * eth_linear_du_j_bar_at_scri;
 
     // Attempting the consensus form; math still needs re-examining
     // extra factor of * -sqrt(2) to agree with SpEC tetrad normalization
-    get(*psi_3) = -(-4.0 * r_view * eth_beta_at_scri *
-                        (conj(eth_dy_u_at_scri) +
-                         conj(eth_r_divided_by_r_view) * conj(dy_u_at_scri)) +
-                    2.0 * r_view *
-                        (ethbar_dy_w_at_scri +
-                         conj(eth_r_divided_by_r_view) * dy_w_at_scri) +
-                    2.0 * eth_beta_at_scri * linear_du_j_bar_at_scri -
-                    (eth_linear_du_j_bar_at_scri +
-                     eth_r_divided_by_r_view * linear_du_j_bar_at_scri)) /
-                  (2.0 * exp_2_beta_at_scri);
+    get(*psi_3) = 2.0 * conj(eth_beta_at_scri) +
+                  4.0 * conj(eth_beta_at_scri) * eth_ethbar_beta_at_scri +
+                  ethbar_eth_ethbar_beta_at_scri +
+                  (0.5 * eth_linear_du_j_bar_at_scri -
+                   eth_beta_at_scri * linear_du_j_bar_at_scri) /
+                      exp_2_beta_at_scri;
   }
 };
 
