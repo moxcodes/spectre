@@ -13,6 +13,7 @@
 #include "DataStructures/DataBox/Prefixes.hpp"
 #include "Evolution/Systems/Cce/InitializeCce.hpp"
 #include "Evolution/Systems/Cce/OptionTags.hpp"
+#include "Evolution/Systems/Cce/ScriPlusInterpolationManager.hpp"
 #include "Evolution/Systems/Cce/Tags.hpp"
 #include "NumericalAlgorithms/Spectral/SwshInterpolation.hpp"
 #include "Parallel/Info.hpp"
@@ -45,6 +46,7 @@ namespace Actions {
  *  - `Tags::TimeStepId`
  *  - `Tags::Next<Tags::TimeStepId>`
  *  - `Tags::TimeStep`
+ *  - `Tags::Time`
  *  -
  * ```
  * Tags::HistoryEvolvedVariables<
@@ -78,16 +80,19 @@ namespace Actions {
  *  - `Tags::Variables<metavariables::cce_swsh_derivative_tags>`
  *  - `Spectral::Swsh::Tags::NumberOfRadialPoints`
  *  - `Tags::EndTime`
- *  - `Spectral::Swsh::Tags::SwshInterpolator<Tags::CauchyAngularCoords>`
+ *  - `Spectral::Swsh::Tags::SwshInterpolator< Tags::CauchyAngularCoords>`
+ *  - `Cce::Tags::InterpolationManager<ComplexDataVector, Tag>` for each `Tag`
+ * in `scri_values_to_observe`
  * - Removes: nothing
  */
 struct InitializeCharacteristicEvolution {
   using initialization_tags =
       tmpl::list<InitializationTags::StartTime, InitializationTags::EndTime,
-                 InitializationTags::TargetStepSize>;
+                 InitializationTags::TargetStepSize,
+                 InitializationTags::ScriInterpolationOrder>;
   using const_global_cache_tags =
-      tmpl::list<::Tags::TimeStepper<TimeStepper>, Spectral::Swsh::Tags::LMax,
-                 Spectral::Swsh::Tags::NumberOfRadialPoints>;
+      tmpl::list<::Tags::TimeStepper<TimeStepper>, InitializationTags::LMax,
+                 InitializationTags::NumberOfRadialPoints>;
 
   template <typename Metavariables>
   struct EvolutionTags {
@@ -95,12 +100,18 @@ struct InitializeCharacteristicEvolution {
         typename Metavariables::evolved_coordinates_variables_tag;
     using dt_coordinate_variables_tag =
         db::add_tag_prefix<::Tags::dt, coordinate_variables_tag>;
+    using evolved_swsh_variables_tag =
+        ::Tags::Variables<tmpl::list<typename Metavariables::evolved_swsh_tag>>;
+    using evolved_swsh_dt_variables_tag =
+        db::add_tag_prefix<::Tags::dt, evolved_swsh_variables_tag>;
     using evolution_simple_tags = db::AddSimpleTags<
         ::Tags::TimeStepId, ::Tags::Next<::Tags::TimeStepId>, ::Tags::TimeStep,
-        ::Tags::HistoryEvolvedVariables<coordinate_variables_tag>,
-        ::Tags::HistoryEvolvedVariables<
-            ::Tags::Variables<
-                tmpl::list<typename Metavariables::evolved_swsh_tag>>>>;
+        ::Tags::Time,
+        ::Tags::HistoryEvolvedVariables<coordinate_variables_tag,
+                                        dt_coordinate_variables_tag>,
+        ::Tags::HistoryEvolvedVariables<evolved_swsh_variables_tag,
+                                        evolved_swsh_dt_variables_tag>>;
+
     using evolution_compute_tags =
         db::AddComputeTags<::Tags::SubstepTimeCompute>;
 
@@ -111,7 +122,6 @@ struct InitializeCharacteristicEvolution {
       const double initial_time_value =
           db::get<InitializationTags::StartTime>(box);
       const double step_size = db::get<InitializationTags::TargetStepSize>(box);
-
       const Slab single_step_slab{initial_time_value,
                                   initial_time_value + step_size};
       const Time initial_time = single_step_slab.start();
@@ -126,8 +136,7 @@ struct InitializeCharacteristicEvolution {
           coordinate_history;
 
       db::item_type<::Tags::HistoryEvolvedVariables<
-          ::Tags::Variables<
-              tmpl::list<typename Metavariables::evolved_swsh_tag>>>>
+          evolved_swsh_variables_tag, evolved_swsh_dt_variables_tag>>
           swsh_history;
 
       return Initialization::merge_into_databox<
@@ -135,7 +144,8 @@ struct InitializeCharacteristicEvolution {
           evolution_compute_tags, Initialization::MergePolicy::Overwrite>(
           std::move(box), std::move(initial_time_id),  // NOLINT
           std::move(second_time_id), fixed_time_step,  // NOLINT
-          std::move(coordinate_history), std::move(swsh_history));
+          initial_time_value, std::move(coordinate_history),
+          std::move(swsh_history));
     }
   };
 
@@ -165,8 +175,9 @@ struct InitializeCharacteristicEvolution {
         db::add_tag_prefix<::Tags::dt, coordinate_variables_tag>;
     using evolved_swsh_variables_tag =
         ::Tags::Variables<tmpl::list<typename Metavariables::evolved_swsh_tag>>;
-    using evolved_swsh_dt_variables_tag = ::Tags::Variables<
-        tmpl::list<typename Metavariables::evolved_swsh_dt_tag>>;
+    using evolved_swsh_dt_variables_tag =
+        db::add_tag_prefix<::Tags::dt, evolved_swsh_variables_tag>;
+
     template <typename TagList>
     static auto initialize(
         db::DataBox<TagList>&& box,
@@ -209,6 +220,41 @@ struct InitializeCharacteristicEvolution {
     }
   };
 
+  template <typename Metavariables>
+  struct ScriObservationTags {
+    template <typename TagList>
+    static auto initialize(
+        db::DataBox<TagList>&& box,
+        const Parallel::ConstGlobalCache<Metavariables>& cache) noexcept {
+      return initialize_impl(std::move(box), cache,
+                             typename Metavariables::scri_values_to_observe{});
+    }
+    template <typename TagList, typename... TagPack>
+    static auto initialize_impl(
+        db::DataBox<TagList>&& box,
+        const Parallel::ConstGlobalCache<Metavariables>& cache,
+        tmpl::list<TagPack...> /*meta*/) noexcept {
+      const size_t target_number_of_points =
+          db::get<InitializationTags::ScriInterpolationOrder>(box);
+      const size_t vector_size =
+          Spectral::Swsh::number_of_swsh_collocation_points(
+              Parallel::get<Spectral::Swsh::Tags::LMax>(cache));
+      // avoid erroneous compiler warnings that the variable is unused.
+      (void)vector_size;
+      return Initialization::merge_into_databox<
+          InitializeCharacteristicEvolution,
+          db::AddSimpleTags<
+              Tags::InterpolationManager<ComplexDataVector, TagPack>...>,
+          db::AddComputeTags<>, Initialization::MergePolicy::Overwrite>(
+          std::move(box),
+          ScriPlusInterpolationManager<ComplexDataVector, TagPack>{
+              target_number_of_points, vector_size,
+              std::make_unique<intrp::BarycentricRationalSpanInterpolator>(
+                  2 * target_number_of_points - 1,
+                  2 * target_number_of_points + 2)}...);
+    }
+  };
+
   template <class Metavariables>
   using return_tag_list = tmpl::append<
       typename EvolutionTags<Metavariables>::evolution_simple_tags,
@@ -230,13 +276,16 @@ struct InitializeCharacteristicEvolution {
     auto characteristic_evolution_box =
         CharacteristicTags<Metavariables>::initialize(std::move(evolution_box),
                                                       cache);
-    auto initialization_moved_box =
+    auto initialization_transferred_box =
         Initialization::merge_into_databox<InitializeCharacteristicEvolution,
                                            db::AddSimpleTags<Tags::EndTime>,
                                            db::AddComputeTags<>>(
             std::move(characteristic_evolution_box),
             db::get<InitializationTags::EndTime>(characteristic_evolution_box));
-    return std::make_tuple(std::move(initialization_moved_box));
+
+    auto scri_initialized_box = ScriObservationTags<Metavariables>::initialize(
+        std::move(initialization_transferred_box), cache);
+    return std::make_tuple(std::move(scri_initialized_box));
   }
 
   template <typename DbTags, typename... InboxTags, typename Metavariables,

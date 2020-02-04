@@ -32,7 +32,6 @@ namespace {
 struct metavariables {
   using cce_boundary_communication_tags =
       Tags::characteristic_worldtube_boundary_tags<Tags::BoundaryValue>;
-  using const_global_cache_tag_list = tmpl::list<Spectral::Swsh::Tags::LMax>;
   using component_list = tmpl::list<mock_h5_worldtube_boundary<metavariables>>;
   enum class Phase { Initialization, Evolve, Exit };
 };
@@ -74,7 +73,8 @@ SPECTRE_TEST_CASE(
   runner.set_phase(metavariables::Phase::Initialization);
   ActionTesting::emplace_component<component>(
       &runner, 0,
-      InitializationTags::H5WorldtubeBoundaryDataManager::create_from_options(
+      InitializationTags::H5WorldtubeBoundaryDataManager::create_from_options<
+          metavariables>(
           l_max, filename, buffer_size,
           std::make_unique<intrp::BarycentricRationalSpanInterpolator>(3u,
                                                                        4u)));

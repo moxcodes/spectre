@@ -106,6 +106,7 @@ struct test_metavariables {
       Spectral::Swsh::Tags::Derivative<Tags::GaugeOmega,
                                        Spectral::Swsh::Tags::Eth>>>;
 
+  using scri_values_to_observe = tmpl::list<>;
   using cce_integrand_tags = tmpl::flatten<tmpl::transform<
       bondi_hypersurface_step_tags,
       tmpl::bind<integrand_terms_to_compute_for_bondi_variable, tmpl::_1>>>;
@@ -168,24 +169,27 @@ SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.Actions.RequestBoundaryData",
   if (file_system::check_if_file_exists(filename)) {
     file_system::rm(filename, true);
   }
+  // create the test file, because on initialization the manager will need
+  // to get basic data out of the file
   TestHelpers::write_test_file(solution, filename, target_time,
                                extraction_radius, frequency, amplitude, l_max);
 
-  // create the test file, because on initialization the manager will need
-  // to get basic data out of the file
   const double start_time = value_dist(gen);
   const double end_time = std::numeric_limits<double>::quiet_NaN();
   const double target_step_size = 0.01 * value_dist(gen);
   const size_t buffer_size = 5;
+  const size_t scri_plus_interpolation_order = 3;
 
   runner.set_phase(test_metavariables::Phase::Initialization);
   ActionTesting::emplace_component<evolution_component>(
       &runner, 0, start_time,
-      InitializationTags::EndTime::create_from_options(end_time, filename),
-      target_step_size);
+      InitializationTags::EndTime::create_from_options<test_metavariables>(
+          end_time, filename),
+      target_step_size, scri_plus_interpolation_order);
   ActionTesting::emplace_component<worldtube_component>(
       &runner, 0,
-      InitializationTags::H5WorldtubeBoundaryDataManager::create_from_options(
+      InitializationTags::H5WorldtubeBoundaryDataManager::create_from_options<
+          test_metavariables>(
           l_max, filename, buffer_size,
           std::make_unique<intrp::BarycentricRationalSpanInterpolator>(3_st,
                                                                        4_st)));

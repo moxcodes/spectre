@@ -16,6 +16,10 @@
 #include "tests/Unit/Evolution/Systems/Cce/BoundaryTestHelpers.hpp"
 #include "tests/Unit/TestCreation.hpp"
 
+namespace {
+struct empty_metavariables {};
+}  // namespace
+
 SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.OptionTags", "[Unit][Cce]") {
   CHECK(TestHelpers::test_creation<size_t, Cce::OptionTags::LMax>("8") == 8_st);
   CHECK(TestHelpers::test_creation<size_t, Cce::OptionTags::FilterLMax>("7") ==
@@ -44,6 +48,10 @@ SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.OptionTags", "[Unit][Cce]") {
   CHECK(TestHelpers::test_creation<size_t,
                                    Cce::OptionTags::ScriInterpolationOrder>(
             "4") == 4_st);
+
+  CHECK(TestHelpers::test_creation<size_t, Cce::OptionTags::ScriOutputDensity>(
+            "6") == 6_st);
+
   const std::string filename = "OptionTagsTestCceR0100.h5";
   if (file_system::check_if_file_exists(filename)) {
     file_system::rm(filename, true);
@@ -54,28 +62,40 @@ SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.OptionTags", "[Unit][Cce]") {
 
   CHECK(
       Cce::InitializationTags::H5WorldtubeBoundaryDataManager::
-          create_from_options(8, filename, 3,
-                              std::make_unique<intrp::CubicSpanInterpolator>())
+          create_from_options<empty_metavariables>(
+              8, filename, 3, std::make_unique<intrp::CubicSpanInterpolator>())
               .get_l_max() == 8);
 
-  CHECK(Cce::InitializationTags::LMax::create_from_options(8u) == 8u);
-  CHECK(Cce::InitializationTags::NumberOfRadialPoints::create_from_options(
-            6u) == 6u);
+  CHECK(Cce::InitializationTags::LMax::create_from_options<empty_metavariables>(
+            8u) == 8u);
+  CHECK(Cce::InitializationTags::NumberOfRadialPoints::create_from_options<
+            empty_metavariables>(6u) == 6u);
 
-  CHECK(Cce::InitializationTags::StartTime::create_from_options(
-            -std::numeric_limits<double>::infinity(),
-            "OptionTagsTestCceR0100.h5") == 2.5);
-  CHECK(Cce::InitializationTags::StartTime::create_from_options(
-            3.3, "OptionTagsTestCceR0100.h5") == 3.3);
+  CHECK(Cce::InitializationTags::StartTime::create_from_options<
+            empty_metavariables>(-std::numeric_limits<double>::infinity(),
+                                 "OptionTagsTestCceR0100.h5") == 2.5);
+  CHECK(Cce::InitializationTags::StartTime::create_from_options<
+            empty_metavariables>(3.3, "OptionTagsTestCceR0100.h5") == 3.3);
 
-  CHECK(Cce::InitializationTags::TargetStepSize::create_from_options(0.2) ==
-        0.2);
+  CHECK(Cce::InitializationTags::EndTime::create_from_options<
+            empty_metavariables>(std::numeric_limits<double>::infinity(),
+                                 "OptionTagsTestCceR0100.h5") == 5.4);
+  CHECK(Cce::InitializationTags::EndTime::create_from_options<
+            empty_metavariables>(2.2, "OptionTagsTestCceR0100.h5") == 2.2);
 
-  CHECK(Cce::InitializationTags::EndTime::create_from_options(
-            std::numeric_limits<double>::infinity(),
-            "OptionTagsTestCceR0100.h5") == 5.4);
-  CHECK(Cce::InitializationTags::EndTime::create_from_options(
-            2.2, "OptionTagsTestCceR0100.h5") == 2.2);
+  CHECK(Cce::Tags::ObservationLMax::create_from_options<empty_metavariables>(
+            5_st) == 5_st);
+  CHECK(Cce::InitializationTags::TargetStepSize::create_from_options<
+            empty_metavariables>(0.2) == 0.2);
+
+  CHECK(Cce::InitializationTags::ScriInterpolationOrder::create_from_options<
+            empty_metavariables>(6_st) == 6_st);
+
+  CHECK(Cce::InitializationTags::ScriOutputDensity::create_from_options<
+            empty_metavariables>(4_st) == 4_st);
+
+  CHECK(Cce::InitializationTags::TargetStepSize::create_from_options<
+            empty_metavariables>(0.2) == 0.2);
 
   if (file_system::check_if_file_exists(filename)) {
     file_system::rm(filename, true);

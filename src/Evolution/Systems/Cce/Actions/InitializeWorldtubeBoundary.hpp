@@ -45,7 +45,7 @@ struct InitializeH5WorldtubeBoundary {
   using initialization_tags =
       tmpl::list<InitializationTags::H5WorldtubeBoundaryDataManager>;
 
-  using const_global_cache_tags = tmpl::list<Spectral::Swsh::Tags::LMax>;
+  using const_global_cache_tags = tmpl::list<InitializationTags::LMax>;
 
   template <class Metavariables>
   using h5_boundary_manager_simple_tags = db::AddSimpleTags<

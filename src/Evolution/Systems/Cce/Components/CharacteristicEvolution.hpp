@@ -5,11 +5,28 @@
 
 #include <type_traits>
 
+#include "Evolution/Systems/Cce/Actions/BoundaryComputeAndSendToEvolution.hpp"
+#include "Evolution/Systems/Cce/Actions/CalculateScriInputs.hpp"
+#include "Evolution/Systems/Cce/Actions/CharacteristicEvolutionBondiCalculations.hpp"
+#include "Evolution/Systems/Cce/Actions/EnqueueInterpolationScriData.hpp"
+#include "Evolution/Systems/Cce/Actions/FilterSwshVolumeQuantity.hpp"
 #include "Evolution/Systems/Cce/Actions/InitializeCharacteristicEvolution.hpp"
+#include "Evolution/Systems/Cce/Actions/RequestBoundaryData.hpp"
+#include "Evolution/Systems/Cce/Actions/ScriObserveInterpolated.hpp"
+#include "Evolution/Systems/Cce/Actions/TimeManagement.hpp"
+#include "Evolution/Systems/Cce/LinearSolve.hpp"
+#include "Evolution/Systems/Cce/PreSwshDerivatives.hpp"
+#include "Evolution/Systems/Cce/PrecomputeCceDependencies.hpp"
+#include "Evolution/Systems/Cce/ScriPlusValues.hpp"
+#include "Evolution/Systems/Cce/SwshDerivatives.hpp"
+#include "IO/Observer/ObserverComponent.hpp"
 #include "Parallel/Actions/TerminatePhase.hpp"
 #include "Parallel/ConstGlobalCache.hpp"
+#include "ParallelAlgorithms/Actions/MutateApply.hpp"
 #include "ParallelAlgorithms/Initialization/Actions/RemoveOptionsAndTerminatePhase.hpp"
 #include "Time/Actions/AdvanceTime.hpp"
+#include "Time/Actions/RecordTimeStepperData.hpp"
+#include "Time/Actions/UpdateU.hpp"
 #include "Utilities/TMPL.hpp"
 
 namespace Cce {
@@ -60,7 +77,10 @@ namespace Cce {
  * modal representation. (typically `Cce::all_transform_buffer_tags`).
  *  - `cce_angular_coordinate_tags`: A typelist of real-valued angular
  * coordinates that are not evolved.
- *  - `cce_scri_tags` - the tags of quantities to compute at scri+
+ *  - `cce_scri_tags`: the tags of quantities to compute at scri+
+ *  - `cce_hypersurface_initialization`: a mutator (for use with
+ * `::Actions::MutateApply`) that is used to compute the initial hypersurface
+ * data from the boundary data.
  */
 template <class Metavariables>
 struct CharacteristicEvolution {
@@ -69,12 +89,86 @@ struct CharacteristicEvolution {
 
   using initialize_action_list =
       tmpl::list<Actions::InitializeCharacteristicEvolution,
+                 Actions::RequestBoundaryData<
+                     typename Metavariables::cce_boundary_component,
+                     CharacteristicEvolution<Metavariables>>,
+                 Actions::ReceiveWorldtubeData<Metavariables>,
+                 ::Actions::MutateApply<
+                     typename Metavariables::cce_hypersurface_initialization>,
+                 ::Actions::MutateApply<InitializeGauge>,
+                 ::Actions::MutateApply<GaugeUpdateAngularFromCartesian<
+                     Tags::CauchyAngularCoords, Tags::CauchyCartesianCoords>>,
+                 ::Actions::MutateApply<GaugeUpdateJacobianFromCoordinates<
+                     Tags::GaugeC, Tags::GaugeD, Tags::CauchyAngularCoords,
+                     Tags::CauchyCartesianCoords>>,
+                 ::Actions::MutateApply<
+                     GaugeUpdateInterpolator<Tags::CauchyAngularCoords>>,
+                 ::Actions::MutateApply<GaugeUpdateOmega>,
+                 ::Actions::MutateApply<
+                     InitializeScriPlusValue<Tags::InertialRetardedTime>>,
                  Initialization::Actions::RemoveOptionsAndTerminatePhase>;
 
   using initialization_tags =
       Parallel::get_initialization_tags<initialize_action_list>;
 
-  using extract_action_list = tmpl::list<::Actions::AdvanceTime>;
+  // the list of actions that occur for each of the hypersurface-integrated
+  // Bondi tags
+  template <typename BondiTag>
+  using hypersurface_computation = tmpl::list<
+      ::Actions::MutateApply<GaugeAdjustedBoundaryValue<BondiTag>>,
+      Actions::CalculateIntegrandInputsForTag<BondiTag>,
+      tmpl::transform<integrand_terms_to_compute_for_bondi_variable<BondiTag>,
+                      tmpl::bind<::Actions::MutateApply,
+                                 tmpl::bind<ComputeBondiIntegrand, tmpl::_1>>>,
+      ::Actions::MutateApply<
+          RadialIntegrateBondi<Tags::EvolutionGaugeBoundaryValue, BondiTag>>,
+      // Once we finish the U computation, we need to update all the quantities
+      // that depend on the time derivative of the gauge
+      tmpl::conditional_t<
+          cpp17::is_same_v<BondiTag, Tags::BondiU>,
+          tmpl::list<
+              ::Actions::MutateApply<GaugeUpdateTimeDerivatives>,
+              ::Actions::MutateApply<
+                  GaugeAdjustedBoundaryValue<Tags::DuRDividedByR>>,
+              ::Actions::MutateApply<PrecomputeCceDependencies<
+                  Tags::EvolutionGaugeBoundaryValue, Tags::DuRDividedByR>>>,
+          tmpl::list<>>>;
+
+  using extract_action_list = tmpl::flatten<tmpl::list<
+      Actions::RequestNextBoundaryData<
+          typename Metavariables::cce_boundary_component,
+          CharacteristicEvolution<Metavariables>>,
+      Actions::PrecomputeGlobalCceDependencies,
+      tmpl::transform<bondi_hypersurface_step_tags,
+                      tmpl::bind<hypersurface_computation, tmpl::_1>>,
+      Actions::FilterSwshVolumeQuantity<Tags::BondiH>,
+      ::Actions::MutateApply<
+          CalculateScriPlusValue<::Tags::dt<Tags::InertialRetardedTime>>>,
+      Actions::CalculateScriInputs,
+      tmpl::transform<typename metavariables::cce_scri_tags,
+                      tmpl::bind<::Actions::MutateApply,
+                                 tmpl::bind<CalculateScriPlusValue, tmpl::_1>>>,
+      tmpl::transform<
+          typename metavariables::scri_values_to_observe,
+          tmpl::bind<Actions::EnqueueInterpolationScriData, tmpl::_1>>,
+      Actions::ScriObserveInterpolated<
+          observers::ObserverWriter<Metavariables>>,
+      ::Actions::RecordTimeStepperData<
+          typename Metavariables::evolved_coordinates_variables_tag>,
+      ::Actions::RecordTimeStepperData<::Tags::Variables<
+          tmpl::list<typename Metavariables::evolved_swsh_tag>>>,
+      ::Actions::UpdateU<
+          typename Metavariables::evolved_coordinates_variables_tag>,
+      ::Actions::UpdateU<::Tags::Variables<
+          tmpl::list<typename Metavariables::evolved_swsh_tag>>>,
+      ::Actions::MutateApply<GaugeUpdateAngularFromCartesian<
+          Tags::CauchyAngularCoords, Tags::CauchyCartesianCoords>>,
+      ::Actions::MutateApply<GaugeUpdateJacobianFromCoordinates<
+          Tags::GaugeC, Tags::GaugeD, Tags::CauchyAngularCoords,
+          Tags::CauchyCartesianCoords>>,
+      ::Actions::MutateApply<GaugeUpdateOmega>, ::Actions::AdvanceTime,
+      Actions::ExitIfEndTimeReached,
+      Actions::ReceiveWorldtubeData<Metavariables>>>;
 
   using phase_dependent_action_list = tmpl::list<
       Parallel::PhaseActions<typename Metavariables::Phase,
@@ -96,8 +190,7 @@ struct CharacteristicEvolution {
       const Parallel::CProxy_ConstGlobalCache<Metavariables>&
           global_cache) noexcept {
     auto& local_cache = *(global_cache.ckLocalBranch());
-    if (next_phase == Metavariables::Phase::RegisterWithObserver or
-        next_phase == Metavariables::Phase::Evolve) {
+    if (next_phase == Metavariables::Phase::Evolve) {
       Parallel::get_parallel_component<CharacteristicEvolution<Metavariables>>(
           local_cache)
           .start_phase(next_phase);
