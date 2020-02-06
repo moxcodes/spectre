@@ -255,11 +255,6 @@ struct InitializeCharacteristicEvolution {
     }
   };
 
-  template <class Metavariables>
-  using return_tag_list = tmpl::append<
-      typename EvolutionTags<Metavariables>::evolution_simple_tags,
-      typename EvolutionTags<Metavariables>::evolution_compute_tags>;
-
   template <
       typename DbTags, typename... InboxTags, typename Metavariables,
       typename ArrayIndex, typename ActionList, typename ParallelComponent,

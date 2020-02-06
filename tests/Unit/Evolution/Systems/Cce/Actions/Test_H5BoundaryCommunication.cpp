@@ -48,7 +48,8 @@ struct mock_h5_worldtube_boundary {
   using replace_these_simple_actions = tmpl::list<>;
   using with_these_simple_actions = tmpl::list<>;
 
-  using initialize_action_list = tmpl::list<InitializeH5WorldtubeBoundary>;
+  using initialize_action_list =
+      tmpl::list<Actions::InitializeH5WorldtubeBoundary>;
   using initialization_tags =
       Parallel::get_initialization_tags<initialize_action_list>;
 
@@ -91,11 +92,11 @@ struct mock_characteristic_evolution {
       Parallel::PhaseActions<
           typename Metavariables::Phase, Metavariables::Phase::Evolve,
           tmpl::list<Actions::RequestBoundaryData<
-                         mock_h5_worldtube_boundary<Metavariables>,
+                         H5WorldtubeBoundary<Metavariables>,
                          mock_characteristic_evolution<Metavariables>>,
                      Actions::ReceiveWorldtubeData<Metavariables>,
                      Actions::RequestNextBoundaryData<
-                         mock_h5_worldtube_boundary<Metavariables>,
+                         H5WorldtubeBoundary<Metavariables>,
                          mock_characteristic_evolution<Metavariables>>>>>;
   using const_global_cache_tags =
       Parallel::get_const_global_cache_tags_from_actions<
@@ -109,6 +110,7 @@ struct test_metavariables {
       tmpl::list<Tags::CauchyCartesianCoords, Tags::InertialRetardedTime>>;
   using cce_boundary_communication_tags =
       Tags::characteristic_worldtube_boundary_tags<Tags::BoundaryValue>;
+  using cce_boundary_component = H5WorldtubeBoundary<test_metavariables>;
   using cce_gauge_boundary_tags = tmpl::flatten<tmpl::list<
       tmpl::transform<
           tmpl::list<Tags::BondiR, Tags::DuRDividedByR, Tags::BondiJ,
@@ -148,7 +150,7 @@ struct test_metavariables {
 };
 }  // namespace
 
-SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.Actions.BoundaryCommunication",
+SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.Actions.H5BoundaryCommunication",
                   "[Unit][Cce]") {
   using evolution_component = mock_characteristic_evolution<test_metavariables>;
   using worldtube_component = mock_h5_worldtube_boundary<test_metavariables>;
@@ -160,7 +162,7 @@ SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.Actions.BoundaryCommunication",
           l_max, std::make_unique<::TimeSteppers::RungeKutta3>(),
           number_of_radial_points}};
 
-  const std::string filename = "BoundaryCommunicationTestCceR0100.h5";
+  const std::string filename = "H5BoundaryCommunicationTestCceR0100.h5";
   // create the test file, because on initialization the manager will need to
   // get basic data out of the file
 

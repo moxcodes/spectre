@@ -17,6 +17,7 @@ namespace Cce {
 struct WorldtubeDataManager;
 template <typename ToInterpolate, typename Tag>
 struct ScriPlusInterpolationManager;
+struct GHWorldtubeInterfaceManager;
 /// \endcond
 
 /// Tags for Cauchy Characteristic Extraction routines
@@ -413,6 +414,10 @@ struct EndTime : db::SimpleTag {
 template <typename ToInterpolate, typename ObservationTag>
 struct InterpolationManager : db::SimpleTag {
   using type = ScriPlusInterpolationManager<ToInterpolate, ObservationTag>;
+};
+
+struct GHInterfaceManager : db::SimpleTag {
+  using type = std::unique_ptr<GHWorldtubeInterfaceManager>;
 };
 }  // namespace Tags
 }  // namespace Cce
