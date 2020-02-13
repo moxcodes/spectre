@@ -43,6 +43,23 @@ namespace Actions {
 ///
 /// - Removes: nothing
 /// - Modifies: nothing
+///
+///
+/// Columns in the file to be read must have the following form:
+///   - 0 = time
+///   - 1 = time of last update
+///   - 2 = number of components
+///   - 3 = maximum derivative order
+///   - 4 = version
+///   - 5 = function
+///   - 6 = d/dt (function)
+///   - 7 = d^2/dt^2 (function)
+///   - 8 = d^3/dt^3 (function)
+///
+/// If the function has more than one component, columns 5-8 give
+/// the first component and its derivatives, columns 9-12 give the second
+/// component and its derivatives, etc.
+///
 struct FunctionOfTimeFromFile {
   template <typename DataBox, typename... InboxTags, typename Metavariables,
             typename ArrayIndex, typename ActionList,
@@ -94,20 +111,13 @@ struct FunctionOfTimeFromFile {
       const size_t number_of_components = dat_data(0, 2);
 
       std::array<DataVector, max_deriv + 1> initial_coefficients;
-      for (size_t i = 0; i < max_deriv + 1; ++i) {
-        gsl::at(initial_coefficients, i) = DataVector(number_of_components);
-        for (size_t a = 0; a < number_of_components; ++a) {
-          // Columns in the file have the following form::
-          // 0 = time
-          // 1 = time of last update
-          // 2 = number of components
-          // 3 = maximum derivative order
-          // 4 = version
-          // 5, ... 5 + maximum derivative order: first component and derivs
-          // ... (sets of coefficients for the next component and derivs)
-          // ...
-          gsl::at(initial_coefficients, i)[a] =
-              dat_data(0, 5 + (max_deriv + 1) * a + i);
+      for (size_t deriv_order = 0; deriv_order < max_deriv + 1; ++deriv_order) {
+        gsl::at(initial_coefficients, deriv_order) =
+            DataVector(number_of_components);
+        for (size_t component = 0; component < number_of_components;
+             ++component) {
+          gsl::at(initial_coefficients, deriv_order)[component] =
+              dat_data(0, 5 + (max_deriv + 1) * component + deriv_order);
         }
       }
       functions_of_time[name] = domain::FunctionsOfTime::PiecewisePolynomial<3>(
