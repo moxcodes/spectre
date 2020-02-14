@@ -53,10 +53,36 @@ struct Metavariables {
   using component_list = tmpl::list<component<Metavariables>>;
   enum class Phase { Initialization, Testing, Exit };
 };
+
+void test_options() noexcept {
+  CHECK(db::tag_name<Initialization::Tags::FuncOfTimeFile>() ==
+        "FuncOfTimeFile");
+  CHECK(db::tag_name<Initialization::Tags::FuncOfTimeSetNames>() ==
+        "FuncOfTimeSetNames");
+
+  const std::string option_string{
+      "FuncOfTimeFromFile:\n"
+      "  FuncOfTimeFile: TestFile.h5\n"
+      "  FuncOfTimeSetNames: [[Set1, Name1], [Set2, Name2]]"};
+  using option_tags =
+      tmpl::list<Initialization::OptionTags::FuncOfTimeFile,
+                 Initialization::OptionTags::FuncOfTimeSetNames>;
+  Options<option_tags> options{""};
+  options.parse(option_string);
+  CHECK(options.get<Initialization::OptionTags::FuncOfTimeFile>() ==
+        "TestFile.h5");
+  const auto& set_names =
+      options.get<Initialization::OptionTags::FuncOfTimeSetNames>();
+  const std::vector<std::array<std::string, 2>> expected_set_names{
+      {{{"Set1", "Name1"}}, {{"Set2", "Name2"}}}};
+  CHECK(set_names == expected_set_names);
+}
 }  // namespace
 
 SPECTRE_TEST_CASE("Unit.Evolution.FunctionOfTimeFromFile",
                   "[Unit][Evolution][Actions]") {
+  test_options();
+
   using MockRuntimeSystem = ActionTesting::MockRuntimeSystem<Metavariables>;
 
   const ElementId<dim> self_id(1);
@@ -64,10 +90,10 @@ SPECTRE_TEST_CASE("Unit.Evolution.FunctionOfTimeFromFile",
   MockRuntimeSystem runner{{}};
   ActionTesting::emplace_component_and_initialize<component<Metavariables>>(
       &runner, self_id,
-      {db::item_type<Initialization::Tags::FuncOfTimeFile>{
+      {std::string{
            unit_test_path() +
            "/Evolution/Initialization/FunctionOfTimeFromFile_TestData.h5"},
-       db::item_type<Initialization::Tags::FuncOfTimeSetNames>{
+       std::vector<std::array<std::string, 2>>{
            {{{"ExpansionFactor", "ExpansionFactor"}},
             {{"RotationAngle", "RotationAngle"}}}}});
   runner.set_phase(Metavariables::Phase::Testing);
@@ -78,7 +104,7 @@ SPECTRE_TEST_CASE("Unit.Evolution.FunctionOfTimeFromFile",
                                      domain::Tags::FunctionsOfTime>(runner,
                                                                     self_id);
 
-  // Check that the function vs. time and its derivatives have the expected
+  // Check that the FunctionOfTime and its derivatives have the expected
   // values
   const std::array<double, 2> expected_times{{0.0, 0.00599999974179903}};
   const std::array<std::string, 2> expected_names{
@@ -112,27 +138,3 @@ SPECTRE_TEST_CASE("Unit.Evolution.FunctionOfTimeFromFile",
   }
 }
 
-SPECTRE_TEST_CASE("Unit.Evolution.FunctionOfTimeFromFile.TestOptions",
-                  "[Unit][Evolution][Options]") {
-  CHECK(db::tag_name<Initialization::Tags::FuncOfTimeFile>() ==
-        "FuncOfTimeFile");
-  CHECK(db::tag_name<Initialization::Tags::FuncOfTimeSetNames>() ==
-        "FuncOfTimeSetNames");
-
-  const std::string option_string{
-      "FuncOfTimeFromFile:\n"
-      "  FuncOfTimeFile: TestFile.h5\n"
-      "  FuncOfTimeSetNames: [[Set1, Name1], [Set2, Name2]]"};
-  using option_tags =
-      tmpl::list<Initialization::OptionTags::FuncOfTimeFile,
-                 Initialization::OptionTags::FuncOfTimeSetNames>;
-  Options<option_tags> options{""};
-  options.parse(option_string);
-  CHECK(options.get<Initialization::OptionTags::FuncOfTimeFile>() ==
-        "TestFile.h5");
-  const auto& set_names =
-      options.get<Initialization::OptionTags::FuncOfTimeSetNames>();
-  const std::vector<std::array<std::string, 2>> expected_set_names{
-      {{{"Set1", "Name1"}}, {{"Set2", "Name2"}}}};
-  CHECK(set_names == expected_set_names);
-}

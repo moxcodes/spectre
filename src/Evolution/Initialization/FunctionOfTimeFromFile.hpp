@@ -3,11 +3,13 @@
 
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <memory>
 #include <tuple>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
 #include "DataStructures/DataBox/DataBox.hpp"
 #include "DataStructures/Matrix.hpp"
@@ -22,6 +24,7 @@
 #include "Parallel/ConstGlobalCache.hpp"
 #include "ParallelAlgorithms/Initialization/MergeIntoDataBox.hpp"
 #include "Utilities/Gsl.hpp"
+#include "Utilities/Requires.hpp"
 #include "Utilities/TMPL.hpp"
 #include "Utilities/TaggedTuple.hpp"
 
@@ -38,8 +41,8 @@ namespace Actions {
 ///
 /// DataBox changes:
 /// - Adds:
-///   - A `FunctionsOfTime` containing a `FunctionOfTime` for each dat
-///   file read from the H5 file
+///   - `::domain::Tags::FunctionsOfTime`. This tag contains a `FunctionOfTime`
+///   for each dat file read from the H5 file
 ///
 /// - Removes: nothing
 /// - Modifies: nothing
@@ -61,10 +64,15 @@ namespace Actions {
 /// component and its derivatives, etc.
 ///
 struct FunctionOfTimeFromFile {
-  template <typename DataBox, typename... InboxTags, typename Metavariables,
-            typename ArrayIndex, typename ActionList,
-            typename ParallelComponent>
-  static auto apply(DataBox& box,
+  template <
+      typename DbTagsList, typename... InboxTags, typename Metavariables,
+      typename ArrayIndex, typename ActionList, typename ParallelComponent,
+      Requires<
+          db::tag_is_retrievable_v<Initialization::Tags::FuncOfTimeFile,
+                                   db::DataBox<DbTagsList>> and
+          db::tag_is_retrievable_v<Initialization::Tags::FuncOfTimeSetNames,
+                                   db::DataBox<DbTagsList>>> = nullptr>
+  static auto apply(db::DataBox<DbTagsList>& box,
                     const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
                     const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
                     const ArrayIndex& /*array_index*/,
@@ -73,15 +81,16 @@ struct FunctionOfTimeFromFile {
     const auto& file_name{
         db::get<Initialization::Tags::FuncOfTimeFile>(box)};
 
-    // Each element of dataset_names is a std::array<std::string, 2>, where
-    // element 0 is the dataset name in the h5 file, and element 1 is the
-    // name used in the std::unordered_map that will store the read-in functions
-    // of time
-    const auto& dataset_names{
+    // Each element of dataset_names has two elements:
+    // element 0 is the dataset name in the h5 file,
+    // and element 1 is the name used in the std::unordered_map that
+    // will store the corresponding read-in function of time
+    const std::vector<std::array<std::string, 2>>& dataset_names{
         db::get<Initialization::Tags::FuncOfTimeSetNames>(box)};
 
     // Currently, only support order 3 piecewise polynomials
-    // This could be generalized later, if needed
+    // This could be generalized later, but the SpEC functions of time
+    // that we will read in with this action always use max_deriv = 3
     constexpr size_t max_deriv{3};
 
     std::unordered_map<std::string,
