@@ -20,6 +20,7 @@
 #include "Evolution/Systems/Cce/ScriPlusValues.hpp"
 #include "Evolution/Systems/Cce/SwshDerivatives.hpp"
 #include "IO/Observer/ObserverComponent.hpp"
+#include "Parallel/Actions/Goto.hpp"
 #include "Parallel/Actions/TerminatePhase.hpp"
 #include "Parallel/ConstGlobalCache.hpp"
 #include "ParallelAlgorithms/Actions/MutateApply.hpp"
@@ -30,6 +31,8 @@
 #include "Utilities/TMPL.hpp"
 
 namespace Cce {
+
+struct CceEvolutionLabelTag {};
 
 /*!
  * \brief The component for handling the CCE evolution and waveform output.
@@ -89,23 +92,6 @@ struct CharacteristicEvolution {
 
   using initialize_action_list =
       tmpl::list<Actions::InitializeCharacteristicEvolution,
-                 Actions::RequestBoundaryData<
-                     typename Metavariables::cce_boundary_component,
-                     CharacteristicEvolution<Metavariables>>,
-                 Actions::ReceiveWorldtubeData<Metavariables>,
-                 ::Actions::MutateApply<
-                     typename Metavariables::cce_hypersurface_initialization>,
-                 ::Actions::MutateApply<InitializeGauge>,
-                 ::Actions::MutateApply<GaugeUpdateAngularFromCartesian<
-                     Tags::CauchyAngularCoords, Tags::CauchyCartesianCoords>>,
-                 ::Actions::MutateApply<GaugeUpdateJacobianFromCoordinates<
-                     Tags::GaugeC, Tags::GaugeD, Tags::CauchyAngularCoords,
-                     Tags::CauchyCartesianCoords>>,
-                 ::Actions::MutateApply<
-                     GaugeUpdateInterpolator<Tags::CauchyAngularCoords>>,
-                 ::Actions::MutateApply<GaugeUpdateOmega>,
-                 ::Actions::MutateApply<
-                     InitializeScriPlusValue<Tags::InertialRetardedTime>>,
                  Initialization::Actions::RemoveOptionsAndTerminatePhase>;
 
   using initialization_tags =
@@ -135,6 +121,24 @@ struct CharacteristicEvolution {
           tmpl::list<>>>;
 
   using extract_action_list = tmpl::flatten<tmpl::list<
+      Actions::RequestBoundaryData<
+          typename Metavariables::cce_boundary_component,
+          CharacteristicEvolution<Metavariables>>,
+      Actions::ReceiveWorldtubeData<Metavariables>,
+      ::Actions::MutateApply<
+          typename Metavariables::cce_hypersurface_initialization>,
+      ::Actions::MutateApply<InitializeGauge>,
+      ::Actions::MutateApply<GaugeUpdateAngularFromCartesian<
+          Tags::CauchyAngularCoords, Tags::CauchyCartesianCoords>>,
+      ::Actions::MutateApply<GaugeUpdateJacobianFromCoordinates<
+          Tags::GaugeC, Tags::GaugeD, Tags::CauchyAngularCoords,
+          Tags::CauchyCartesianCoords>>,
+      ::Actions::MutateApply<
+          GaugeUpdateInterpolator<Tags::CauchyAngularCoords>>,
+      ::Actions::MutateApply<GaugeUpdateOmega>,
+      ::Actions::MutateApply<
+          InitializeScriPlusValue<Tags::InertialRetardedTime>>,
+      ::Actions::Label<CceEvolutionLabelTag>,
       Actions::RequestNextBoundaryData<
           typename Metavariables::cce_boundary_component,
           CharacteristicEvolution<Metavariables>>,
@@ -168,7 +172,8 @@ struct CharacteristicEvolution {
           Tags::CauchyCartesianCoords>>,
       ::Actions::MutateApply<GaugeUpdateOmega>, ::Actions::AdvanceTime,
       Actions::ExitIfEndTimeReached,
-      Actions::ReceiveWorldtubeData<Metavariables>>>;
+      Actions::ReceiveWorldtubeData<Metavariables>,
+      ::Actions::Goto<CceEvolutionLabelTag>>>;
 
   using phase_dependent_action_list = tmpl::list<
       Parallel::PhaseActions<typename Metavariables::Phase,
