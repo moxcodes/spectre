@@ -4,12 +4,16 @@
 set(LIBRARY "Test_Cce_Actions")
 
 set(LIBRARY_SOURCES
-  Test_BoundaryCommunication.cpp
+  Test_CalculateScriInputs.cpp
   Test_CharacteristicEvolutionBondiCalculations.cpp
+  Test_EnqueueInterpolationScriData.cpp
   Test_FilterSwshVolumeQuantity.cpp
+  Test_GHBoundaryCommunication.cpp
+  Test_H5BoundaryCommunication.cpp
   Test_InitializeCharacteristicEvolution.cpp
   Test_InitializeWorldtubeBoundary.cpp
   Test_RequestBoundaryData.cpp
+  Test_ScriObserveInterpolated.cpp
   Test_TimeManagement.cpp
   )
 

@@ -77,8 +77,10 @@ struct metavariables {
       Tags::BondiUAtScri, Tags::GaugeC, Tags::GaugeD, Tags::GaugeOmega,
       Tags::Du<Tags::GaugeOmega>,
       Spectral::Swsh::Tags::Derivative<Tags::GaugeOmega,
-                                       Spectral::Swsh::Tags::Eth>>>;
+                                       Spectral::Swsh::Tags::Eth>,
+      all_boundary_swsh_derivative_tags_for_scri>>;
 
+  using scri_values_to_observe = tmpl::list<>;
   using cce_integrand_tags = tmpl::flatten<tmpl::transform<
       bondi_hypersurface_step_tags,
       tmpl::bind<integrand_terms_to_compute_for_bondi_variable, tmpl::_1>>>;
@@ -148,12 +150,14 @@ SPECTRE_TEST_CASE(
   const double start_time = value_dist(gen);
   const double end_time = std::numeric_limits<double>::infinity();
   const double target_step_size = 0.01 * value_dist(gen);
+  const size_t scri_plus_interpolation_order = 3;
 
   runner.set_phase(metavariables::Phase::Initialization);
   ActionTesting::emplace_component<component>(
       &runner, 0, start_time,
-      InitializationTags::EndTime::create_from_options(end_time, filename),
-      target_step_size);
+      InitializationTags::EndTime::create_from_options<metavariables>(end_time,
+                                                                      filename),
+      target_step_size, scri_plus_interpolation_order);
 
   // this should run the initialization
   ActionTesting::next_action<component>(make_not_null(&runner), 0);
@@ -180,8 +184,11 @@ SPECTRE_TEST_CASE(
                                                                       0);
   CHECK(coordinates_history.size() == 0);
   const auto& evolved_swsh_history = ActionTesting::get_databox_tag<
-      component, ::Tags::HistoryEvolvedVariables<::Tags::Variables<
-                     tmpl::list<typename metavariables::evolved_swsh_tag>>>>(
+      component, ::Tags::HistoryEvolvedVariables<
+                     ::Tags::Variables<
+                         tmpl::list<typename metavariables::evolved_swsh_tag>>,
+                     ::Tags::dt<::Tags::Variables<tmpl::list<
+                         typename metavariables::evolved_swsh_dt_tag>>>>>(
       runner, 0);
   CHECK(evolved_swsh_history.size() == 0);
 
@@ -239,8 +246,8 @@ SPECTRE_TEST_CASE(
             number_of_radial_points);
 
   const auto& evolved_swsh_dt_variables = ActionTesting::get_databox_tag<
-      component, ::Tags::Variables<
-                     tmpl::list<typename metavariables::evolved_swsh_dt_tag>>>(
+      component, ::Tags::dt<::Tags::Variables<
+                     tmpl::list<typename metavariables::evolved_swsh_dt_tag>>>>(
       runner, 0);
   CHECK(evolved_swsh_dt_variables.number_of_grid_points() ==
         Spectral::Swsh::number_of_swsh_collocation_points(l_max) *

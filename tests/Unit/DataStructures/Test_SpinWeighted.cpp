@@ -211,6 +211,9 @@ SPECTRE_TEST_CASE("Unit.DataStructures.SpinWeighted",
   // check unchanged if no resize
   destructive_resize_check.destructive_resize(5);
   CHECK(destructive_resize_check == destructive_resize_copy);
+  const auto serialized_and_deserialized_copy =
+      serialize_and_deserialize(destructive_resize_copy);
+  CHECK(destructive_resize_check == serialized_and_deserialized_copy);
   // check resize occurs if appropriate
   destructive_resize_check.destructive_resize(6);
   CHECK(destructive_resize_check != destructive_resize_copy);

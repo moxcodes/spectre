@@ -48,7 +48,8 @@ struct mock_h5_worldtube_boundary {
   using replace_these_simple_actions = tmpl::list<>;
   using with_these_simple_actions = tmpl::list<>;
 
-  using initialize_action_list = tmpl::list<InitializeH5WorldtubeBoundary>;
+  using initialize_action_list =
+      tmpl::list<Actions::InitializeH5WorldtubeBoundary>;
   using initialization_tags =
       Parallel::get_initialization_tags<initialize_action_list>;
 
@@ -91,11 +92,11 @@ struct mock_characteristic_evolution {
       Parallel::PhaseActions<
           typename Metavariables::Phase, Metavariables::Phase::Evolve,
           tmpl::list<Actions::RequestBoundaryData<
-                         mock_h5_worldtube_boundary<Metavariables>,
+                         H5WorldtubeBoundary<Metavariables>,
                          mock_characteristic_evolution<Metavariables>>,
                      Actions::ReceiveWorldtubeData<Metavariables>,
                      Actions::RequestNextBoundaryData<
-                         mock_h5_worldtube_boundary<Metavariables>,
+                         H5WorldtubeBoundary<Metavariables>,
                          mock_characteristic_evolution<Metavariables>>>>>;
   using const_global_cache_tags =
       Parallel::get_const_global_cache_tags_from_actions<
@@ -109,6 +110,7 @@ struct test_metavariables {
       tmpl::list<Tags::CauchyCartesianCoords, Tags::InertialRetardedTime>>;
   using cce_boundary_communication_tags =
       Tags::characteristic_worldtube_boundary_tags<Tags::BoundaryValue>;
+  using cce_boundary_component = H5WorldtubeBoundary<test_metavariables>;
   using cce_gauge_boundary_tags = tmpl::flatten<tmpl::list<
       tmpl::transform<
           tmpl::list<Tags::BondiR, Tags::DuRDividedByR, Tags::BondiJ,
@@ -120,6 +122,7 @@ struct test_metavariables {
       Spectral::Swsh::Tags::Derivative<Tags::GaugeOmega,
                                        Spectral::Swsh::Tags::Eth>>>;
 
+  using scri_values_to_observe = tmpl::list<>;
   using cce_integrand_tags = tmpl::flatten<tmpl::transform<
       bondi_hypersurface_step_tags,
       tmpl::bind<integrand_terms_to_compute_for_bondi_variable, tmpl::_1>>>;
@@ -147,7 +150,7 @@ struct test_metavariables {
 };
 }  // namespace
 
-SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.Actions.BoundaryCommunication",
+SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.Actions.H5BoundaryCommunication",
                   "[Unit][Cce]") {
   using evolution_component = mock_characteristic_evolution<test_metavariables>;
   using worldtube_component = mock_h5_worldtube_boundary<test_metavariables>;
@@ -159,7 +162,7 @@ SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.Actions.BoundaryCommunication",
           l_max, std::make_unique<::TimeSteppers::RungeKutta3>(),
           number_of_radial_points}};
 
-  const std::string filename = "BoundaryCommunicationTestCceR0100.h5";
+  const std::string filename = "H5BoundaryCommunicationTestCceR0100.h5";
   // create the test file, because on initialization the manager will need to
   // get basic data out of the file
 
@@ -189,15 +192,18 @@ SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.Actions.BoundaryCommunication",
   const double end_time = std::numeric_limits<double>::quiet_NaN();
   const double target_step_size = 0.01 * value_dist(gen);
   const size_t buffer_size = 5;
+  const size_t scri_plus_interpolation_order = 3;
 
   runner.set_phase(test_metavariables::Phase::Initialization);
   ActionTesting::emplace_component<evolution_component>(
       &runner, 0, start_time,
-      InitializationTags::EndTime::create_from_options(end_time, filename),
-      target_step_size);
+      InitializationTags::EndTime::create_from_options<test_metavariables>(
+          end_time, filename),
+      target_step_size, scri_plus_interpolation_order);
   ActionTesting::emplace_component<worldtube_component>(
       &runner, 0,
-      InitializationTags::H5WorldtubeBoundaryDataManager::create_from_options(
+      InitializationTags::H5WorldtubeBoundaryDataManager::create_from_options<
+          test_metavariables>(
           l_max, filename, buffer_size,
           std::make_unique<intrp::BarycentricRationalSpanInterpolator>(3u,
                                                                        4u)));

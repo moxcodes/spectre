@@ -7,14 +7,11 @@
 #include <limits>
 
 #include "Evolution/Systems/Cce/ReadBoundaryDataH5.hpp"
+#include "Evolution/Systems/Cce/WorldtubeInterfaceManager.hpp"
 #include "NumericalAlgorithms/Interpolation/SpanInterpolator.hpp"
 #include "Options/Options.hpp"
 
 namespace Cce {
-/// \cond
-class Interpolator;
-/// \endcond
-
 namespace OptionTags {
 
 /// %Option group
@@ -68,6 +65,12 @@ struct NumberOfRadialPoints {
   using group = Cce;
 };
 
+struct ExtractionRadius {
+  using type = double;
+  static constexpr OptionString help{"Extraction radius from the GH system."};
+  using group = Cce;
+};
+
 struct EndTime {
   using type = double;
   static constexpr OptionString help{"End time for the Cce Evolution."};
@@ -109,9 +112,16 @@ struct H5LookaheadTimes {
 };
 
 struct H5Interpolator {
-  using type = std::unique_ptr<Interpolator>;
+  using type = std::unique_ptr<intrp::SpanInterpolator>;
   static constexpr OptionString help{
       "The interpolator for imported h5 worldtube data."};
+  using group = Cce;
+};
+
+struct GHInterfaceManager {
+  using type = std::unique_ptr<GHWorldtubeInterfaceManager>;
+  static constexpr OptionString help{
+      "Class to manage worldtube data from a GH system."};
   using group = Cce;
 };
 
@@ -122,6 +132,15 @@ struct ScriInterpolationOrder {
   static size_t default_value() noexcept { return 5; }
   using group = Cce;
 };
+
+struct ScriOutputDensity {
+  using type = size_t;
+  static constexpr OptionString help{
+      "Number of scri output points per timestep."};
+  static size_t default_value() noexcept { return 1; }
+  using group = Cce;
+};
+
 }  // namespace OptionTags
 
 namespace InitializationTags {
@@ -132,6 +151,7 @@ struct H5WorldtubeBoundaryDataManager : db::SimpleTag {
       tmpl::list<OptionTags::LMax, OptionTags::BoundaryDataFilename,
                  OptionTags::H5LookaheadTimes, OptionTags::H5Interpolator>;
 
+  template <typename Metavariables>
   static WorldtubeDataManager create_from_options(
       const size_t l_max, const std::string& filename,
       const size_t number_of_lookahead_times,
@@ -142,19 +162,33 @@ struct H5WorldtubeBoundaryDataManager : db::SimpleTag {
   }
 };
 
-struct LMax : db::SimpleTag {
+struct GHInterfaceManager : db::SimpleTag {
+  using type = std::unique_ptr<GHWorldtubeInterfaceManager>;
+  using option_tags = tmpl::list<OptionTags::GHInterfaceManager>;
+
+  template <typename Metavariables>
+  static std::unique_ptr<::Cce::GHWorldtubeInterfaceManager>
+  create_from_options(const std::unique_ptr<::Cce::GHWorldtubeInterfaceManager>&
+                          interface_handler) noexcept {
+    return interface_handler->get_clone();
+  }
+};
+
+struct LMax : Spectral::Swsh::Tags::LMax {
   using type = size_t;
   using option_tags = tmpl::list<OptionTags::LMax>;
 
+  template <typename Metavariables>
   static size_t create_from_options(const size_t l_max) noexcept {
     return l_max;
   }
 };
 
-struct NumberOfRadialPoints : db::SimpleTag {
+struct NumberOfRadialPoints : Spectral::Swsh::Tags::NumberOfRadialPoints {
   using type = size_t;
   using option_tags = tmpl::list<OptionTags::NumberOfRadialPoints>;
 
+  template <typename Metavariables>
   static size_t create_from_options(
       const size_t number_of_radial_points) noexcept {
     return number_of_radial_points;
@@ -166,6 +200,7 @@ struct StartTime : db::SimpleTag {
   using option_tags =
       tmpl::list<OptionTags::StartTime, OptionTags::BoundaryDataFilename>;
 
+  template <typename Metavariables>
   static double create_from_options(double start_time,
                                     const std::string& filename) noexcept {
     if (start_time == -std::numeric_limits<double>::infinity()) {
@@ -177,10 +212,22 @@ struct StartTime : db::SimpleTag {
   }
 };
 
+struct ScriInterpolationOrder : db::SimpleTag {
+  using type = size_t;
+  using option_tags = tmpl::list<OptionTags::ScriInterpolationOrder>;
+
+  template <typename Metavariables>
+  static size_t create_from_options(
+      const size_t scri_plus_interpolation_order) noexcept {
+    return scri_plus_interpolation_order;
+  }
+};
+
 struct TargetStepSize : db::SimpleTag {
   using type = double;
   using option_tags = tmpl::list<OptionTags::TargetStepSize>;
 
+  template <typename Metavariables>
   static double create_from_options(const double target_step_size) noexcept {
     return target_step_size;
   }
@@ -191,6 +238,7 @@ struct EndTime : db::SimpleTag {
   using option_tags =
       tmpl::list<OptionTags::EndTime, OptionTags::BoundaryDataFilename>;
 
+  template <typename Metavariables>
   static double create_from_options(double end_time,
                                     const std::string& filename) {
     if (end_time == std::numeric_limits<double>::infinity()) {
@@ -201,13 +249,44 @@ struct EndTime : db::SimpleTag {
     return end_time;
   }
 };
+
+struct ExtractionRadius : db::SimpleTag {
+  using type = double;
+  using option_tags = tmpl::list<OptionTags::ExtractionRadius>;
+
+  template <typename Metavariables>
+  static double create_from_options(const double extraction_radius) noexcept {
+    return extraction_radius;
+  }
+};
+
+struct ScriOutputDensity : db::SimpleTag {
+  using type = size_t;
+  using option_tags = tmpl::list<OptionTags::ScriOutputDensity>;
+
+  template <typename Metavariables>
+  static size_t create_from_options(const size_t scri_output_density) noexcept {
+    return scri_output_density;
+  }
+};
 }  // namespace InitializationTags
 
 namespace Tags {
+struct ObservationLMax : db::SimpleTag {
+  using type = size_t;
+  using option_tags = tmpl::list<OptionTags::ObservationLMax>;
+
+  template <typename Metavariables>
+  static size_t create_from_options(const size_t observation_l_max) noexcept {
+    return observation_l_max;
+  }
+};
+
 struct FilterLMax : db::SimpleTag {
   using type = size_t;
   using option_tags = tmpl::list<OptionTags::FilterLMax>;
 
+  template <typename Metavariables>
   static size_t create_from_options(const size_t filter_l_max) noexcept {
     return filter_l_max;
   }
@@ -217,6 +296,7 @@ struct RadialFilterAlpha : db::SimpleTag {
   using type = double;
   using option_tags = tmpl::list<OptionTags::RadialFilterAlpha>;
 
+  template <typename Metavariables>
   static double create_from_options(const double radial_filter_alpha) noexcept {
     return radial_filter_alpha;
   }
@@ -226,6 +306,7 @@ struct RadialFilterHalfPower : db::SimpleTag {
   using type = size_t;
   using option_tags = tmpl::list<OptionTags::RadialFilterHalfPower>;
 
+  template <typename Metavariables>
   static size_t create_from_options(
       const size_t radial_filter_half_power) noexcept {
     return radial_filter_half_power;
