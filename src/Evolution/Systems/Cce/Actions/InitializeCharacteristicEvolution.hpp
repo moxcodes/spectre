@@ -106,11 +106,8 @@ struct InitializeCharacteristicEvolution {
         db::add_tag_prefix<::Tags::dt, evolved_swsh_variables_tag>;
     using evolution_simple_tags = db::AddSimpleTags<
         ::Tags::TimeStepId, ::Tags::Next<::Tags::TimeStepId>, ::Tags::TimeStep,
-        ::Tags::Time,
-        ::Tags::HistoryEvolvedVariables<coordinate_variables_tag,
-                                        dt_coordinate_variables_tag>,
-        ::Tags::HistoryEvolvedVariables<evolved_swsh_variables_tag,
-                                        evolved_swsh_dt_variables_tag>>;
+        ::Tags::Time, ::Tags::HistoryEvolvedVariables<coordinate_variables_tag>,
+        ::Tags::HistoryEvolvedVariables<evolved_swsh_variables_tag>>;
 
     using evolution_compute_tags =
         db::AddComputeTags<::Tags::SubstepTimeCompute>;
@@ -135,8 +132,7 @@ struct InitializeCharacteristicEvolution {
       db::item_type<::Tags::HistoryEvolvedVariables<coordinate_variables_tag>>
           coordinate_history;
 
-      db::item_type<::Tags::HistoryEvolvedVariables<
-          evolved_swsh_variables_tag, evolved_swsh_dt_variables_tag>>
+      db::item_type<::Tags::HistoryEvolvedVariables<evolved_swsh_variables_tag>>
           swsh_history;
 
       return Initialization::merge_into_databox<
