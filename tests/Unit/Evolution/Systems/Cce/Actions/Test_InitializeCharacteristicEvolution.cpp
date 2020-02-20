@@ -184,11 +184,8 @@ SPECTRE_TEST_CASE(
                                                                       0);
   CHECK(coordinates_history.size() == 0);
   const auto& evolved_swsh_history = ActionTesting::get_databox_tag<
-      component, ::Tags::HistoryEvolvedVariables<
-                     ::Tags::Variables<
-                         tmpl::list<typename metavariables::evolved_swsh_tag>>,
-                     ::Tags::dt<::Tags::Variables<tmpl::list<
-                         typename metavariables::evolved_swsh_dt_tag>>>>>(
+      component, ::Tags::HistoryEvolvedVariables<::Tags::Variables<
+                     tmpl::list<typename metavariables::evolved_swsh_tag>>>>(
       runner, 0);
   CHECK(evolved_swsh_history.size() == 0);
 
