@@ -15,6 +15,7 @@
 #include "NumericalAlgorithms/Interpolation/Tags.hpp"
 #include "NumericalAlgorithms/Interpolation/TryToInterpolate.hpp"
 #include "Parallel/ConstGlobalCache.hpp"
+#include "Parallel/Printf.hpp"
 #include "Utilities/Gsl.hpp"
 #include "Utilities/TMPL.hpp"
 #include "Utilities/TaggedTuple.hpp"
@@ -95,6 +96,33 @@ struct InterpolatorReceiveVolumeData {
       try_to_interpolate<tag>(make_not_null(&box), make_not_null(&cache),
                               temporal_id);
     });
+
+    // The following is output for debugging.
+    size_t volume_data_allocated = 0;
+    const auto& volume_info = db::get<Tags::VolumeVarsInfo<Metavariables>>(box);
+    for(const auto& time_id: volume_info) {
+      for(const auto& elem_id: time_id.second) {
+        volume_data_allocated += elem_id.second.vars.size();
+      }
+    }
+    size_t interp_data_allocated = 0;
+    const auto& holders =
+        db::get<Tags::InterpolatedVarsHolders<Metavariables>>(box);
+    tmpl::for_each<typename Metavariables::interpolation_target_tags>([&](
+        auto tag) noexcept {
+      using Tag = typename decltype(tag)::type;
+      const auto& holder = get<Vars::HolderTag<Tag, Metavariables>>(holders);
+      for (const auto& info : holder.infos) {
+        for (const auto& var: info.second.vars) {
+          interp_data_allocated += var.size();
+        }
+      }
+    });
+    Parallel::printf(
+        "Proc %zu node %zu: End of InterpolatorReceiveVolumeData: volume "
+        "holds %zu doubles, interp holds %zu doubles\n",
+        Parallel::my_proc(), Parallel::my_node(), volume_data_allocated,
+        interp_data_allocated);
   }
 };
 
