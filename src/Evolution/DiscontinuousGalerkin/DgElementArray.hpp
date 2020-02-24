@@ -16,6 +16,7 @@
 #include "Parallel/ConstGlobalCache.hpp"
 #include "Parallel/Info.hpp"
 #include "Parallel/ParallelComponentHelpers.hpp"
+#include "Parallel/Printf.hpp"
 #include "Utilities/TMPL.hpp"
 #include "Utilities/TaggedTuple.hpp"
 
