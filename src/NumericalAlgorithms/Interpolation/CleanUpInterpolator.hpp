@@ -4,11 +4,14 @@
 #pragma once
 
 #include <cstddef>
+#include <sstream>
 
 #include "DataStructures/DataBox/DataBox.hpp"
 #include "DataStructures/DataBox/DataBoxTag.hpp"
-#include "Domain/Tags.hpp" // IWYU pragma: keep
+#include "Domain/Tags.hpp"  // IWYU pragma: keep
+#include "Parallel/Info.hpp"
 #include "Utilities/Gsl.hpp"
+#include "Utilities/PrettyType.hpp"
 #include "Utilities/Requires.hpp"
 #include "Utilities/TMPL.hpp"
 #include "Utilities/TaggedTuple.hpp"
@@ -138,10 +141,15 @@ struct CleanUpInterpolator {
         }
       }
     });
+    std::ostringstream oss;
+    oss << temporal_id;
     Parallel::printf(
-        "Proc %zu node %zu: End of CleanUpInterpolator: volume "
-        "holds %zu doubles, interp holds %zu doubles\n",
-        Parallel::my_proc(), Parallel::my_node(), volume_data_allocated,
+        "Proc %zu node %zu: End of CleanUpInterpolator for tag %s, time %s: "
+        "volume holds %zu doubles, interp holds %zu doubles\n",
+        Parallel::my_proc(), Parallel::my_node(),
+        pretty_type::short_name<InterpolationTargetTag>(),
+        oss.str(),
+        volume_data_allocated,
         interp_data_allocated);
   }
 };
