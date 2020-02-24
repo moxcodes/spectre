@@ -77,6 +77,10 @@ void DgElementArray<Metavariables, PhaseDepActionList>::allocate_array(
     int which_proc = 0;
     const int number_of_procs = Parallel::number_of_procs();
     for (size_t i = 0; i < element_ids.size(); ++i) {
+      Parallel::printf(
+          "Proc %zu node %zu: In DgElementArray, num procs= %d, which_proc=%d",
+          Parallel::my_proc(), Parallel::my_node(), number_of_procs,
+          which_proc);
       dg_element_array(ElementIndex<volume_dim>(element_ids[i]))
           .insert(global_cache, initialization_items, which_proc);
       which_proc = which_proc + 1 == number_of_procs ? 0 : which_proc + 1;
