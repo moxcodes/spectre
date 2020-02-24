@@ -11,8 +11,11 @@
 #include "NumericalAlgorithms/Interpolation/IrregularInterpolant.hpp"
 #include "NumericalAlgorithms/Interpolation/Tags.hpp"
 #include "Parallel/ConstGlobalCache.hpp"
+#include "Parallel/Info.hpp"
 #include "Parallel/Invoke.hpp"
+#include "Parallel/Printf.hpp"
 #include "Utilities/Gsl.hpp"
+#include "Utilities/MakeString.hpp"
 #include "Utilities/TMPL.hpp"
 #include "Utilities/TaggedTuple.hpp"
 
@@ -148,6 +151,14 @@ void try_to_interpolate(
     // Send data to InterpolationTarget, but only if the list of points is
     // non-empty.
     if (not vars_infos.at(temporal_id).global_offsets.empty()) {
+
+      Parallel::printf(
+          "Proc %zu node %zu: Calling InterpolationTargetReceiveVars for tag "
+          "%s, time %s: ",
+          Parallel::my_proc(), Parallel::my_node(),
+          pretty_type::short_name<InterpolationTargetTag>(),
+          MakeString() << temporal_id);
+
       const auto& info = vars_infos.at(temporal_id);
       auto& receiver_proxy = Parallel::get_parallel_component<
           InterpolationTarget<Metavariables, InterpolationTargetTag>>(*cache);

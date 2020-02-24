@@ -12,8 +12,12 @@
 #include "DataStructures/DataBox/DataBox.hpp"
 #include "DataStructures/DataBox/DataBoxTag.hpp"
 #include "Parallel/ConstGlobalCache.hpp"
+#include "Parallel/Info.hpp"
 #include "Parallel/Invoke.hpp"
+#include "Parallel/Printf.hpp"
 #include "Utilities/Gsl.hpp"
+#include "Utilities/MakeString.hpp"
+#include "Utilities/PrettyType.hpp"
 #include "Utilities/Requires.hpp"
 #include "Utilities/TMPL.hpp"
 #include "Utilities/TaggedTuple.hpp"
@@ -146,6 +150,12 @@ void callback_and_cleanup(
   // of the points might be outside of the Domain.
   fill_invalid_points<InterpolationTargetTag>(box);
 
+  Parallel::printf(
+      "Proc %zu node %zu: Before apply_callback for tag %s, time %s: ",
+      Parallel::my_proc(), Parallel::my_node(),
+      pretty_type::short_name<InterpolationTargetTag>(),
+      MakeString() << temporal_id);
+
   // apply_callback should return true if we are done with this
   // temporal_id.  It should return false only if the callback
   // calls another `intrp::Action` that needs the volume data at this
@@ -153,6 +163,12 @@ void callback_and_cleanup(
   // clean up.
   const bool done_with_temporal_id =
       apply_callback<InterpolationTargetTag>(box, cache, temporal_id);
+
+  Parallel::printf(
+      "Proc %zu node %zu: After apply_callback for tag %s, time %s: done=%d",
+      Parallel::my_proc(), Parallel::my_node(),
+      pretty_type::short_name<InterpolationTargetTag>(),
+      MakeString() << temporal_id, done_with_temporal_id);
 
   if (not done_with_temporal_id) {
     return;
