@@ -9,6 +9,7 @@
 #include "Evolution/Systems/Cce/Tags.hpp"
 #include "Parallel/ConstGlobalCache.hpp"
 #include "Parallel/Invoke.hpp"
+#include "Parallel/Printf.hpp"
 #include "Time/Tags.hpp"
 #include "Time/TimeStepId.hpp"
 
@@ -41,6 +42,8 @@ struct ExitIfEndTimeReached {
                     const ArrayIndex& /*array_index*/,
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
+    Parallel::printf("Cce at time: %f\n",
+                     db::get<::Tags::TimeStepId>(box).substep_time().value());
     return std::tuple<db::DataBox<DbTags>&&, bool>(
         std::move(box),
         db::get<::Tags::TimeStepId>(box).substep_time().value() >=

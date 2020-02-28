@@ -16,7 +16,7 @@ Evolution:
 
 Cce:
   LMax: 32
-  ExtractionRadius: 48.0
+  ExtractionRadius: 15.0
   NumberOfRadialPoints: 32
   ObservationLMax: 8
 

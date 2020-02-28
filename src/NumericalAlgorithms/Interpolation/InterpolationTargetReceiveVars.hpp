@@ -174,11 +174,11 @@ void callback_and_cleanup(
       },
       box);
 
-  Parallel::printf(
-      "Proc %zu node %zu: Before apply_callback for tag %s, time %s: ",
-      Parallel::my_proc(), Parallel::my_node(),
-      pretty_type::short_name<InterpolationTargetTag>(),
-      MakeString() << temporal_id);
+  // Parallel::printf(
+      // "Proc %zu node %zu: Before apply_callback for tag %s, time %s: ",
+      // Parallel::my_proc(), Parallel::my_node(),
+      // pretty_type::short_name<InterpolationTargetTag>(),
+      // MakeString() << temporal_id);
 
   // apply_callback should return true if we are done with this
   // temporal_id.  It should return false only if the callback
@@ -188,11 +188,11 @@ void callback_and_cleanup(
   const bool done_with_temporal_id =
       apply_callback<InterpolationTargetTag>(box, cache, temporal_id);
 
-  Parallel::printf(
-      "Proc %zu node %zu: After apply_callback for tag %s, time %s: done=%d",
-      Parallel::my_proc(), Parallel::my_node(),
-      pretty_type::short_name<InterpolationTargetTag>(),
-      MakeString() << temporal_id, done_with_temporal_id);
+  // Parallel::printf(
+      // "Proc %zu node %zu: After apply_callback for tag %s, time %s: done=%d",
+      // Parallel::my_proc(), Parallel::my_node(),
+      // pretty_type::short_name<InterpolationTargetTag>(),
+      // MakeString() << temporal_id, done_with_temporal_id);
 
   if (not done_with_temporal_id) {
     return;

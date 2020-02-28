@@ -102,7 +102,7 @@ void interpolate_data(
 
             tmpl::for_each<
                 typename InterpolationTargetTag::vars_to_interpolate_to_target>(
-                [&new_box, &local_vars](auto x) noexcept {
+                [&new_box, &local_vars ](auto x) noexcept {
                   using tag = typename decltype(x)::type;
                   get<tag>(local_vars) = db::get<tag>(new_box);
                 });
@@ -151,13 +151,12 @@ void try_to_interpolate(
     // Send data to InterpolationTarget, but only if the list of points is
     // non-empty.
     if (not vars_infos.at(temporal_id).global_offsets.empty()) {
-
-      Parallel::printf(
-          "Proc %zu node %zu: Calling InterpolationTargetReceiveVars for tag "
-          "%s, time %s: ",
-          Parallel::my_proc(), Parallel::my_node(),
-          pretty_type::short_name<InterpolationTargetTag>(),
-          MakeString() << temporal_id);
+      // Parallel::printf(
+      // "Proc %zu node %zu: Calling InterpolationTargetReceiveVars for tag "
+      // "%s, time %s: ",
+      // Parallel::my_proc(), Parallel::my_node(),
+      // pretty_type::short_name<InterpolationTargetTag>(),
+      // MakeString() << temporal_id);
 
       const auto& info = vars_infos.at(temporal_id);
       auto& receiver_proxy = Parallel::get_parallel_component<

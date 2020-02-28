@@ -143,14 +143,14 @@ struct CleanUpInterpolator {
     });
     std::ostringstream oss;
     oss << temporal_id;
-    Parallel::printf(
-        "Proc %zu node %zu: End of CleanUpInterpolator for tag %s, time %s: "
-        "volume holds %zu doubles, interp holds %zu doubles\n",
-        Parallel::my_proc(), Parallel::my_node(),
-        pretty_type::short_name<InterpolationTargetTag>(),
-        oss.str(),
-        volume_data_allocated,
-        interp_data_allocated);
+    // Parallel::printf(
+        // "Proc %zu node %zu: End of CleanUpInterpolator for tag %s, time %s: "
+        // "volume holds %zu doubles, interp holds %zu doubles\n",
+        // Parallel::my_proc(), Parallel::my_node(),
+        // pretty_type::short_name<InterpolationTargetTag>(),
+        // oss.str(),
+        // volume_data_allocated,
+        // interp_data_allocated);
   }
 };
 }  // namespace Actions
