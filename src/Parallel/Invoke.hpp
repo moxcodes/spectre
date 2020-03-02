@@ -98,8 +98,29 @@ template <typename ReceiveTag, typename Proxy, typename ReceiveDataType,
               nullptr>
 void receive_data(Proxy&& proxy, typename ReceiveTag::temporal_id temporal_id,
                   ReceiveDataType&& receive_data) noexcept {
+    proxy.template receive_data<ReceiveTag>(
+        std::move(temporal_id), std::forward<ReceiveDataType>(receive_data));
+}
+
+template <typename ReceiveTag, typename Proxy, typename ReceiveDataType>
+void receive_data_with_options(Proxy&& proxy,
+                               typename ReceiveTag::temporal_id temporal_id,
+                               ReceiveDataType&& receive_data,
+                               const bool enable_if_disabled,
+                               CkEntryOptions* opts) noexcept {
   proxy.template receive_data<ReceiveTag>(
-      std::move(temporal_id), std::forward<ReceiveDataType>(receive_data));
+      std::move(temporal_id), std::forward<ReceiveDataType>(receive_data),
+      enable_if_disabled, opts);
+}
+
+template <typename ReceiveTag, typename Proxy, typename ReceiveDataType>
+void receive_data_with_options(Proxy&& proxy,
+                               typename ReceiveTag::temporal_id temporal_id,
+                               ReceiveDataType&& receive_data,
+                               CkEntryOptions* opts) noexcept {
+  proxy.template receive_data<ReceiveTag>(
+      std::move(temporal_id), std::forward<ReceiveDataType>(receive_data),
+      false, opts);
 }
 // @}
 
@@ -120,6 +141,20 @@ void simple_action(Proxy&& proxy, Arg0&& arg0, Args&&... args) noexcept {
           std::forward<Arg0>(arg0), std::forward<Args>(args)...));
 }
 // @}
+
+template <typename Action, typename Proxy>
+void simple_action_with_options(Proxy&& proxy, CkEntryOptions* opts) noexcept {
+  proxy.template simple_action<Action>(opts);
+}
+
+template <typename Action, typename Proxy, typename Arg0, typename... Args>
+void simple_action_with_options(Proxy&& proxy, CkEntryOptions* opts,
+                                Arg0&& arg0, Args&&... args) noexcept {
+  proxy.template simple_action<Action>(
+      std::tuple<std::decay_t<Arg0>, std::decay_t<Args>...>(
+          std::forward<Arg0>(arg0), std::forward<Args>(args)...),
+      opts);
+}
 
 // @{
 /*!

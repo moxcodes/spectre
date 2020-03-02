@@ -81,11 +81,15 @@ struct ReceiveGHWorldtubeData {
                                dt_spacetime_metric, dt_phi, dt_pi);
           if (const auto gh_data =
                   (*interface_manager)->try_retrieve_first_ready_gh_data()) {
-            Parallel::simple_action<Actions::SendToEvolution<
+            // this is part of a two-way communication pathway, so promote its
+            // priority to avoid scheduling disadvantage
+            CkEntryOptions opts;
+            opts.setPriority(-1);
+            Parallel::simple_action_with_options<Actions::SendToEvolution<
                 GHWorldtubeBoundary<Metavariables>, EvolutionComponent>>(
                 Parallel::get_parallel_component<
                     GHWorldtubeBoundary<Metavariables>>(cache),
-                get<0>(*gh_data), get<1>(*gh_data), get<2>(*gh_data),
+                &opts, get<0>(*gh_data), get<1>(*gh_data), get<2>(*gh_data),
                 get<3>(*gh_data));
           }
         });

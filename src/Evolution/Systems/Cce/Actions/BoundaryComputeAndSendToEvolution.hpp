@@ -128,11 +128,16 @@ struct BoundaryComputeAndSendToEvolution<GHWorldtubeBoundary<Metavariables>,
           (*interface_manager)->request_gh_data(time);
           if (const auto gh_data =
                   (*interface_manager)->try_retrieve_first_ready_gh_data()) {
-            Parallel::simple_action<Actions::SendToEvolution<
+            // this is part of a two-way communication pathway, so promote its
+            // priority to avoid scheduling disadvantage
+            CkEntryOptions opts;
+            opts.setPriority(-1);
+
+            Parallel::simple_action_with_options<Actions::SendToEvolution<
                 GHWorldtubeBoundary<Metavariables>, EvolutionComponent>>(
                 Parallel::get_parallel_component<
                     GHWorldtubeBoundary<Metavariables>>(cache),
-                get<0>(*gh_data), get<1>(*gh_data), get<2>(*gh_data),
+                &opts, get<0>(*gh_data), get<1>(*gh_data), get<2>(*gh_data),
                 get<3>(*gh_data));
           }
         });
@@ -173,12 +178,17 @@ struct SendToEvolution<GHWorldtubeBoundary<Metavariables>, EvolutionComponent> {
         make_not_null(&box), phi, pi, spacetime_metric,
         Parallel::get<InitializationTags::ExtractionRadius>(cache),
         Parallel::get<Spectral::Swsh::Tags::LMax>(cache));
-    Parallel::receive_data<Cce::ReceiveTags::BoundaryData<
-      typename Metavariables::cce_boundary_communication_tags>>(
-          Parallel::get_parallel_component<EvolutionComponent>(cache), time,
-          db::get<::Tags::Variables<
-          typename Metavariables::cce_boundary_communication_tags>>(box),
-          true);
+    // this is part of a two-way communication pathway, so promote its
+    // priority to avoid scheduling disadvantage
+    CkEntryOptions opts;
+    opts.setPriority(-1);
+
+    Parallel::receive_data_with_options<Cce::ReceiveTags::BoundaryData<
+        typename Metavariables::cce_boundary_communication_tags>>(
+        Parallel::get_parallel_component<EvolutionComponent>(cache), time,
+        db::get<::Tags::Variables<
+            typename Metavariables::cce_boundary_communication_tags>>(box),
+        true, &opts);
   }
 };
 

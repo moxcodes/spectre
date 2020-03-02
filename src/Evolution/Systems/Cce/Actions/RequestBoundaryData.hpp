@@ -51,10 +51,15 @@ struct RequestBoundaryData {
                     const ArrayIndex& /*array_index*/,
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
-    Parallel::simple_action<Actions::BoundaryComputeAndSendToEvolution<
-        WorldtubeBoundaryComponent, EvolutionComponent>>(
+    // this is part of a two-way communication pathway, so promote its
+    // priority to avoid scheduling disadvantage
+    CkEntryOptions opts;
+    opts.setPriority(-1);
+    Parallel::simple_action_with_options<
+        Actions::BoundaryComputeAndSendToEvolution<WorldtubeBoundaryComponent,
+                                                   EvolutionComponent>>(
         Parallel::get_parallel_component<WorldtubeBoundaryComponent>(cache),
-        db::get<::Tags::TimeStepId>(box));
+        &opts, db::get<::Tags::TimeStepId>(box));
     return std::forward_as_tuple(std::move(box));
   }
 };
@@ -94,10 +99,15 @@ struct RequestNextBoundaryData {
     // only request the data if the next step is not after the end time.
     if (db::get<::Tags::Next<::Tags::TimeStepId>>(box).substep_time().value() <
         db::get<Tags::EndTime>(box)) {
-      Parallel::simple_action<Actions::BoundaryComputeAndSendToEvolution<
-          WorldtubeBoundaryComponent, EvolutionComponent>>(
+      // this is part of a two-way communication pathway, so promote its
+      // priority to avoid scheduling disadvantage
+      CkEntryOptions opts;
+      opts.setPriority(-1);
+      Parallel::simple_action_with_options<
+          Actions::BoundaryComputeAndSendToEvolution<WorldtubeBoundaryComponent,
+                                                     EvolutionComponent>>(
           Parallel::get_parallel_component<WorldtubeBoundaryComponent>(cache),
-          db::get<::Tags::Next<::Tags::TimeStepId>>(box));
+          &opts, db::get<::Tags::Next<::Tags::TimeStepId>>(box));
     }
     return std::forward_as_tuple(std::move(box));
   }
