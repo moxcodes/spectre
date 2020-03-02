@@ -71,7 +71,7 @@ void DgElementArray<Metavariables, PhaseDepActionList>::allocate_array(
   const auto& domain = Parallel::get<::Tags::Domain<volume_dim>>(local_cache);
   const auto& initial_refinement_levels =
       get<::Tags::InitialRefinementLevels<volume_dim>>(initialization_items);
-  int which_proc = 0;
+  int which_proc = 3;
   for (const auto& block : domain.blocks()) {
     const auto initial_ref_levs = initial_refinement_levels[block.id()];
     const std::vector<ElementId<volume_dim>> element_ids =

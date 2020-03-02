@@ -104,7 +104,8 @@ struct H5WorldtubeBoundary {
  */
 template <class Metavariables>
 struct GHWorldtubeBoundary {
-  using chare_type = Parallel::Algorithms::Singleton;
+  using chare_type = Parallel::Algorithms::Array;
+  using array_index = int;
   using metavariables = Metavariables;
   using initialize_action_list =
       tmpl::list<Actions::InitializeGHWorldtubeBoundary,
@@ -130,6 +131,16 @@ struct GHWorldtubeBoundary {
 
   static void initialize(Parallel::CProxy_ConstGlobalCache<
                          Metavariables>& /*global_cache*/) noexcept {}
+
+  static void allocate_array(
+      Parallel::CProxy_ConstGlobalCache<Metavariables>& global_cache,
+      const tuples::tagged_tuple_from_typelist<initialization_tags>&
+      initialization_items) noexcept {
+    auto& local_cache = *(global_cache.ckLocalBranch());
+    auto& element_array =
+        Parallel::get_parallel_component<GHWorldtubeBoundary>(local_cache);
+    element_array[0].insert(global_cache, initialization_items, 2);
+  }
 
   static void execute_next_phase(
       const typename Metavariables::Phase next_phase,
