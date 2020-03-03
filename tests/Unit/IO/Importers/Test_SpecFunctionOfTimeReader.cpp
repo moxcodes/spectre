@@ -5,9 +5,9 @@
 
 #include <array>
 #include <cstddef>
+#include <map>
 #include <string>
 #include <unordered_map>
-#include <vector>
 
 #include "DataStructures/DataBox/DataBox.hpp"
 #include "DataStructures/DataBox/DataBoxTag.hpp"
@@ -18,8 +18,8 @@
 #include "Domain/FunctionsOfTime/FunctionOfTime.hpp"
 #include "Domain/FunctionsOfTime/PiecewisePolynomial.hpp"
 #include "Domain/FunctionsOfTime/Tags.hpp"
-#include "Evolution/Initialization/FunctionOfTimeFromFile.hpp"
-#include "Evolution/Initialization/Tags.hpp"
+#include "IO/Importers/SpecFunctionOfTimeReader.hpp"
+#include "IO/Importers/Tags.hpp"
 #include "Informer/InfoFromBuild.hpp"
 #include "Options/Options.hpp"
 #include "Options/ParseOptions.hpp"
@@ -31,22 +31,21 @@
 
 namespace {
 constexpr size_t dim = 2;
-using ElementIndexType = ElementIndex<dim>;
 
 template <typename Metavariables>
 struct component {
   using metavariables = Metavariables;
   using chare_type = ActionTesting::MockArrayChare;
-  using array_index = ElementIndexType;
-  using simple_tags = tmpl::list<Initialization::Tags::FuncOfTimeFile,
-                                 Initialization::Tags::FuncOfTimeSetNames>;
+  using array_index = size_t;
+  using simple_tags = tmpl::list<importers::Tags::FuncOfTimeFile,
+                                 importers::Tags::FuncOfTimeNameMap>;
   using phase_dependent_action_list = tmpl::list<
       Parallel::PhaseActions<
           typename Metavariables::Phase, Metavariables::Phase::Initialization,
           tmpl::list<ActionTesting::InitializeDataBox<simple_tags>>>,
       Parallel::PhaseActions<
           typename Metavariables::Phase, Metavariables::Phase::Testing,
-          tmpl::list<Initialization::Actions::FunctionOfTimeFromFile>>>;
+          tmpl::list<importers::Actions::SpecFunctionOfTimeReader>>>;
 };
 
 struct Metavariables {
@@ -55,37 +54,34 @@ struct Metavariables {
 };
 
 void test_options() noexcept {
-  CHECK(db::tag_name<Initialization::Tags::FuncOfTimeFile>() ==
-        "FuncOfTimeFile");
-  CHECK(db::tag_name<Initialization::Tags::FuncOfTimeSetNames>() ==
-        "FuncOfTimeSetNames");
+  CHECK(db::tag_name<importers::Tags::FuncOfTimeFile>() == "FuncOfTimeFile");
+  CHECK(db::tag_name<importers::Tags::FuncOfTimeNameMap>() ==
+        "FuncOfTimeNameMap");
 
   const std::string option_string{
-      "FuncOfTimeFromFile:\n"
+      "SpecFuncOfTimeReader:\n"
       "  FuncOfTimeFile: TestFile.h5\n"
-      "  FuncOfTimeSetNames: [[Set1, Name1], [Set2, Name2]]"};
-  using option_tags =
-      tmpl::list<Initialization::OptionTags::FuncOfTimeFile,
-                 Initialization::OptionTags::FuncOfTimeSetNames>;
+      "  FuncOfTimeNameMap: {Set1: Name1, Set2: Name2}"};
+  using option_tags = tmpl::list<importers::OptionTags::FuncOfTimeFile,
+                                 importers::OptionTags::FuncOfTimeNameMap>;
   Options<option_tags> options{""};
   options.parse(option_string);
-  CHECK(options.get<Initialization::OptionTags::FuncOfTimeFile>() ==
-        "TestFile.h5");
+  CHECK(options.get<importers::OptionTags::FuncOfTimeFile>() == "TestFile.h5");
   const auto& set_names =
-      options.get<Initialization::OptionTags::FuncOfTimeSetNames>();
-  const std::vector<std::array<std::string, 2>> expected_set_names{
-      {{{"Set1", "Name1"}}, {{"Set2", "Name2"}}}};
+      options.get<importers::OptionTags::FuncOfTimeNameMap>();
+  const std::map<std::string, std::string> expected_set_names{
+      {"Set1", "Name1"}, {"Set2", "Name2"}};
   CHECK(set_names == expected_set_names);
 }
 }  // namespace
 
-SPECTRE_TEST_CASE("Unit.Evolution.FunctionOfTimeFromFile",
+SPECTRE_TEST_CASE("Unit.Evolution.SpecFunctionOfTimeReader",
                   "[Unit][Evolution][Actions]") {
   test_options();
 
   using MockRuntimeSystem = ActionTesting::MockRuntimeSystem<Metavariables>;
 
-  const ElementId<dim> self_id(1);
+  const size_t self_id{1};
 
   MockRuntimeSystem runner{{}};
   ActionTesting::emplace_component_and_initialize<component<Metavariables>>(
@@ -93,9 +89,9 @@ SPECTRE_TEST_CASE("Unit.Evolution.FunctionOfTimeFromFile",
       {std::string{
            unit_test_path() +
            "/Evolution/Initialization/FunctionOfTimeFromFile_TestData.h5"},
-       std::vector<std::array<std::string, 2>>{
-           {{{"ExpansionFactor", "ExpansionFactor"}},
-            {{"RotationAngle", "RotationAngle"}}}}});
+       std::map<std::string, std::string>{
+           {"ExpansionFactor", "ExpansionFactor"},
+           {"RotationAngle", "RotationAngle"}}});
   runner.set_phase(Metavariables::Phase::Testing);
   runner.next_action<component<Metavariables>>(self_id);
 
@@ -137,4 +133,3 @@ SPECTRE_TEST_CASE("Unit.Evolution.FunctionOfTimeFromFile",
     }
   }
 }
-

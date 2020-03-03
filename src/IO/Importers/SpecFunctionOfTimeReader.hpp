@@ -17,10 +17,10 @@
 #include "Domain/FunctionsOfTime/PiecewisePolynomial.hpp"
 #include "Domain/FunctionsOfTime/Tags.hpp"
 #include "ErrorHandling/Assert.hpp"
-#include "Evolution/Initialization/Tags.hpp"
 #include "IO/H5/AccessType.hpp"
 #include "IO/H5/Dat.hpp"
 #include "IO/H5/File.hpp"
+#include "IO/Importers/Tags.hpp"
 #include "Parallel/ConstGlobalCache.hpp"
 #include "ParallelAlgorithms/Initialization/MergeIntoDataBox.hpp"
 #include "Utilities/Gsl.hpp"
@@ -28,25 +28,20 @@
 #include "Utilities/TMPL.hpp"
 #include "Utilities/TaggedTuple.hpp"
 
-namespace Initialization {
+namespace importers {
 namespace Actions {
-/// \ingroup InitializationGroup
-/// \brief Initialize a `FunctionsOfTime` from dat files in an
-/// H5 file.
+/// \brief Import SpEC `FunctionOfTime` data from an H5 file.
 ///
 /// Uses:
 ///  - DataBox:
-///    - `Initialization::Tags::FuncOfTimeFile`
-///    - `Initialization::Tags::FuncOfTimeSetNames`
+///    - `importers::Tags::FuncOfTimeFile`
+///    - `importers::Tags::FuncOfTimeNameMap`
 ///
 /// DataBox changes:
-/// - Adds:
-///   - `::domain::Tags::FunctionsOfTime`. This tag contains a `FunctionOfTime`
-///   for each dat file read from the H5 file
-///
+/// - Adds: nothing
 /// - Removes: nothing
-/// - Modifies: nothing
-///
+/// - Modifies:
+///   - `::domain::Tags::FunctionsOfTime`
 ///
 /// Columns in the file to be read must have the following form:
 ///   - 0 = time
@@ -63,34 +58,30 @@ namespace Actions {
 /// the first component and its derivatives, columns 9-12 give the second
 /// component and its derivatives, etc.
 ///
-struct FunctionOfTimeFromFile {
+struct SpecFunctionOfTimeReader {
   template <
       typename DbTagsList, typename... InboxTags, typename Metavariables,
       typename ArrayIndex, typename ActionList, typename ParallelComponent,
-      Requires<
-          db::tag_is_retrievable_v<Initialization::Tags::FuncOfTimeFile,
-                                   db::DataBox<DbTagsList>> and
-          db::tag_is_retrievable_v<Initialization::Tags::FuncOfTimeSetNames,
-                                   db::DataBox<DbTagsList>>> = nullptr>
+      Requires<db::tag_is_retrievable_v<importers::Tags::FuncOfTimeFile,
+                                        db::DataBox<DbTagsList>> and
+               db::tag_is_retrievable_v<importers::Tags::FuncOfTimeNameMap,
+                                        db::DataBox<DbTagsList>>> = nullptr>
   static auto apply(db::DataBox<DbTagsList>& box,
                     const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
                     const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
                     const ArrayIndex& /*array_index*/,
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
-    const auto& file_name{
-        db::get<Initialization::Tags::FuncOfTimeFile>(box)};
+    const auto& file_name{db::get<importers::Tags::FuncOfTimeFile>(box)};
 
-    // Each element of dataset_names has two elements:
-    // element 0 is the dataset name in the h5 file,
-    // and element 1 is the name used in the std::unordered_map that
-    // will store the corresponding read-in function of time
-    const std::vector<std::array<std::string, 2>>& dataset_names{
-        db::get<Initialization::Tags::FuncOfTimeSetNames>(box)};
+    // Get the map of SpEC -> SpECTRE FunctionofTime names
+    const std::map<std::string, std::string>& dataset_name_map{
+        db::get<importers::Tags::FuncOfTimeNameMap>(box)};
 
-    // Currently, only support order 3 piecewise polynomials
+    // Currently, only support order 3 piecewise polynomials.
     // This could be generalized later, but the SpEC functions of time
-    // that we will read in with this action always use max_deriv = 3
+    // that we will read in with this action will always be 3rd-order
+    // piecewise polynomials
     constexpr size_t max_deriv{3};
 
     std::unordered_map<std::string,
@@ -98,10 +89,10 @@ struct FunctionOfTimeFromFile {
         functions_of_time;
 
     h5::H5File<h5::AccessType::ReadOnly> file(file_name);
-    for (auto dataset_name : dataset_names) {
-      const auto& dataset = dataset_name[0];
-      const auto& name = dataset_name[1];
-      const auto& dat_file = file.get<h5::Dat>("/" + dataset);
+    for (auto spec_and_spectre_names : dataset_name_map) {
+      const auto& spec_name = std::get<0>(spec_and_spectre_names);
+      const auto& spectre_name = std::get<1>(spec_and_spectre_names);
+      const auto& dat_file = file.get<h5::Dat>("/" + spec_name);
       const auto& dat_data = dat_file.get_data();
 
       // Check that the data in the file uses deriv order 3
@@ -129,8 +120,9 @@ struct FunctionOfTimeFromFile {
               dat_data(0, 5 + (max_deriv + 1) * component + deriv_order);
         }
       }
-      functions_of_time[name] = domain::FunctionsOfTime::PiecewisePolynomial<3>(
-          start_time, initial_coefficients);
+      functions_of_time[spectre_name] =
+          domain::FunctionsOfTime::PiecewisePolynomial<3>(start_time,
+                                                          initial_coefficients);
 
       // Loop over the remaining times, updating the function of time
       DataVector highest_derivative(number_of_components);
@@ -139,7 +131,8 @@ struct FunctionOfTimeFromFile {
           highest_derivative[a] =
               dat_data(row, 4 + (max_deriv + 1) * a + max_deriv);
         }
-        functions_of_time[name].update(dat_data(row, 1), highest_derivative);
+        functions_of_time[spectre_name].update(dat_data(row, 1),
+                                               highest_derivative);
       }
     }
 
@@ -148,17 +141,17 @@ struct FunctionOfTimeFromFile {
     std::unordered_map<std::string,
                        std::unique_ptr<domain::FunctionsOfTime::FunctionOfTime>>
         functions_of_time_for_databox;
-    for (auto dataset_name : dataset_names) {
-      const auto& name = dataset_name[1];
-      functions_of_time_for_databox[name] = std::make_unique<
+    for (auto spec_and_spectre_names : dataset_name_map) {
+      const auto& spectre_name = std::get<1>(spec_and_spectre_names);
+      functions_of_time_for_databox[spectre_name] = std::make_unique<
           domain::FunctionsOfTime::PiecewisePolynomial<max_deriv>>(
-          std::move(functions_of_time[name]));
+          std::move(functions_of_time[spectre_name]));
     }
     return std::make_tuple(::Initialization::merge_into_databox<
-                           FunctionOfTimeFromFile,
+                           SpecFunctionOfTimeReader,
                            db::AddSimpleTags<::domain::Tags::FunctionsOfTime>>(
         std::move(box), std::move(functions_of_time_for_databox)));
   }
 };
 }  // namespace Actions
-}  // namespace Initialization
+}  // namespace importers

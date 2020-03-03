@@ -5,6 +5,7 @@ set(LIBRARY "Test_DataImporter")
 
 set(LIBRARY_SOURCES
   Test_Tags.cpp
+  Test_SpecFunctionOfTimeReader.cpp
   Test_VolumeDataReaderActions.cpp
   )
 
