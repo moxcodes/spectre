@@ -176,8 +176,7 @@ struct RegisteredElements : db::SimpleTag {
 struct FuncOfTimeFile : db::SimpleTag {
   static std::string name() noexcept { return "FuncOfTimeFile"; }
   using type = std::string;
-  using option_tags =
-      tmpl::list<::importers::OptionTags::FuncOfTimeFile>;
+  using option_tags = tmpl::list<::importers::OptionTags::FuncOfTimeFile>;
   template <typename Metavariables>
   static std::string create_from_options(
       const std::string& function_of_time_file) noexcept {
@@ -197,8 +196,7 @@ struct FuncOfTimeFile : db::SimpleTag {
 struct FuncOfTimeNameMap : db::SimpleTag {
   static std::string name() noexcept { return "FuncOfTimeNameMap"; }
   using type = std::map<std::string, std::string>;
-  using option_tags =
-      tmpl::list<::importers::OptionTags::FuncOfTimeNameMap>;
+  using option_tags = tmpl::list<::importers::OptionTags::FuncOfTimeNameMap>;
   template <typename Metavariables>
   static std::map<std::string, std::string> create_from_options(
       const std::map<std::string, std::string>& dataset_names) noexcept {
