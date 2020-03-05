@@ -3,17 +3,11 @@
 
 #pragma once
 
-#include <array>
 #include <cmath>
 #include <string>
-#include <vector>
 
 #include "DataStructures/DataBox/DataBoxTag.hpp"
-#include "Domain/FunctionsOfTime/FunctionOfTime.hpp"
-#include "Domain/FunctionsOfTime/Tags.hpp"
-#include "Options/Options.hpp"
 #include "Time/Tags.hpp"
-#include "Utilities/Gsl.hpp"
 #include "Utilities/TMPL.hpp"
 #include "Utilities/TaggedTuple.hpp"
 
@@ -23,7 +17,7 @@ namespace Initialization {
 namespace Tags {
 struct InitialTime : db::SimpleTag {
   using type = double;
-  using option_tags = tmpl::list<::OptionTags::InitialTime>;
+  using option_tags = tmpl::list<OptionTags::InitialTime>;
 
   static constexpr bool pass_metavariables = false;
   static double create_from_options(const double initial_time) noexcept {
@@ -33,7 +27,7 @@ struct InitialTime : db::SimpleTag {
 
 struct InitialTimeDelta : db::SimpleTag {
   using type = double;
-  using option_tags = tmpl::list<::OptionTags::InitialTimeStep>;
+  using option_tags = tmpl::list<OptionTags::InitialTimeStep>;
 
   static constexpr bool pass_metavariables = false;
   static double create_from_options(const double initial_time_step) noexcept {
@@ -44,7 +38,7 @@ struct InitialTimeDelta : db::SimpleTag {
 template <bool UsingLocalTimeStepping>
 struct InitialSlabSize : db::SimpleTag {
   using type = double;
-  using option_tags = tmpl::list<::OptionTags::InitialSlabSize>;
+  using option_tags = tmpl::list<OptionTags::InitialSlabSize>;
 
   static constexpr bool pass_metavariables = false;
   static double create_from_options(const double initial_slab_size) noexcept {
@@ -55,7 +49,7 @@ struct InitialSlabSize : db::SimpleTag {
 template <>
 struct InitialSlabSize<false> : db::SimpleTag {
   using type = double;
-  using option_tags = tmpl::list<::OptionTags::InitialTimeStep>;
+  using option_tags = tmpl::list<OptionTags::InitialTimeStep>;
 
   static constexpr bool pass_metavariables = false;
   static double create_from_options(const double initial_time_step) noexcept {

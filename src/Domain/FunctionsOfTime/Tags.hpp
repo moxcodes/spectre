@@ -16,10 +16,6 @@
 #include "Utilities/TMPL.hpp"
 
 namespace domain {
-namespace FunctionsOfTime {
-class FunctionOfTime;
-}  // namespace FunctionsOfTime
-
 namespace Tags {
 /// The functions of time obtained from a domain creator
 template <size_t Dim>
