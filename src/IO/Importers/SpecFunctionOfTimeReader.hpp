@@ -17,6 +17,7 @@
 #include "Domain/FunctionsOfTime/PiecewisePolynomial.hpp"
 #include "Domain/FunctionsOfTime/Tags.hpp"
 #include "ErrorHandling/Assert.hpp"
+#include "ErrorHandling/Error.hpp"
 #include "IO/H5/AccessType.hpp"
 #include "IO/H5/Dat.hpp"
 #include "IO/H5/File.hpp"
@@ -65,6 +66,8 @@ struct SpecFunctionOfTimeReader {
       Requires<db::tag_is_retrievable_v<importers::Tags::FuncOfTimeFile,
                                         db::DataBox<DbTagsList>> and
                db::tag_is_retrievable_v<importers::Tags::FuncOfTimeNameMap,
+                                        db::DataBox<DbTagsList>> and
+               db::tag_is_retrievable_v<::domain::Tags::FunctionsOfTime,
                                         db::DataBox<DbTagsList>>> = nullptr>
   static auto apply(db::DataBox<DbTagsList>& box,
                     const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
@@ -86,7 +89,7 @@ struct SpecFunctionOfTimeReader {
 
     std::unordered_map<std::string,
                        domain::FunctionsOfTime::PiecewisePolynomial<max_deriv>>
-        functions_of_time;
+        spec_functions_of_time;
 
     h5::H5File<h5::AccessType::ReadOnly> file(file_name);
     for (auto spec_and_spectre_names : dataset_name_map) {
@@ -120,7 +123,7 @@ struct SpecFunctionOfTimeReader {
               dat_data(0, 5 + (max_deriv + 1) * component + deriv_order);
         }
       }
-      functions_of_time[spectre_name] =
+      spec_functions_of_time[spectre_name] =
           domain::FunctionsOfTime::PiecewisePolynomial<3>(start_time,
                                                           initial_coefficients);
 
@@ -131,26 +134,33 @@ struct SpecFunctionOfTimeReader {
           highest_derivative[a] =
               dat_data(row, 4 + (max_deriv + 1) * a + max_deriv);
         }
-        functions_of_time[spectre_name].update(dat_data(row, 1),
-                                               highest_derivative);
+        spec_functions_of_time[spectre_name].update(dat_data(row, 1),
+                                                    highest_derivative);
       }
     }
 
-    // Create an unordered map of the same type as the FunctionsOfTime tag,
-    // and then add this to the databox
-    std::unordered_map<std::string,
-                       std::unique_ptr<domain::FunctionsOfTime::FunctionOfTime>>
-        functions_of_time_for_databox;
-    for (auto spec_and_spectre_names : dataset_name_map) {
-      const auto& spectre_name = std::get<1>(spec_and_spectre_names);
-      functions_of_time_for_databox[spectre_name] = std::make_unique<
-          domain::FunctionsOfTime::PiecewisePolynomial<max_deriv>>(
-          std::move(functions_of_time[spectre_name]));
-    }
-    return std::make_tuple(::Initialization::merge_into_databox<
-                           SpecFunctionOfTimeReader,
-                           db::AddSimpleTags<::domain::Tags::FunctionsOfTime>>(
-        std::move(box), std::move(functions_of_time_for_databox)));
+    // Mutate ::domain::Tags::FunctionsOfTime, adding the imported
+    // FunctionsOfTime to it
+    db::mutate<::domain::Tags::FunctionsOfTime>(
+        make_not_null(&box),
+        [&dataset_name_map, &spec_functions_of_time](
+            const gsl::not_null<std::unordered_map<
+                std::string,
+                std::unique_ptr<domain::FunctionsOfTime::FunctionOfTime>>*>
+                functions_of_time) {
+          for (auto spec_and_spectre_names : dataset_name_map) {
+            const std::string& spectre_name =
+                std::get<1>(spec_and_spectre_names);
+            auto* piecewise_polynomial = dynamic_cast<
+                domain::FunctionsOfTime::PiecewisePolynomial<max_deriv>*>(
+                (*functions_of_time)[spectre_name].get());
+            if (piecewise_polynomial == nullptr) {
+              ERROR("piecewise_polynomial should not be nullptr\n");
+            }
+            *piecewise_polynomial = spec_functions_of_time[spectre_name];
+          }
+        });
+    return std::forward_as_tuple(std::move(box));
   }
 };
 }  // namespace Actions

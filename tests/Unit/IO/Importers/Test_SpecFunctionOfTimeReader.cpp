@@ -5,7 +5,9 @@
 
 #include <array>
 #include <cstddef>
+#include <limits>
 #include <map>
+#include <memory>
 #include <string>
 #include <unordered_map>
 
@@ -41,7 +43,8 @@ struct component {
   using chare_type = ActionTesting::MockArrayChare;
   using array_index = size_t;
   using simple_tags = tmpl::list<importers::Tags::FuncOfTimeFile,
-                                 importers::Tags::FuncOfTimeNameMap>;
+                                 importers::Tags::FuncOfTimeNameMap,
+                                 ::domain::Tags::FunctionsOfTime>;
   using phase_dependent_action_list = tmpl::list<
       Parallel::PhaseActions<
           typename Metavariables::Phase, Metavariables::Phase::Initialization,
@@ -127,11 +130,27 @@ SPECTRE_TEST_CASE("Unit.Evolution.SpecFunctionOfTimeReader",
   rotation_file.append(test_rotation);
 
   MockRuntimeSystem runner{{}};
+  std::unordered_map<std::string,
+                     std::unique_ptr<::domain::FunctionsOfTime::FunctionOfTime>>
+      initial_functions_of_time{};
+
+  const std::array<DataVector, 4> initial_coefficients{
+      {{0.0}, {0.0}, {0.0}, {0.0}}};
+  initial_functions_of_time["ExpansionFactor"] =
+      std::make_unique<domain::FunctionsOfTime::PiecewisePolynomial<3>>(
+          0.0, initial_coefficients);
+  initial_functions_of_time["RotationAngle"] =
+      std::make_unique<domain::FunctionsOfTime::PiecewisePolynomial<3>>(
+          0.0, initial_coefficients);
+
   ActionTesting::emplace_component_and_initialize<component<Metavariables>>(
       &runner, self_id,
-      {std::string{test_filename}, std::map<std::string, std::string>{
-                                       {"ExpansionFactor", "ExpansionFactor"},
-                                       {"RotationAngle", "RotationAngle"}}});
+      {std::string{test_filename},
+       std::map<std::string, std::string>{
+           {"ExpansionFactor", "ExpansionFactor"},
+           {"RotationAngle", "RotationAngle"}},
+       std::move(initial_functions_of_time)});
+
   runner.set_phase(Metavariables::Phase::Testing);
   runner.next_action<component<Metavariables>>(self_id);
 
