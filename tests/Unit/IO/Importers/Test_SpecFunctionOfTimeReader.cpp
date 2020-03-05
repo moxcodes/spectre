@@ -19,6 +19,7 @@
 #include "Domain/ElementIndex.hpp"
 #include "Domain/FunctionsOfTime/FunctionOfTime.hpp"
 #include "Domain/FunctionsOfTime/PiecewisePolynomial.hpp"
+#include "Domain/FunctionsOfTime/RegisterDerivedWithCharm.hpp"
 #include "Domain/FunctionsOfTime/Tags.hpp"
 #include "IO/H5/AccessType.hpp"
 #include "IO/H5/Dat.hpp"
@@ -83,6 +84,8 @@ void test_options() noexcept {
 
 SPECTRE_TEST_CASE("Unit.Evolution.SpecFunctionOfTimeReader",
                   "[Unit][Evolution][Actions]") {
+  domain::FunctionsOfTime::register_derived_with_charm();
+
   test_options();
 
   using MockRuntimeSystem = ActionTesting::MockRuntimeSystem<Metavariables>;
