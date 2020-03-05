@@ -208,8 +208,6 @@ SPECTRE_TEST_CASE(
   ERROR_TEST();
   domain::FunctionsOfTime::register_derived_with_charm();
 
-  test_options();
-
   using MockRuntimeSystem = ActionTesting::MockRuntimeSystem<Metavariables>;
 
   const size_t self_id{1};
@@ -224,20 +222,6 @@ SPECTRE_TEST_CASE(
 
   h5::H5File<h5::AccessType::ReadWrite> test_file(test_filename);
 
-  const std::array<std::string, 2> expected_names{
-      {"ExpansionFactor", "RotationAngle"}};
-
-  const std::vector<std::vector<double>> test_expansion{
-      {0.0, 0.0, 1.0, 3.0, 1.0, 1.0, -1.4268296756999999e-06, 0.0, 0.0},
-      {0.0, 0.0, 1.0, 3.0, 1.0, 9.9999999143902230e-01, -1.4268296756999999e-06,
-       0.0, -3.5943676411727592e-05}};
-  const std::vector<std::string> expansion_legend{
-      "Time", "TLastUpdate", "Nc",  "DerivOrder", "Version",
-      "a",    "da",          "d2a", "d3a"};
-  auto& expansion_file = test_file.insert<h5::Dat>(
-      "/" + expected_names[0], expansion_legend, version_number);
-  expansion_file.append(test_expansion);
-
   const std::vector<std::vector<double>> test_rotation{
       {0.0, 0.0, 1.0, 3.0, 1.0, 0.0, 1.3472907726000001e-02, 0.0, 0.0},
       {-1.0, -1.0, 1.0, 3.0, 1.0, 8.0837442877282155e-05,
@@ -246,7 +230,7 @@ SPECTRE_TEST_CASE(
       "Time", "TLastUpdate", "Nc",    "DerivOrder", "Version",
       "Phi",  "dPhi",        "d2Phi", "d3Phi"};
   auto& rotation_file = test_file.insert<h5::Dat>(
-      "/" + expected_names[1], rotation_legend, version_number);
+      "/RotationAngle", rotation_legend, version_number);
   rotation_file.append(test_rotation);
 
   MockRuntimeSystem runner{{}};
@@ -256,9 +240,6 @@ SPECTRE_TEST_CASE(
 
   const std::array<DataVector, 4> initial_coefficients{
       {{0.0}, {0.0}, {0.0}, {0.0}}};
-  initial_functions_of_time["ExpansionFactor"] =
-      std::make_unique<domain::FunctionsOfTime::PiecewisePolynomial<3>>(
-          0.0, initial_coefficients);
   initial_functions_of_time["RotationAngle"] =
       std::make_unique<domain::FunctionsOfTime::PiecewisePolynomial<3>>(
           0.0, initial_coefficients);
@@ -267,7 +248,6 @@ SPECTRE_TEST_CASE(
       &runner, self_id,
       {std::string{test_filename},
        std::map<std::string, std::string>{
-           {"ExpansionFactor", "ExpansionFactor"},
            {"RotationAngle", "RotationAngle"}},
        std::move(initial_functions_of_time)});
 
