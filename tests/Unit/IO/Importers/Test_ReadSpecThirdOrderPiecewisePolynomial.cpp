@@ -24,7 +24,7 @@
 #include "IO/H5/AccessType.hpp"
 #include "IO/H5/Dat.hpp"
 #include "IO/H5/File.hpp"
-#include "IO/Importers/SpecFunctionOfTimeReader.hpp"
+#include "IO/Importers/ReadSpecThirdOrderPiecewisePolynomial.hpp"
 #include "IO/Importers/Tags.hpp"
 #include "Informer/InfoFromBuild.hpp"
 #include "Options/Options.hpp"
@@ -43,8 +43,8 @@ struct component {
   using metavariables = Metavariables;
   using chare_type = ActionTesting::MockArrayChare;
   using array_index = size_t;
-  using simple_tags = tmpl::list<importers::Tags::FuncOfTimeFile,
-                                 importers::Tags::FuncOfTimeNameMap,
+  using simple_tags = tmpl::list<importers::Tags::FunctionOfTimeFile,
+                                 importers::Tags::FunctionOfTimeNameMap,
                                  ::domain::Tags::FunctionsOfTime>;
   using phase_dependent_action_list = tmpl::list<
       Parallel::PhaseActions<
@@ -52,7 +52,8 @@ struct component {
           tmpl::list<ActionTesting::InitializeDataBox<simple_tags>>>,
       Parallel::PhaseActions<
           typename Metavariables::Phase, Metavariables::Phase::Testing,
-          tmpl::list<importers::Actions::SpecFunctionOfTimeReader>>>;
+          tmpl::list<
+              importers::Actions::ReadSpecThirdOrderPiecewisePolynomial>>>;
 };
 
 struct Metavariables {
@@ -61,28 +62,30 @@ struct Metavariables {
 };
 
 void test_options() noexcept {
-  CHECK(db::tag_name<importers::Tags::FuncOfTimeFile>() == "FuncOfTimeFile");
-  CHECK(db::tag_name<importers::Tags::FuncOfTimeNameMap>() ==
-        "FuncOfTimeNameMap");
+  CHECK(db::tag_name<importers::Tags::FunctionOfTimeFile>() ==
+        "FunctionOfTimeFile");
+  CHECK(db::tag_name<importers::Tags::FunctionOfTimeNameMap>() ==
+        "FunctionOfTimeNameMap");
 
   const std::string option_string{
       "SpecFuncOfTimeReader:\n"
-      "  FuncOfTimeFile: TestFile.h5\n"
-      "  FuncOfTimeNameMap: {Set1: Name1, Set2: Name2}"};
-  using option_tags = tmpl::list<importers::OptionTags::FuncOfTimeFile,
-                                 importers::OptionTags::FuncOfTimeNameMap>;
+      "  FunctionOfTimeFile: TestFile.h5\n"
+      "  FunctionOfTimeNameMap: {Set1: Name1, Set2: Name2}"};
+  using option_tags = tmpl::list<importers::OptionTags::FunctionOfTimeFile,
+                                 importers::OptionTags::FunctionOfTimeNameMap>;
   Options<option_tags> options{""};
   options.parse(option_string);
-  CHECK(options.get<importers::OptionTags::FuncOfTimeFile>() == "TestFile.h5");
+  CHECK(options.get<importers::OptionTags::FunctionOfTimeFile>() ==
+        "TestFile.h5");
   const auto& set_names =
-      options.get<importers::OptionTags::FuncOfTimeNameMap>();
+      options.get<importers::OptionTags::FunctionOfTimeNameMap>();
   const std::map<std::string, std::string> expected_set_names{
       {"Set1", "Name1"}, {"Set2", "Name2"}};
   CHECK(set_names == expected_set_names);
 }
 }  // namespace
 
-SPECTRE_TEST_CASE("Unit.Evolution.SpecFunctionOfTimeReader",
+SPECTRE_TEST_CASE("Unit.Evolution.ReadSpecThirdOrderPiecewisePolynomial",
                   "[Unit][Evolution][Actions]") {
   domain::FunctionsOfTime::register_derived_with_charm();
 
@@ -175,6 +178,8 @@ SPECTRE_TEST_CASE("Unit.Evolution.SpecFunctionOfTimeReader",
   expected_functions[expected_names[0]] = expected_expansion;
   expected_functions[expected_names[1]] = expected_rotation;
 
+  REQUIRE(functions_of_time.size() == expected_names.size());
+
   for (const auto& function_of_time : functions_of_time) {
     const auto& f = function_of_time.second;
     const auto& name = function_of_time.first;
@@ -194,4 +199,78 @@ SPECTRE_TEST_CASE("Unit.Evolution.SpecFunctionOfTimeReader",
 
   // Delete the temporary file created for this test
   file_system::rm(test_filename, true);
+}
+
+// [[OutputRegex, Non-monotonic time found]]
+SPECTRE_TEST_CASE(
+    "Unit.Evolution.ReadSpecThirdOrderPiecewisePolynomialNonmonotonic",
+    "[Unit][Evolution][Actions]") {
+  ERROR_TEST();
+  domain::FunctionsOfTime::register_derived_with_charm();
+
+  test_options();
+
+  using MockRuntimeSystem = ActionTesting::MockRuntimeSystem<Metavariables>;
+
+  const size_t self_id{1};
+
+  // Create a temporary file with test data to read in
+  // First, check if the file exists, and delete it if so
+  const std::string test_filename{"TestSpecFuncOfTimeData.h5"};
+  constexpr uint32_t version_number = 4;
+  if (file_system::check_if_file_exists(test_filename)) {
+    file_system::rm(test_filename, true);
+  }
+
+  h5::H5File<h5::AccessType::ReadWrite> test_file(test_filename);
+
+  const std::array<std::string, 2> expected_names{
+      {"ExpansionFactor", "RotationAngle"}};
+
+  const std::vector<std::vector<double>> test_expansion{
+      {0.0, 0.0, 1.0, 3.0, 1.0, 1.0, -1.4268296756999999e-06, 0.0, 0.0},
+      {0.0, 0.0, 1.0, 3.0, 1.0, 9.9999999143902230e-01, -1.4268296756999999e-06,
+       0.0, -3.5943676411727592e-05}};
+  const std::vector<std::string> expansion_legend{
+      "Time", "TLastUpdate", "Nc",  "DerivOrder", "Version",
+      "a",    "da",          "d2a", "d3a"};
+  auto& expansion_file = test_file.insert<h5::Dat>(
+      "/" + expected_names[0], expansion_legend, version_number);
+  expansion_file.append(test_expansion);
+
+  const std::vector<std::vector<double>> test_rotation{
+      {0.0, 0.0, 1.0, 3.0, 1.0, 0.0, 1.3472907726000001e-02, 0.0, 0.0},
+      {-1.0, -1.0, 1.0, 3.0, 1.0, 8.0837442877282155e-05,
+       1.3472907726000001e-02, 0.0, 1.4799266358888008e-04}};
+  const std::vector<std::string> rotation_legend{
+      "Time", "TLastUpdate", "Nc",    "DerivOrder", "Version",
+      "Phi",  "dPhi",        "d2Phi", "d3Phi"};
+  auto& rotation_file = test_file.insert<h5::Dat>(
+      "/" + expected_names[1], rotation_legend, version_number);
+  rotation_file.append(test_rotation);
+
+  MockRuntimeSystem runner{{}};
+  std::unordered_map<std::string,
+                     std::unique_ptr<::domain::FunctionsOfTime::FunctionOfTime>>
+      initial_functions_of_time{};
+
+  const std::array<DataVector, 4> initial_coefficients{
+      {{0.0}, {0.0}, {0.0}, {0.0}}};
+  initial_functions_of_time["ExpansionFactor"] =
+      std::make_unique<domain::FunctionsOfTime::PiecewisePolynomial<3>>(
+          0.0, initial_coefficients);
+  initial_functions_of_time["RotationAngle"] =
+      std::make_unique<domain::FunctionsOfTime::PiecewisePolynomial<3>>(
+          0.0, initial_coefficients);
+
+  ActionTesting::emplace_component_and_initialize<component<Metavariables>>(
+      &runner, self_id,
+      {std::string{test_filename},
+       std::map<std::string, std::string>{
+           {"ExpansionFactor", "ExpansionFactor"},
+           {"RotationAngle", "RotationAngle"}},
+       std::move(initial_functions_of_time)});
+
+  runner.set_phase(Metavariables::Phase::Testing);
+  runner.next_action<component<Metavariables>>(self_id);
 }
