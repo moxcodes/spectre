@@ -8,7 +8,8 @@
 #include <string>
 
 #include "DataStructures/SpinWeighted.hpp"
-#include "DataStructures/Tensor/TypeAliases.hpp"
+#include "DataStructures/Tensor/Tensor.hpp"
+#include "Evolution/Systems/Cce/GaugeTransformBoundaryData.hpp"
 #include "Evolution/Systems/Cce/Tags.hpp"
 #include "NumericalAlgorithms/Spectral/SwshCollocation.hpp"
 #include "NumericalAlgorithms/Spectral/SwshInterpolation.hpp"
@@ -22,6 +23,9 @@ class ComplexDataVector;
 /// \endcond
 
 namespace Cce {
+template <typename Tag>
+struct GaugeAdjustedBoundaryValue;
+
 namespace Tags {
 /// \cond
 struct LMax;
@@ -29,6 +33,24 @@ struct NumberOfRadialPoints;
 /// \endcond
 }  // namespace Tags
 
+/*!
+ * \brief Perform a gauge transformation on each angular slice of volumetric
+ * \f$J\f$ data.
+ *
+ * \details The gauge transformation for \f$J\f$ is:
+ *
+ * * \f{align*}{
+ * \hat J = \frac{1}{4 \hat{\omega}^2} \left( \bar{\hat d}^2  J(\hat x^{\hat A})
+ * + \hat c^2 \bar J(\hat x^{\hat A})
+ * + 2 \hat c \bar{\hat d} K(\hat x^{\hat A}) \right)
+ * \f}
+ *
+ * Where \f$\hat c\f$ and \f$\hat d\f$ are the spin-weighted angular Jacobian
+ * factors computed by `GaugeUpdateJacobianFromCoords`, and \f$\hat \omega\f$ is
+ * the conformal factor associated with the angular coordinate transformation.
+ * Note that the right-hand sides with explicit \f$\hat x^{\hat A}\f$ dependence
+ * must be interpolated and that \f$K = \sqrt{1 + J \bar J}\f$.
+ */
 struct GaugeAdjustInitialJ {
   using boundary_tags =
       tmpl::list<Tags::GaugeC, Tags::GaugeD, Tags::GaugeOmega,
@@ -45,6 +67,8 @@ struct GaugeAdjustInitialJ {
           cauchy_angular_coordinates,
       size_t l_max) noexcept;
 };
+
+struct InitializeJNoIncomingRadiation;
 
 struct InitializeJZeroNonSmooth;
 
@@ -77,7 +101,8 @@ struct InitializeJ : public PUP::able {
       tmpl::push_back<boundary_tags, Tags::LMax, Tags::NumberOfRadialPoints>;
 
   using creatable_classes =
-      tmpl::list<InitializeJZeroNonSmooth, InitializeJInverseCubic>;
+      tmpl::list<InitializeJNoIncomingRadiation, InitializeJZeroNonSmooth,
+                 InitializeJInverseCubic>;
 
   WRAPPED_PUPable_abstract(InitializeJ);  // NOLINT
 
@@ -93,6 +118,88 @@ struct InitializeJ : public PUP::able {
       const Scalar<SpinWeighted<ComplexDataVector, 2>>& boundary_dr_j,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& r, size_t l_max,
       size_t number_of_radial_points) const noexcept = 0;
+};
+
+
+/*!
+ * \brief Initialize \f$J\f$ on the first hypersurface by constraining
+ * \f$\psi_0 = 0\f$.
+ *
+ * \details This algorithm first radially evolves the \f$\psi_0 = 0\f$
+ * condition, which can be converted to a second-order radial ODE for J. Then,
+ *  the initial data generator performs an iterative solve for the angular
+ * coordinates necessary to ensure asymptotic flatness. The step size for the
+ * radial ODE integration is set by `RadialStep`; the parameters for the
+ * iterative procedure are determined by options
+ * `AngularCoordinateTolerance` and
+ * `MaxIterations`.
+ */
+struct InitializeJNoIncomingRadiation : InitializeJ {
+  struct AngularCoordinateTolerance {
+    using type = double;
+    static std::string name() noexcept { return "AngularCoordTolerance"; }
+    static constexpr OptionString help = {
+        "Tolerance of initial angular coordinates for CCE"};
+    static type lower_bound() noexcept { return 1.0e-14; }
+    static type upper_bound() noexcept { return 1.0e-3; }
+    static type default_value() noexcept { return 1.0e-10; }
+  };
+
+  struct MaxIterations {
+    using type = size_t;
+    static constexpr OptionString help = {
+        "Number of linearized inversion iterations."};
+    static type lower_bound() noexcept { return 10; }
+    static type upper_bound() noexcept { return 1000; }
+    static type default_value() noexcept { return 300; }
+  };
+
+  struct RadialStep {
+    using type = double;
+    static constexpr OptionString help = {
+        "Step size for performing the radial integration of Psi0"};
+    static type lower_bound() noexcept { return 1.0e-4; }
+    static type upper_bound() noexcept { return 0.1; }
+    static type default_value() noexcept { return 1.0e-2; }
+  };
+
+  using options =
+      tmpl::list<AngularCoordinateTolerance, MaxIterations, RadialStep>;
+  static constexpr OptionString help = {
+      "Initialization process where J is set so Psi0 is vanishing\n"
+      "vanishing (roughly a no incoming radiation condition)"};
+
+  static std::string name() noexcept { return "NoIncomingRadiation"; }
+
+  WRAPPED_PUPable_decl_template(InitializeJNoIncomingRadiation);  // NOLINT
+  explicit InitializeJNoIncomingRadiation(
+      CkMigrateMessage* /*unused*/) noexcept {}
+
+  InitializeJNoIncomingRadiation(double angular_coordinate_tolerance,
+                                 size_t max_iterations,
+                                 double radial_step) noexcept;
+
+  InitializeJNoIncomingRadiation() = default;
+
+  std::unique_ptr<InitializeJ> get_clone() const noexcept override;
+
+  void operator()(
+      gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> j,
+      gsl::not_null<tnsr::i<DataVector, 3>*> cartesian_cauchy_coordinates,
+      gsl::not_null<
+          tnsr::i<DataVector, 2, ::Frame::Spherical<::Frame::Inertial>>*>
+          angular_cauchy_coordinates,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& boundary_j,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& boundary_dr_j,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& r, size_t l_max,
+      size_t number_of_radial_points) const noexcept override;
+
+  void pup(PUP::er& p) noexcept override;
+
+ private:
+  double angular_coordinate_tolerance_ = 1.0e-10;
+  size_t max_iterations_ = 300;
+  double radial_step_ = 1.0e-2;
 };
 
 /*!

@@ -3,9 +3,11 @@
 
 #include "Evolution/Systems/Cce/InitializeCce.hpp"
 
+#include <complex>
 #include <cstddef>
-#include <type_traits>
 #include <memory>
+#include <type_traits>
+#include <utility>
 
 #include "DataStructures/ComplexDataVector.hpp"
 #include "DataStructures/DataVector.hpp"
@@ -21,12 +23,97 @@
 #include "NumericalAlgorithms/Spectral/SwshInterpolation.hpp"
 #include "NumericalAlgorithms/Spectral/SwshTags.hpp"
 #include "Time/History.hpp"
+#include "Time/Slab.hpp"
+#include "Time/Time.hpp"
+#include "Time/TimeStepId.hpp"
 #include "Time/TimeSteppers/RungeKutta3.hpp"
 #include "Utilities/ConstantExpressions.hpp"
 #include "Utilities/Gsl.hpp"
 #include "Utilities/TMPL.hpp"
 
 namespace Cce {
+
+void radial_evolve_psi0_condition(
+    const gsl::not_null<SpinWeighted<ComplexDataVector, 2>*> volume_j_id,
+    const SpinWeighted<ComplexDataVector, 2>& boundary_j,
+    const SpinWeighted<ComplexDataVector, 2>& boundary_dr_j,
+    const SpinWeighted<ComplexDataVector, 0>& r, const double radial_step,
+    const size_t l_max, const size_t number_of_radial_points) noexcept {
+  // initialize J and dy J = I with their boundary values
+  // Optimization note: this could be slightly improved with aggregated
+  // allocations via Variables
+  SpinWeighted<ComplexDataVector, 2> radial_evolved_j = boundary_j;
+  SpinWeighted<ComplexDataVector, 2> radial_evolved_i = 0.5 * boundary_dr_j * r;
+
+  TimeSteppers::RungeKutta3 stepper{};
+  TimeSteppers::History<ComplexDataVector, ComplexDataVector> j_history{};
+  TimeSteppers::History<ComplexDataVector, ComplexDataVector> i_history{};
+  Slab radial_slab{-1.0, 1.0};
+  TimeDelta radial_delta{
+      radial_slab, Time::rational_t{1, static_cast<int>(2.0 / radial_step)}};
+  TimeStepId time{true, 0, Time{radial_slab, Time::rational_t{0, 1}}};
+  auto y_collocation =
+      Spectral::collocation_points<Spectral::Basis::Legendre,
+                                   Spectral::Quadrature::GaussLobatto>(
+          number_of_radial_points);
+  size_t next_y_collocation_point = 0;
+  SpinWeighted<ComplexDataVector, 2> radial_evolved_j_dense_step{
+      boundary_j.size()};
+
+  while (time.step_time().value() < 1.0) {
+    ComplexDataVector dy_j = radial_evolved_i.data();
+    const double one_minus_y = 1.0 - time.substep_time().value();
+    ComplexDataVector dy_i =
+        -0.0625 *
+        (square(conj(radial_evolved_i.data()) * radial_evolved_j.data()) +
+         square(conj(radial_evolved_j.data()) * radial_evolved_i.data()) -
+         2.0 * radial_evolved_i.data() * conj(radial_evolved_i.data()) *
+             (2.0 + radial_evolved_j.data() * conj(radial_evolved_j.data()))) *
+        (4.0 * radial_evolved_j.data() +
+         radial_evolved_i.data() * one_minus_y) /
+        (1.0 + radial_evolved_j.data() * conj(radial_evolved_j.data()));
+    i_history.insert(time, radial_evolved_i.data(), std::move(dy_i));
+    j_history.insert(time, radial_evolved_j.data(), std::move(dy_j));
+
+    if (time.substep() == 2 and
+        time.step_time().value() + radial_step >=
+            y_collocation[next_y_collocation_point] and
+        time.step_time().value() <= y_collocation[next_y_collocation_point]) {
+      radial_evolved_j_dense_step = radial_evolved_j;
+      stepper.dense_update_u(make_not_null(&radial_evolved_j_dense_step.data()),
+                             j_history,
+                             y_collocation[next_y_collocation_point]);
+      ComplexDataVector angular_view{
+          volume_j_id->data().data() +
+              next_y_collocation_point *
+                  Spectral::Swsh::number_of_swsh_collocation_points(l_max),
+          Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
+      angular_view = radial_evolved_j_dense_step.data();
+      ++next_y_collocation_point;
+    }
+    stepper.update_u(make_not_null(&radial_evolved_j.data()),
+                     make_not_null(&j_history), radial_delta);
+    stepper.update_u(make_not_null(&radial_evolved_i.data()),
+                     make_not_null(&i_history), radial_delta);
+    time = stepper.next_time_id(time, radial_delta);
+  }
+  if (time.substep() == 2 and
+      time.step_time().value() + radial_step >=
+          y_collocation[next_y_collocation_point] and
+      time.step_time().value() <= y_collocation[next_y_collocation_point]) {
+    radial_evolved_j_dense_step = radial_evolved_j;
+    stepper.dense_update_u(make_not_null(&radial_evolved_j_dense_step.data()),
+                           j_history, y_collocation[next_y_collocation_point]);
+    radial_evolved_j_dense_step = radial_evolved_j;
+    ComplexDataVector angular_view{
+        volume_j_id->data().data() +
+            next_y_collocation_point *
+                Spectral::Swsh::number_of_swsh_collocation_points(l_max),
+        Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
+    angular_view = radial_evolved_j_dense_step.data();
+    ++next_y_collocation_point;
+  }
+}
 
 // perform an iterative solve for the set of angular coordinates necessary to
 // set the gauge transformed version of `surface_j` to zero. This reliably
@@ -38,12 +125,14 @@ namespace Cce {
 // function becomes a bottleneck, the numerical procedure of the iterative
 // method should be revisited.
 double adjust_angular_coordinates_for_j(
+    const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> volume_j,
     const gsl::not_null<tnsr::i<DataVector, 3>*> cartesian_cauchy_coordinates,
     const gsl::not_null<
         tnsr::i<DataVector, 2, ::Frame::Spherical<::Frame::Inertial>>*>
         angular_cauchy_coordinates,
     const SpinWeighted<ComplexDataVector, 2>& surface_j, const size_t l_max,
-    const double tolerance, const size_t max_steps) noexcept {
+    const double tolerance, const size_t max_steps,
+    const bool adjust_volume_gauge) noexcept {
   const size_t number_of_angular_points =
       Spectral::Swsh::number_of_swsh_collocation_points(l_max);
 
@@ -317,12 +406,22 @@ double adjust_angular_coordinates_for_j(
       Tags::CauchyCartesianCoords>::apply(angular_cauchy_coordinates,
                                           cartesian_cauchy_coordinates);
 
-  GaugeUpdateJacobianFromCoordinates<
-      Tags::GaugeC, Tags::GaugeD, Tags::CauchyAngularCoords,
-      Tags::CauchyCartesianCoords>::apply(make_not_null(&gauge_c),
-                                          make_not_null(&gauge_d),
-                                          angular_cauchy_coordinates,
-                                          *cartesian_cauchy_coordinates, l_max);
+  if (adjust_volume_gauge) {
+    GaugeUpdateJacobianFromCoordinates<
+        Tags::GaugeC, Tags::GaugeD, Tags::CauchyAngularCoords,
+        Tags::CauchyCartesianCoords>::apply(make_not_null(&gauge_c),
+                                            make_not_null(&gauge_d),
+                                            angular_cauchy_coordinates,
+                                            *cartesian_cauchy_coordinates,
+                                            l_max);
+
+    get(gauge_omega).data() =
+        0.5 * sqrt(get(gauge_d).data() * conj(get(gauge_d).data()) -
+                   get(gauge_c).data() * conj(get(gauge_c).data()));
+
+    GaugeAdjustInitialJ::apply(volume_j, gauge_c, gauge_d, gauge_omega,
+                               *angular_cauchy_coordinates, l_max);
+  }
   return max_error;
 }
 
@@ -358,6 +457,51 @@ void GaugeAdjustInitialJ::apply(
   }
 }
 
+InitializeJNoIncomingRadiation::InitializeJNoIncomingRadiation(
+    const double angular_coordinate_tolerance, const size_t max_iterations,
+    const double radial_step) noexcept
+    : angular_coordinate_tolerance_{angular_coordinate_tolerance},
+      max_iterations_{max_iterations},
+      radial_step_{radial_step} {}
+
+std::unique_ptr<InitializeJ> InitializeJNoIncomingRadiation::get_clone() const
+    noexcept {
+  return std::make_unique<InitializeJNoIncomingRadiation>(
+      angular_coordinate_tolerance_, max_iterations_, radial_step_);
+}
+
+void InitializeJNoIncomingRadiation::operator()(
+    const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> j,
+    const gsl::not_null<tnsr::i<DataVector, 3>*> cartesian_cauchy_coordinates,
+    const gsl::not_null<
+        tnsr::i<DataVector, 2, ::Frame::Spherical<::Frame::Inertial>>*>
+        angular_cauchy_coordinates,
+    const Scalar<SpinWeighted<ComplexDataVector, 2>>& boundary_j,
+    const Scalar<SpinWeighted<ComplexDataVector, 2>>& boundary_dr_j,
+    const Scalar<SpinWeighted<ComplexDataVector, 0>>& r, const size_t l_max,
+    const size_t number_of_radial_points) const noexcept {
+  const size_t number_of_angular_points =
+      Spectral::Swsh::number_of_swsh_collocation_points(l_max);
+  radial_evolve_psi0_condition(make_not_null(&get(*j)), get(boundary_j),
+                               get(boundary_dr_j), get(r), radial_step_, l_max,
+                               number_of_radial_points);
+  const SpinWeighted<ComplexDataVector, 2> j_at_scri_view;
+  make_const_view(make_not_null(&j_at_scri_view), get(*j),
+                  (number_of_radial_points - 1) * number_of_angular_points,
+                  number_of_angular_points);
+
+  adjust_angular_coordinates_for_j(j, cartesian_cauchy_coordinates,
+                                   angular_cauchy_coordinates, j_at_scri_view,
+                                   l_max, angular_coordinate_tolerance_,
+                                   max_iterations_, true);
+}
+
+void InitializeJNoIncomingRadiation::pup(PUP::er& p) noexcept {
+  p | angular_coordinate_tolerance_;
+  p | max_iterations_;
+  p | radial_step_;
+}
+
 InitializeJZeroNonSmooth::InitializeJZeroNonSmooth(
     const double angular_coordinate_tolerance,
     const size_t max_iterations) noexcept
@@ -388,9 +532,10 @@ void InitializeJZeroNonSmooth::operator()(
                   number_of_angular_points);
 
   get(*j).data() = 0.0;
-  adjust_angular_coordinates_for_j(
-      cartesian_cauchy_coordinates, angular_cauchy_coordinates, get(boundary_j),
-      l_max, angular_coordinate_tolerance_, max_iterations_);
+  adjust_angular_coordinates_for_j(j, cartesian_cauchy_coordinates,
+                                   angular_cauchy_coordinates, get(boundary_j),
+                                   l_max, angular_coordinate_tolerance_,
+                                   max_iterations_, false);
 }
 
 void InitializeJZeroNonSmooth::pup(PUP::er& p) noexcept {
@@ -455,6 +600,7 @@ void InitializeJInverseCubic::operator()(
 void InitializeJInverseCubic::pup(PUP::er& /*p*/) noexcept {}
 
 /// \cond
+PUP::able::PUP_ID InitializeJNoIncomingRadiation::my_PUP_ID = 0;
 PUP::able::PUP_ID InitializeJZeroNonSmooth::my_PUP_ID = 0;
 PUP::able::PUP_ID InitializeJInverseCubic::my_PUP_ID = 0;
 /// \endcond
