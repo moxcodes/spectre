@@ -103,6 +103,7 @@ struct ReadSpecThirdOrderPiecewisePolynomial {
       // Column 3 of the file contains the derivative order
       const size_t dat_max_deriv = dat_data(0, 3);
       if (dat_max_deriv != max_deriv) {
+        file.~H5File();
         ERROR("Deriv order in " << file_name << " should be " << max_deriv
                                 << ", not " << dat_max_deriv);
       }
@@ -144,6 +145,7 @@ struct ReadSpecThirdOrderPiecewisePolynomial {
           spec_functions_of_time[spectre_name].update(time_last_updated,
                                                       highest_derivative);
         } else {
+          file.~H5File();
           ERROR("Non-monotonic time found in FunctionOfTime data. "
                 << "Time " << dat_data(row, 1) << " follows time "
                 << time_last_updated << " while reading " << spectre_name
@@ -156,11 +158,11 @@ struct ReadSpecThirdOrderPiecewisePolynomial {
     // FunctionsOfTime to it
     db::mutate<::domain::Tags::FunctionsOfTime>(
         make_not_null(&box),
-        [&dataset_name_map, &spec_functions_of_time](
-            const gsl::not_null<std::unordered_map<
-                std::string,
-                std::unique_ptr<domain::FunctionsOfTime::FunctionOfTime>>*>
-                functions_of_time) {
+        [&dataset_name_map, &spec_functions_of_time,
+         &file](const gsl::not_null<std::unordered_map<
+                    std::string,
+                    std::unique_ptr<domain::FunctionsOfTime::FunctionOfTime>>*>
+                    functions_of_time) {
           for (auto spec_and_spectre_names : dataset_name_map) {
             const std::string& spectre_name =
                 std::get<1>(spec_and_spectre_names);
@@ -169,6 +171,7 @@ struct ReadSpecThirdOrderPiecewisePolynomial {
             // an element with key==spectre_name; this action only
             // mutates the value associated with that key
             if ((*functions_of_time).count(spectre_name) == 0) {
+              file.~H5File();
               ERROR("Trying to import data for key "
                     << spectre_name
                     << "in FunctionsOfTime, but FunctionsOfTime does not "

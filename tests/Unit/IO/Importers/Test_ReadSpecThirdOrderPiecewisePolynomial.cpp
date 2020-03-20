@@ -36,7 +36,6 @@
 #include "tests/Unit/ActionTesting.hpp"
 
 namespace {
-constexpr size_t dim = 2;
 
 template <typename Metavariables>
 struct component {
@@ -214,7 +213,7 @@ SPECTRE_TEST_CASE(
 
   // Create a temporary file with test data to read in
   // First, check if the file exists, and delete it if so
-  const std::string test_filename{"TestSpecFuncOfTimeData.h5"};
+  const std::string test_filename{"TestSpecFuncOfTimeDataError.h5"};
   constexpr uint32_t version_number = 4;
   if (file_system::check_if_file_exists(test_filename)) {
     file_system::rm(test_filename, true);
