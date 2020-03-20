@@ -29,6 +29,25 @@ struct NumberOfRadialPoints;
 /// \endcond
 }  // namespace Tags
 
+struct GaugeAdjustInitialJ {
+  using boundary_tags =
+      tmpl::list<Tags::GaugeC, Tags::GaugeD, Tags::GaugeOmega,
+                 Tags::CauchyAngularCoords, Spectral::Swsh::Tags::LMax>;
+  using return_tags = tmpl::list<Tags::BondiJ>;
+  using argument_tags = tmpl::append<boundary_tags>;
+
+  static void apply(
+      gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> volume_j,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& gauge_c,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& gauge_d,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& gauge_omega,
+      const tnsr::i<DataVector, 2, ::Frame::Spherical<::Frame::Inertial>>&
+          cauchy_angular_coordinates,
+      size_t l_max) noexcept;
+};
+
+struct InitializeJZeroNonSmooth;
+
 struct InitializeJInverseCubic;
 
 /*!
@@ -57,7 +76,8 @@ struct InitializeJ : public PUP::able {
   using argument_tags =
       tmpl::push_back<boundary_tags, Tags::LMax, Tags::NumberOfRadialPoints>;
 
-  using creatable_classes = tmpl::list<InitializeJInverseCubic>;
+  using creatable_classes =
+      tmpl::list<InitializeJZeroNonSmooth, InitializeJInverseCubic>;
 
   WRAPPED_PUPable_abstract(InitializeJ);  // NOLINT
 
@@ -73,6 +93,76 @@ struct InitializeJ : public PUP::able {
       const Scalar<SpinWeighted<ComplexDataVector, 2>>& boundary_dr_j,
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& r, size_t l_max,
       size_t number_of_radial_points) const noexcept = 0;
+};
+
+/*!
+ * \brief Initialize \f$J\f$ on the first hypersurface to be vanishing, finding
+ * the appropriate angular coordinates to be continuous with the provided
+ * worldtube boundary data.
+ *
+ * \details Internally, this performs an iterative solve for the angular
+ * coordinates necessary to give rise to a vanishing gauge-transformed J on the
+ * worldtube boundary. The parameters for the iterative procedure are determined
+ * by options `InitializeJZeroNonSmooth::AngularCoordinateTolerance` and
+ * `InitializeJZeroNonSmooth::MaxIterations`. The resulting `J` will necessarily
+ * have vanishing first radial derivative, and so will typically not be smooth
+ * (only continuous) with the provided Cauchy data at the worldtube boundary.
+ */
+struct InitializeJZeroNonSmooth : InitializeJ {
+  struct AngularCoordinateTolerance {
+    using type = double;
+    static std::string name() noexcept { return "AngularCoordTolerance"; }
+    static constexpr OptionString help = {
+      "Tolerance of initial angular coordinates for CCE"};
+    static type lower_bound() noexcept { return 1.0e-14; }
+    static type upper_bound() noexcept { return 1.0e-3; }
+    static type default_value() noexcept { return 1.0e-10; }
+  };
+
+  struct MaxIterations {
+    using type = size_t;
+    static constexpr OptionString help = {
+      "Number of linearized inversion iterations."};
+    static type lower_bound() noexcept { return 10; }
+    static type upper_bound() noexcept { return 1000; }
+    static type default_value() noexcept { return 300; }
+  };
+  using options =
+      tmpl::list<AngularCoordinateTolerance, MaxIterations>;
+
+  static constexpr OptionString help = {
+      "Initialization process where J is set so Psi0 is vanishing\n"
+      "vanishing (roughly a no incoming radiation condition)"};
+
+  static std::string name() noexcept { return "ZeroNonsmooth"; }
+
+  WRAPPED_PUPable_decl_template(InitializeJZeroNonSmooth);  // NOLINT
+  explicit InitializeJZeroNonSmooth(
+      CkMigrateMessage* /*unused*/) noexcept {}
+
+  InitializeJZeroNonSmooth(double angular_coordinate_tolerance,
+                                 size_t max_iterations) noexcept;
+
+  InitializeJZeroNonSmooth() = default;
+
+  std::unique_ptr<InitializeJ> get_clone() const noexcept override;
+
+  void operator()(
+      gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> j,
+      gsl::not_null<tnsr::i<DataVector, 3>*> cartesian_cauchy_coordinates,
+      gsl::not_null<
+          tnsr::i<DataVector, 2, ::Frame::Spherical<::Frame::Inertial>>*>
+          angular_cauchy_coordinates,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& boundary_j,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& boundary_dr_j,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& r, size_t l_max,
+      size_t number_of_radial_points) const noexcept override;
+
+  void pup(PUP::er& p) noexcept override;
+
+ private:
+  double angular_coordinate_tolerance_ = 1.0e-10;
+  size_t max_iterations_ = 300;
 };
 
 /*!
