@@ -11,6 +11,7 @@ set(LIBRARY_SOURCES
   InterfaceManagers/GhLockstepInterfaceManager.cpp
   LinearOperators.cpp
   LinearSolve.cpp
+  NpValues.cpp
   PrecomputeCceDependencies.cpp
   ReadBoundaryDataH5.cpp
   ReducedWorldtubeModeRecorder.cpp
