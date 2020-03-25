@@ -10,6 +10,7 @@
 #include "DataStructures/SpinWeighted.hpp"
 #include "DataStructures/Tensor/Tensor.hpp"
 #include "Evolution/Systems/Cce/GaugeTransformBoundaryData.hpp"
+#include "Evolution/Systems/Cce/ReadBoundaryDataH5.hpp"
 #include "Evolution/Systems/Cce/Tags.hpp"
 #include "NumericalAlgorithms/Spectral/SwshCollocation.hpp"
 #include "NumericalAlgorithms/Spectral/SwshInterpolation.hpp"
@@ -32,6 +33,12 @@ struct LMax;
 struct NumberOfRadialPoints;
 /// \endcond
 }  // namespace Tags
+
+namespace OptionTags {
+/// \cond
+struct StartTime;
+/// \endcond
+}
 
 /*!
  * \brief Perform a gauge transformation on each angular slice of volumetric
@@ -68,6 +75,8 @@ struct GaugeAdjustInitialJ {
       size_t l_max) noexcept;
 };
 
+struct InitializeJImportModes;
+
 struct InitializeJNoIncomingRadiation;
 
 struct InitializeJZeroNonSmooth;
@@ -102,7 +111,7 @@ struct InitializeJ : public PUP::able {
 
   using creatable_classes =
       tmpl::list<InitializeJNoIncomingRadiation, InitializeJZeroNonSmooth,
-                 InitializeJInverseCubic>;
+                 InitializeJInverseCubic, InitializeJImportModes>;
 
   WRAPPED_PUPable_abstract(InitializeJ);  // NOLINT
 
@@ -120,6 +129,87 @@ struct InitializeJ : public PUP::able {
       size_t number_of_radial_points) const noexcept = 0;
 };
 
+struct InitializeJImportModes : public InitializeJ {
+  struct ModeImportFilename {
+    using type = std::string;
+    static constexpr OptionString help = {
+        "H5 file with time-series mode estimates"};
+  };
+  struct ModeImportDataset {
+    using type = std::string;
+    static constexpr OptionString help = {
+        "Dataset within the H5 that contains the set of modes"};
+  };
+  struct FileLMax{
+    using type = size_t;
+    static constexpr OptionString help = {
+        "l_max of the modes in the provided H5 file"};
+  };
+  struct AngularCoordinateTolerance {
+    using type = double;
+    static std::string name() noexcept { return "AngularCoordTolerance"; }
+    static constexpr OptionString help = {
+      "Tolerance of initial angular coordinates for CCE"};
+    static type lower_bound() noexcept { return 1.0e-14; }
+    static type upper_bound() noexcept { return 1.0e-3; }
+    static type default_value() noexcept { return 1.0e-10; }
+  };
+  struct MaxIterations {
+    using type = size_t;
+    static constexpr OptionString help = {
+      "Number of linearized inversion iterations."};
+    static type lower_bound() noexcept { return 10; }
+    static type upper_bound() noexcept { return 10000; }
+    static type default_value() noexcept { return 300; }
+  };
+  struct StartTime {
+    using type = double;
+    static constexpr OptionString help = {
+        "Time after the first time in the mode file to use."};
+    static type default_value() noexcept { return 0.0; }
+  };
+
+  using options =
+      tmpl::list<ModeImportFilename, ModeImportDataset, FileLMax,
+                 AngularCoordinateTolerance, MaxIterations, StartTime>;
+  static constexpr OptionString help = {
+      "Initialization process where J is set to a 1/r profile fixed by a "
+      "strain estimate provided by input file."};
+
+  WRAPPED_PUPable_decl_template(InitializeJImportModes);
+  explicit InitializeJImportModes(CkMigrateMessage* /*unused*/) noexcept {}
+
+  InitializeJImportModes(const std::string& mode_filename,
+                         const std::string& mode_dataset, size_t file_l_max,
+                         double angular_coordinate_tolerance,
+                         size_t max_iterations, double start_time) noexcept;
+
+  InitializeJImportModes() = default;
+
+  std::unique_ptr<InitializeJ> get_clone() const noexcept override;
+
+  void operator()(
+      gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> j,
+      gsl::not_null<tnsr::i<DataVector, 3>*> cartesian_cauchy_coordinates,
+      gsl::not_null<
+          tnsr::i<DataVector, 2, ::Frame::Spherical<::Frame::Inertial>>*>
+          angular_cauchy_coordinates,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& boundary_j,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& boundary_dr_j,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& r, size_t l_max,
+      size_t number_of_radial_points) const noexcept override;
+
+  void pup(PUP::er& p) noexcept override;
+
+ private:
+  mutable ModeSetBoundaryH5BufferUpdater buffer_updater_;
+  std::string filename_;
+  std::string dataset_name_;
+  size_t file_l_max_;
+  double angular_coordinate_tolerance_ = 1.0e-10;
+  size_t max_iterations_ = 300;
+  double start_time_ = 0.0;
+};
 
 /*!
  * \brief Initialize \f$J\f$ on the first hypersurface by constraining
@@ -150,7 +240,7 @@ struct InitializeJNoIncomingRadiation : InitializeJ {
     static constexpr OptionString help = {
         "Number of linearized inversion iterations."};
     static type lower_bound() noexcept { return 10; }
-    static type upper_bound() noexcept { return 1000; }
+    static type upper_bound() noexcept { return 10000; }
     static type default_value() noexcept { return 300; }
   };
 
@@ -231,7 +321,7 @@ struct InitializeJZeroNonSmooth : InitializeJ {
     static constexpr OptionString help = {
       "Number of linearized inversion iterations."};
     static type lower_bound() noexcept { return 10; }
-    static type upper_bound() noexcept { return 1000; }
+    static type upper_bound() noexcept { return 10000; }
     static type default_value() noexcept { return 300; }
   };
   using options =

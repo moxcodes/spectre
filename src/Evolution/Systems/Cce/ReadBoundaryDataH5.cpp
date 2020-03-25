@@ -12,6 +12,7 @@
 #include "IO/H5/Dat.hpp"
 #include "IO/H5/File.hpp"
 #include "Parallel/CharmPupable.hpp"
+#include "Utilities/MakeString.hpp"
 #include "Utilities/Numeric.hpp"
 
 namespace Cce {
@@ -141,48 +142,48 @@ double SpecWorldtubeH5BufferUpdater::update_buffers_for_time(
     for (size_t j = i; j < 3; ++j) {
       tmpl::for_each<tmpl::list<Tags::detail::SpatialMetric,
                                 Tags::detail::Dr<Tags::detail::SpatialMetric>,
-                                ::Tags::dt<Tags::detail::SpatialMetric>>>([
-        this, &i, &j, &buffers, &time_span_start, &time_span_end, &
-        computation_l_max
-      ](auto tag_v) noexcept {
-        using tag = typename decltype(tag_v)::type;
-        this->update_buffer(
-            make_not_null(&get<tag>(*buffers).get(i, j)),
-            cce_data_file_.get<h5::Dat>(detail::dataset_name_for_component(
-                get<Tags::detail::InputDataSet<tag>>(dataset_names_), i, j)),
-            computation_l_max, *time_span_start, *time_span_end);
-        cce_data_file_.close_current_object();
-      });
+                                ::Tags::dt<Tags::detail::SpatialMetric>>>(
+          [this, &i, &j, &buffers, &time_span_start, &time_span_end,
+           &computation_l_max](auto tag_v) noexcept {
+            using tag = typename decltype(tag_v)::type;
+            this->update_buffer(
+                make_not_null(&get<tag>(*buffers).get(i, j)),
+                cce_data_file_.get<h5::Dat>(detail::dataset_name_for_component(
+                    get<Tags::detail::InputDataSet<tag>>(dataset_names_), i,
+                    j)),
+                computation_l_max, *time_span_start, *time_span_end);
+            cce_data_file_.close_current_object();
+          });
     }
     // shift
     tmpl::for_each<
         tmpl::list<Tags::detail::Shift, Tags::detail::Dr<Tags::detail::Shift>,
-                   ::Tags::dt<Tags::detail::Shift>>>([
-      this, &i, &buffers, &time_span_start, &time_span_end, &computation_l_max
-    ](auto tag_v) noexcept {
-      using tag = typename decltype(tag_v)::type;
-      this->update_buffer(
-          make_not_null(&get<tag>(*buffers).get(i)),
-          cce_data_file_.get<h5::Dat>(detail::dataset_name_for_component(
-              get<Tags::detail::InputDataSet<tag>>(dataset_names_), i)),
-          computation_l_max, *time_span_start, *time_span_end);
-      cce_data_file_.close_current_object();
-    });
+                   ::Tags::dt<Tags::detail::Shift>>>(
+        [this, &i, &buffers, &time_span_start, &time_span_end,
+         &computation_l_max](auto tag_v) noexcept {
+          using tag = typename decltype(tag_v)::type;
+          this->update_buffer(
+              make_not_null(&get<tag>(*buffers).get(i)),
+              cce_data_file_.get<h5::Dat>(detail::dataset_name_for_component(
+                  get<Tags::detail::InputDataSet<tag>>(dataset_names_), i)),
+              computation_l_max, *time_span_start, *time_span_end);
+          cce_data_file_.close_current_object();
+        });
   }
   // lapse
   tmpl::for_each<
       tmpl::list<Tags::detail::Lapse, Tags::detail::Dr<Tags::detail::Lapse>,
-                 ::Tags::dt<Tags::detail::Lapse>>>([
-    this, &buffers, &time_span_start, &time_span_end, &computation_l_max
-  ](auto tag_v) noexcept {
-    using tag = typename decltype(tag_v)::type;
-    this->update_buffer(
-        make_not_null(&get(get<tag>(*buffers))),
-        cce_data_file_.get<h5::Dat>(detail::dataset_name_for_component(
-            get<Tags::detail::InputDataSet<tag>>(dataset_names_))),
-        computation_l_max, *time_span_start, *time_span_end);
-    cce_data_file_.close_current_object();
-  });
+                 ::Tags::dt<Tags::detail::Lapse>>>(
+      [this, &buffers, &time_span_start, &time_span_end,
+       &computation_l_max](auto tag_v) noexcept {
+        using tag = typename decltype(tag_v)::type;
+        this->update_buffer(
+            make_not_null(&get(get<tag>(*buffers))),
+            cce_data_file_.get<h5::Dat>(detail::dataset_name_for_component(
+                get<Tags::detail::InputDataSet<tag>>(dataset_names_))),
+            computation_l_max, *time_span_start, *time_span_end);
+        cce_data_file_.close_current_object();
+      });
   // the next time an update will be required
   return time_buffer_[std::min(*time_span_end - interpolator_length + 1,
                                time_buffer_.size() - 1)];
@@ -323,18 +324,18 @@ double ReducedSpecWorldtubeH5BufferUpdater::update_buffers_for_time(
   *time_span_start = new_span_pair.first;
   *time_span_end = new_span_pair.second;
   // load the desired time spans into the buffers
-  tmpl::for_each<detail::reduced_cce_input_tags>([
-    this, &buffers, &time_span_start, &time_span_end, &computation_l_max
-  ](auto tag_v) noexcept {
-    using tag = typename decltype(tag_v)::type;
-    this->update_buffer(
-        make_not_null(&get(get<tag>(*buffers)).data()),
-        cce_data_file_.get<h5::Dat>(
-            "/" + get<Tags::detail::InputDataSet<tag>>(dataset_names_)),
-        computation_l_max, *time_span_start, *time_span_end,
-        tag::type::type::spin == 0);
-    cce_data_file_.close_current_object();
-  });
+  tmpl::for_each<detail::reduced_cce_input_tags>(
+      [this, &buffers, &time_span_start, &time_span_end,
+       &computation_l_max](auto tag_v) noexcept {
+        using tag = typename decltype(tag_v)::type;
+        this->update_buffer(
+            make_not_null(&get(get<tag>(*buffers)).data()),
+            cce_data_file_.get<h5::Dat>(
+                "/" + get<Tags::detail::InputDataSet<tag>>(dataset_names_)),
+            computation_l_max, *time_span_start, *time_span_end,
+            tag::type::type::spin == 0);
+        cce_data_file_.close_current_object();
+      });
   // the next time an update will be required
   return time_buffer_[std::min(*time_span_end - interpolator_length + 1,
                                time_buffer_.size() - 1)];
@@ -424,6 +425,85 @@ void ReducedSpecWorldtubeH5BufferUpdater::pup(PUP::er& p) noexcept {
   p | dataset_names_;
   if (p.isUnpacking()) {
     cce_data_file_ = h5::H5File<h5::AccessType::ReadOnly>{filename_};
+  }
+}
+
+ModeSetBoundaryH5BufferUpdater::ModeSetBoundaryH5BufferUpdater(
+    const std::string& cce_data_filename, const std::string& dataset_name,
+    const size_t input_l_max, const size_t input_l_min) noexcept
+    : mode_file_{cce_data_filename},
+      filename_{cce_data_filename},
+      dataset_name_{dataset_name},
+      l_max_{input_l_max},
+      l_min_{input_l_min} {
+  // assume that any valid mode file has at least the 2, 2 mode.
+  const auto& mode22_data = mode_file_.get<h5::Dat>(dataset_name + "Y_l2_m2");
+  const auto data_table_dimensions = mode22_data.get_dimensions();
+  const Matrix time_matrix = mode22_data.get_data_subset(
+      std::vector<size_t>{0}, 0, data_table_dimensions[0]);
+  time_buffer_ = DataVector{data_table_dimensions[0]};
+  for (size_t i = 0; i < data_table_dimensions[0]; ++i) {
+    // the mode format often has 0 at merger, so adjust for 0 at start of
+    // simulation.
+    time_buffer_[i] = time_matrix(i, 0);
+  }
+  mode_file_.close_current_object();
+}
+
+double ModeSetBoundaryH5BufferUpdater::update_buffer_for_time(
+    gsl::not_null<ComplexModalVector*> buffer,
+    gsl::not_null<size_t*> time_span_start,
+    gsl::not_null<size_t*> time_span_end, double time, size_t computation_l_max,
+    size_t interpolator_length, size_t buffer_depth) const noexcept {
+  if (*time_span_end >= time_buffer_.size()) {
+    return std::numeric_limits<double>::quiet_NaN();
+  }
+  if (*time_span_end > interpolator_length and
+      time_buffer_[*time_span_end - interpolator_length] > time) {
+    // the next time an update will be required
+    return time_buffer_[*time_span_end - interpolator_length + 1];
+  }
+  // find the time spans that are needed
+  auto new_span_pair = detail::create_span_for_time_value(
+      time, buffer_depth, interpolator_length, 0, time_buffer_.size(),
+      time_buffer_);
+  *time_span_start = new_span_pair.first;
+  *time_span_end = new_span_pair.second;
+
+  *buffer = 0.0;
+  std::vector<size_t> columns = {{1, 2}};
+  for (int l = l_min_;
+       l <= static_cast<int>(std::min(computation_l_max, l_max_)); ++l) {
+    for (int m = -l; m <= l; ++m) {
+      const h5::Dat& read_data = mode_file_.get<h5::Dat>(
+          MakeString{} << dataset_name_ << "Y_l" << l << "_m" << m);
+
+      const Matrix data_matrix = read_data.get_data_subset(
+          columns, *time_span_start, *time_span_end - *time_span_start);
+
+      for (size_t time_row = 0; time_row < *time_span_end - *time_span_start;
+           ++time_row) {
+        (*buffer)[Spectral::Swsh::goldberg_mode_index(
+                      computation_l_max, static_cast<size_t>(l), m) *
+                      (*time_span_end - *time_span_start) +
+                  time_row] = std::complex<double>(data_matrix(time_row, 0),
+                                                   data_matrix(time_row, 1));
+        mode_file_.close_current_object();
+      }
+    }
+  }
+  return time_buffer_[std::min(*time_span_end - interpolator_length + 1,
+                               time_buffer_.size() - 1)];
+}
+
+void ModeSetBoundaryH5BufferUpdater::pup(PUP::er& p) noexcept {
+  p | time_buffer_;
+  p | filename_;
+  p | dataset_name_;
+  p | l_max_;
+  p | l_min_;
+  if (p.isUnpacking()) {
+    mode_file_ = h5::H5File<h5::AccessType::ReadOnly>{filename_};
   }
 }
 

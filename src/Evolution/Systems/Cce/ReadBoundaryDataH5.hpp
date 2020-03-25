@@ -362,6 +362,44 @@ class ReducedSpecWorldtubeH5BufferUpdater
   DataVector time_buffer_;
 };
 
+
+class ModeSetBoundaryH5BufferUpdater {
+ public:
+  ModeSetBoundaryH5BufferUpdater() = default;
+
+  ModeSetBoundaryH5BufferUpdater(const std::string& cce_data_filename,
+                                 const std::string& dataset_name,
+                                 const size_t l_max,
+                                 const size_t l_min) noexcept;
+
+  double update_buffer_for_time(gsl::not_null<ComplexModalVector*> buffer,
+                                gsl::not_null<size_t*> time_span_start,
+                                gsl::not_null<size_t*> time_span_end,
+                                double time, size_t computation_l_max,
+                                size_t interpolator_length,
+                                size_t buffer_depth) const noexcept;
+
+  bool time_is_outside_range(const double time) const noexcept {
+    return time < time_buffer_[0] or
+           time > time_buffer_[time_buffer_.size() - 1];
+  }
+
+  size_t get_l_max() const noexcept { return l_max_; }
+
+  DataVector& get_time_buffer() noexcept { return time_buffer_; }
+
+  void pup(PUP::er& p) noexcept;
+
+ private:
+  size_t l_max_ = 0;
+  size_t l_min_ = 0;
+  h5::H5File<h5::AccessType::ReadOnly> mode_file_;
+  std::string filename_;
+  std::string dataset_name_;
+
+  DataVector time_buffer_;
+};
+
 /*!
  * \brief Manages the cached buffer data associated with a CCE worldtube and
  * interpolates to requested time points to provide worldtube boundary data to

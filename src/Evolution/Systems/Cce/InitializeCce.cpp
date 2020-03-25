@@ -4,6 +4,7 @@
 #include "Evolution/Systems/Cce/InitializeCce.hpp"
 
 #include <complex>
+#include <boost/optional.hpp>
 #include <cstddef>
 #include <memory>
 #include <type_traits>
@@ -17,11 +18,16 @@
 #include "DataStructures/Tensor/TypeAliases.hpp"
 #include "DataStructures/Variables.hpp"
 #include "Evolution/Systems/Cce/GaugeTransformBoundaryData.hpp"
+#include "Evolution/Systems/Cce/PreSwshDerivatives.hpp"
+#include "Evolution/Systems/Cce/ReadBoundaryDataH5.hpp"
+#include "NumericalAlgorithms/Interpolation/BarycentricRationalSpanInterpolator.hpp"
+#include "NumericalAlgorithms/Interpolation/SpanInterpolator.hpp"
 #include "NumericalAlgorithms/Spectral/Spectral.hpp"
 #include "NumericalAlgorithms/Spectral/SwshCollocation.hpp"
 #include "NumericalAlgorithms/Spectral/SwshDerivatives.hpp"
 #include "NumericalAlgorithms/Spectral/SwshInterpolation.hpp"
 #include "NumericalAlgorithms/Spectral/SwshTags.hpp"
+#include "Parallel/Printf.hpp"
 #include "Time/History.hpp"
 #include "Time/Slab.hpp"
 #include "Time/Time.hpp"
@@ -132,7 +138,9 @@ double adjust_angular_coordinates_for_j(
         angular_cauchy_coordinates,
     const SpinWeighted<ComplexDataVector, 2>& surface_j, const size_t l_max,
     const double tolerance, const size_t max_steps,
-    const bool adjust_volume_gauge) noexcept {
+    const bool adjust_volume_gauge,
+    boost::optional<const SpinWeighted<ComplexDataVector, 2>&> target_j =
+        boost::none) noexcept {
   const size_t number_of_angular_points =
       Spectral::Swsh::number_of_swsh_collocation_points(l_max);
 
@@ -347,7 +355,13 @@ double adjust_angular_coordinates_for_j(
         square(get(gauge_omega).data());
 
     // check completion conditions
-    max_error = max(abs(evolution_gauge_surface_j.data()));
+    if(not target_j) {
+      max_error = max(abs(evolution_gauge_surface_j.data()));
+    } else {
+      max_error =
+          max(abs(evolution_gauge_surface_j.data() - (*target_j).data()));
+    }
+    Parallel::printf("step %zu, error %e\n", number_of_steps, max_error);
     ++number_of_steps;
     if (max_error > 5.0e-3) {
       ERROR(
@@ -362,12 +376,22 @@ double adjust_angular_coordinates_for_j(
     }
     // The alteration in each of the spin-weighted Jacobian factors determined
     // by linearizing the system in small J
-    get(next_gauge_c).data() = -0.5 * evolution_gauge_surface_j.data() *
-                               square(get(gauge_omega).data()) /
-                               (get(gauge_d).data() * interpolated_k.data());
-    get(next_gauge_d).data() = get(next_gauge_c).data() *
-                               conj(get(gauge_c).data()) /
-                               conj(get(gauge_d).data());
+    if (not target_j) {
+      get(next_gauge_c).data() = -0.5 * evolution_gauge_surface_j.data() *
+                                 square(get(gauge_omega).data()) /
+                                 (get(gauge_d).data() * interpolated_k.data());
+      get(next_gauge_d).data() = get(next_gauge_c).data() *
+                                 conj(get(gauge_c).data()) /
+                                 conj(get(gauge_d).data());
+    } else {
+      get(next_gauge_c).data() =
+          -0.5 * (evolution_gauge_surface_j.data() - (*target_j).data()) *
+          square(get(gauge_omega).data()) /
+          (get(gauge_d).data() * interpolated_k.data());
+      get(next_gauge_d).data() = get(next_gauge_c).data() *
+          conj(get(gauge_c).data()) /
+          conj(get(gauge_d).data());
+    }
 
     iteration_interpolator.interpolate(make_not_null(&evolution_gauge_eth_x),
                                        eth_x);
@@ -456,6 +480,137 @@ void GaugeAdjustInitialJ::apply(
         gauge_d, gauge_omega, interpolator);
   }
 }
+
+InitializeJImportModes::InitializeJImportModes(
+    const std::string& mode_filename, const std::string& mode_dataset,
+    const size_t file_l_max, const double angular_coordinate_tolerance,
+    const size_t max_iterations, const double start_time) noexcept
+    : buffer_updater_{mode_filename, mode_dataset, file_l_max, 2_st},
+      filename_{mode_filename},
+      dataset_name_{mode_dataset},
+      file_l_max_{file_l_max},
+      angular_coordinate_tolerance_{angular_coordinate_tolerance},
+      max_iterations_{max_iterations},
+      start_time_{start_time} {}
+
+std::unique_ptr<InitializeJ> InitializeJImportModes::get_clone() const
+    noexcept {
+  return std::make_unique<InitializeJImportModes>(
+      filename_, dataset_name_, file_l_max_, angular_coordinate_tolerance_,
+      max_iterations_, start_time_);
+}
+
+void InitializeJImportModes::operator()(
+    const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> j,
+    const gsl::not_null<tnsr::i<DataVector, 3>*> cartesian_cauchy_coordinates,
+    const gsl::not_null<
+        tnsr::i<DataVector, 2, ::Frame::Spherical<::Frame::Inertial>>*>
+        angular_cauchy_coordinates,
+    const Scalar<SpinWeighted<ComplexDataVector, 2>>& boundary_j,
+    const Scalar<SpinWeighted<ComplexDataVector, 2>>& boundary_dr_j,
+    const Scalar<SpinWeighted<ComplexDataVector, 0>>& r, const size_t l_max,
+    const size_t number_of_radial_points) const noexcept {
+  const size_t number_of_angular_points =
+      Spectral::Swsh::number_of_swsh_collocation_points(l_max);
+
+  intrp::BarycentricRationalSpanInterpolator interpolator{10_st, 10_st};
+  // get the appropriately interpolated dataset to use for the angular
+  // coordinate solve.
+  ComplexModalVector buffer{
+      square(l_max + 1) *
+      (2_st + 2 * interpolator.required_number_of_points_before_and_after())};
+  size_t time_span_start;
+  size_t time_span_end;
+  buffer_updater_.update_buffer_for_time(
+      make_not_null(&buffer), make_not_null(&time_span_start),
+      make_not_null(&time_span_end), start_time_, l_max, 6_st, 2_st);
+
+  auto interpolation_time_span = detail::create_span_for_time_value(
+      start_time_, 0, interpolator.required_number_of_points_before_and_after(),
+      time_span_start, time_span_end, buffer_updater_.get_time_buffer());
+
+  // search through and find the two interpolation points the time point is
+  // between. If we can, put the range for the interpolation centered on the
+  // desired point. If that can't be done (near the start or the end of the
+  // simulation), make the range terminated at the start or end of the cached
+  // data and extending for the desired range in the other direction.
+  const size_t buffer_span_size = time_span_end - time_span_start;
+  const size_t interpolation_span_size =
+      interpolation_time_span.second - interpolation_time_span.first;
+
+  DataVector time_points{
+      buffer_updater_.get_time_buffer().data() + interpolation_time_span.first,
+      interpolation_span_size};
+
+  auto interpolate_from_column =
+      [this, &time_points, &buffer_span_size, &interpolation_time_span,
+       &interpolator, &time_span_start,
+       &interpolation_span_size](auto data, size_t column) {
+        const auto interp_val = interpolator.interpolate(
+            gsl::span<const double>(time_points.data(), time_points.size()),
+            gsl::span<const std::complex<double>>(
+                data + column * (buffer_span_size) +
+                    (interpolation_time_span.first - time_span_start),
+                interpolation_span_size),
+            start_time_);
+        return interp_val;
+      };
+
+  SpinWeighted<ComplexModalVector, 2> target_j_transform{
+      Spectral::Swsh::size_of_libsharp_coefficient_vector(l_max)};
+
+  for (const auto& libsharp_mode :
+       Spectral::Swsh::cached_coefficients_metadata(l_max)) {
+    Spectral::Swsh::goldberg_modes_to_libsharp_modes_single_pair(
+        libsharp_mode, make_not_null(&target_j_transform), 0,
+        interpolate_from_column(
+            buffer.data(),
+            Spectral::Swsh::goldberg_mode_index(
+                l_max, libsharp_mode.l, static_cast<int>(libsharp_mode.m))),
+        interpolate_from_column(
+            buffer.data(),
+            Spectral::Swsh::goldberg_mode_index(
+                l_max, libsharp_mode.l, -static_cast<int>(libsharp_mode.m))));
+  }
+  SpinWeighted<ComplexDataVector, 2> target_j =
+      Spectral::Swsh::inverse_swsh_transform(l_max, 1, target_j_transform);
+  target_j = target_j / get(r);
+
+  // now we have initialized the boundary data compatible with the inverse-cubic
+  // state from the boundary, and we'll transform to the set of coordinates
+  // necessary to fix the 1/r part of the initial J to the modes determined by
+  // the input data.
+  adjust_angular_coordinates_for_j(j, cartesian_cauchy_coordinates,
+                                   angular_cauchy_coordinates, get(boundary_j),
+                                   l_max, angular_coordinate_tolerance_,
+                                   max_iterations_, false, target_j);
+
+  const DataVector one_minus_y_collocation =
+      1.0 - Spectral::collocation_points<Spectral::Basis::Legendre,
+                                         Spectral::Quadrature::GaussLobatto>(
+                number_of_radial_points);
+
+  const SpinWeighted<ComplexDataVector, 2> one_minus_y_coefficient = target_j;
+
+  for (size_t i = 0; i < number_of_radial_points; i++) {
+    ComplexDataVector angular_view_j{
+        get(*j).data().data() + get(boundary_j).size() * i,
+        number_of_angular_points};
+    angular_view_j =
+        0.5 * one_minus_y_collocation[i] * one_minus_y_coefficient.data();
+  }
+}
+
+void InitializeJImportModes::pup(PUP::er& p) noexcept {
+  p | buffer_updater_;
+  p | filename_;
+  p | dataset_name_;
+  p | file_l_max_;
+  p | angular_coordinate_tolerance_;
+  p | max_iterations_;
+  p | start_time_;
+}
+
 
 InitializeJNoIncomingRadiation::InitializeJNoIncomingRadiation(
     const double angular_coordinate_tolerance, const size_t max_iterations,
@@ -600,6 +755,7 @@ void InitializeJInverseCubic::operator()(
 void InitializeJInverseCubic::pup(PUP::er& /*p*/) noexcept {}
 
 /// \cond
+PUP::able::PUP_ID InitializeJImportModes::my_PUP_ID = 0;
 PUP::able::PUP_ID InitializeJNoIncomingRadiation::my_PUP_ID = 0;
 PUP::able::PUP_ID InitializeJZeroNonSmooth::my_PUP_ID = 0;
 PUP::able::PUP_ID InitializeJInverseCubic::my_PUP_ID = 0;
