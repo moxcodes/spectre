@@ -51,7 +51,8 @@ struct InitializeFirstHypersurface {
     db::mutate_apply<InitializeJ::mutate_tags, InitializeJ::argument_tags>(
         db::get<Tags::InitializeJ>(box), make_not_null(&box));
     db::mutate_apply<InitializeScriPlusValue<Tags::InertialRetardedTime>>(
-        make_not_null(&box));
+        make_not_null(&box),
+        db::get<::Tags::TimeStepId>(box).substep_time().value());
     return {std::move(box)};
   }
 };
