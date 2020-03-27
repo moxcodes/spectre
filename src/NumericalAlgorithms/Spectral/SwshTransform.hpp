@@ -784,5 +784,45 @@ void interpolate_to_collocation(
     const SpinWeighted<ComplexDataVector, Spin>& source, size_t target_l_max,
     size_t source_l_max, size_t number_of_radial_points) noexcept;
 
+
+template <int Spin>
+void resample(
+    const gsl::not_null<SpinWeighted<ComplexDataVector, Spin>*> target,
+    const SpinWeighted<ComplexDataVector, Spin>& source,
+    const size_t target_l_max, const size_t source_l_max) noexcept {
+  auto source_modes = swsh_transform(source_l_max, 1, source);
+  SpinWeighted<ComplexModalVector, Spin> target_modes{
+      size_of_libsharp_coefficient_vector(target_l_max)};
+
+  const auto& target_coefficient_metadata =
+      cached_coefficients_metadata(target_l_max);
+  auto source_coefficient_metadata_iterator =
+      cached_coefficients_metadata(source_l_max).begin();
+  for (const auto& coefficient : target_coefficient_metadata) {
+    // catch up the source metadata if it is behind. Assumes that the modes are
+    // ascending in both m and l
+    while (source_coefficient_metadata_iterator !=
+               cached_coefficients_metadata(source_l_max).end() and
+           ((*source_coefficient_metadata_iterator).l < coefficient.l or
+            (*source_coefficient_metadata_iterator).m < coefficient.m)) {
+      ++source_coefficient_metadata_iterator;
+    }
+    if (coefficient.l <= source_l_max and
+        coefficient.l == (*source_coefficient_metadata_iterator).l and
+        coefficient.m == (*source_coefficient_metadata_iterator).m) {
+      target_modes.data()[coefficient.transform_of_real_part_offset] =
+          source_modes.data()[(*source_coefficient_metadata_iterator)
+                                  .transform_of_real_part_offset];
+      target_modes.data()[coefficient.transform_of_imag_part_offset] =
+          source_modes.data()[(*source_coefficient_metadata_iterator)
+                                  .transform_of_imag_part_offset];
+    } else {
+      target_modes.data()[coefficient.transform_of_real_part_offset] = 0.0;
+      target_modes.data()[coefficient.transform_of_imag_part_offset] = 0.0;
+    }
+  }
+  inverse_swsh_transform(target_l_max, 1, target, target_modes);
+}
+
 }  // namespace Swsh
 }  // namespace Spectral
