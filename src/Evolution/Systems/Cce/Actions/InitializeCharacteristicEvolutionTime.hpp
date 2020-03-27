@@ -53,16 +53,20 @@ namespace Actions {
  * ```
  * - Removes: nothing
  */
+template <typename RunStage>
 struct InitializeCharacteristicEvolutionTime {
-  using initialization_tags = tmpl::list<InitializationTags::TargetStepSize>;
-  using const_global_cache_tags =
-      tmpl::list<::Tags::TimeStepper<TimeStepper>>;
+  using initialization_tags =
+      tmpl::list<InitializationTags::TargetStepSize<RunStage>,
+                 Tags::StartTime<RunStage>, Tags::EndTime<RunStage>>;
+  using initialization_tags_to_keep =
+      tmpl::list<Tags::StartTime<RunStage>, Tags::EndTime<RunStage>>;
+  using const_global_cache_tags = tmpl::list<::Tags::TimeStepper<TimeStepper>>;
 
-  template <typename DbTags, typename... InboxTags, typename Metavariables,
-            typename ArrayIndex, typename ActionList,
-            typename ParallelComponent,
-            Requires<tmpl::list_contains_v<
-                DbTags, InitializationTags::TargetStepSize>> = nullptr>
+  template <
+      typename DbTags, typename... InboxTags, typename Metavariables,
+      typename ArrayIndex, typename ActionList, typename ParallelComponent,
+      Requires<tmpl::list_contains_v<
+          DbTags, InitializationTags::TargetStepSize<RunStage>>> = nullptr>
   static auto apply(db::DataBox<DbTags>& box,
                     const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
                     const Parallel::GlobalCache<Metavariables>& /*cache*/,
@@ -80,8 +84,9 @@ struct InitializeCharacteristicEvolutionTime {
     using evolution_compute_tags =
         db::AddComputeTags<::Tags::SubstepTimeCompute>;
 
-    const double initial_time_value = db::get<Tags::StartTime>(box);
-    const double step_size = db::get<InitializationTags::TargetStepSize>(box);
+    const double initial_time_value = db::get<Tags::StartTime<RunStage>>(box);
+    const double step_size =
+        db::get<InitializationTags::TargetStepSize<RunStage>>(box);
 
     const Slab single_step_slab{initial_time_value,
                                 initial_time_value + step_size};
@@ -108,11 +113,11 @@ struct InitializeCharacteristicEvolutionTime {
             std::move(swsh_history)));
   }
 
-  template <typename DbTags, typename... InboxTags, typename Metavariables,
-            typename ArrayIndex, typename ActionList,
-            typename ParallelComponent,
-            Requires<not tmpl::list_contains_v<
-                DbTags, InitializationTags::TargetStepSize>> = nullptr>
+  template <
+      typename DbTags, typename... InboxTags, typename Metavariables,
+      typename ArrayIndex, typename ActionList, typename ParallelComponent,
+      Requires<not tmpl::list_contains_v<
+          DbTags, InitializationTags::TargetStepSize<RunStage>>> = nullptr>
   static std::tuple<db::DataBox<DbTags>&&> apply(
       const db::DataBox<DbTags>& /*box*/,
       const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,

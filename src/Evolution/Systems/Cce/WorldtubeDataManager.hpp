@@ -235,4 +235,52 @@ class BondiWorldtubeDataManager : public WorldtubeDataManager {
 
   std::unique_ptr<intrp::SpanInterpolator> interpolator_;
 };
+
+class PnWorldtubeDataManager : public WorldtubeDataManager {
+ public:
+  // charm needs an empty constructor.
+  PnWorldtubeDataManager() = default;
+
+  PnWorldtubeDataManager(
+      std::unique_ptr<ModeSetBoundaryH5BufferUpdater> buffer_updater,
+      size_t l_max, size_t buffer_depth,
+      std::unique_ptr<intrp::SpanInterpolator> interpolator) noexcept;
+
+  bool populate_hypersurface_boundary_data(
+      gsl::not_null<Variables<
+          Tags::characteristic_worldtube_boundary_tags<Tags::BoundaryValue>>*>
+          boundary_data_variables,
+      double time) const noexcept override;
+
+  /// retrieves the l_max that will be supplied to the \ref DataBoxGroup in
+  /// `populate_hypersurface_boundary_data()`
+  size_t get_l_max() const noexcept { return l_max_; }
+
+  /// retrieves the current time span associated with the `buffer_updater_` for
+  /// diagnostics
+  std::pair<size_t, size_t> get_time_span() const noexcept {
+    return std::make_pair(time_span_start_, time_span_end_);
+  }
+
+  /// Serialization for Charm++.
+  void pup(PUP::er& p) noexcept;  // NOLINT
+
+ private:
+  std::unique_ptr<ModeSetBoundaryH5BufferUpdater> buffer_updater_;
+  mutable size_t time_span_start_ = 0;
+  mutable size_t time_span_end_ = 0;
+  size_t l_max_ = 0;
+
+  // These buffers are just kept around to avoid allocations; they're
+  // updated every time a time is requested
+  mutable ComplexModalVector interpolated_j_coefficients_;
+  mutable ComplexModalVector interpolated_h_coefficients_;
+
+  // note: buffers store data in an 'time-varies-fastest' manner
+  mutable ComplexModalVector coefficients_buffers_;
+
+  size_t buffer_depth_ = 0;
+
+  std::unique_ptr<intrp::SpanInterpolator> interpolator_;
+};
 }  // namespace Cce

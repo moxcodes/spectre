@@ -82,9 +82,10 @@ struct SendToEvolution;
  *   - `Tags::Variables<typename
  * Metavariables::cce_boundary_communication_tags>` (every tensor)
  */
-template <typename Metavariables, typename EvolutionComponent>
-struct BoundaryComputeAndSendToEvolution<H5WorldtubeBoundary<Metavariables>,
-                                         EvolutionComponent> {
+template <typename Metavariables, typename RunStage,
+          typename EvolutionComponent>
+struct BoundaryComputeAndSendToEvolution<
+    H5WorldtubeBoundary<RunStage, Metavariables>, EvolutionComponent> {
   template <typename ParallelComponent, typename... DbTags, typename ArrayIndex,
             Requires<tmpl2::flat_any_v<std::is_same_v<
                 ::Tags::Variables<
@@ -94,23 +95,9 @@ struct BoundaryComputeAndSendToEvolution<H5WorldtubeBoundary<Metavariables>,
                     Parallel::GlobalCache<Metavariables>& cache,
                     const ArrayIndex& /*array_index*/,
                     const TimeStepId& time) noexcept {
-    bool successfully_populated = false;
-    db::mutate<Tags::H5WorldtubeBoundaryDataManager,
-               ::Tags::Variables<
-                   typename Metavariables::cce_boundary_communication_tags>>(
-        make_not_null(&box),
-        [&successfully_populated, &time](
-            const gsl::not_null<std::unique_ptr<Cce::WorldtubeDataManager>*>
-                worldtube_data_manager,
-            const gsl::not_null<Variables<
-                typename Metavariables::cce_boundary_communication_tags>*>
-                boundary_variables) noexcept {
-          successfully_populated =
-              (*worldtube_data_manager)
-                  ->populate_hypersurface_boundary_data(
-                      boundary_variables, time.substep_time().value());
-        });
-    if (not successfully_populated) {
+    if (not db::get<Tags::WorldtubeBoundaryDataManager<RunStage>>(box)
+                .populate_hypersurface_boundary_data(
+                    make_not_null(&box), time.substep_time().value())) {
       ERROR("Insufficient boundary data to proceed, exiting early at time " +
             std::to_string(time.substep_time().value()));
     }

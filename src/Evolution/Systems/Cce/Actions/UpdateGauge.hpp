@@ -34,8 +34,6 @@ namespace Actions {
  * for those mutators for mathematical details.
  */
 struct UpdateGauge {
-  using const_global_cache_tags = tmpl::list<Tags::LMax>;
-
   template <typename DbTags, typename... InboxTags, typename Metavariables,
             typename ArrayIndex, typename ActionList,
             typename ParallelComponent>

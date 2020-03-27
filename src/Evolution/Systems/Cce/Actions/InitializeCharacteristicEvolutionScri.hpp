@@ -36,11 +36,13 @@ namespace Actions {
  * in `scri_values_to_observe`
  * - Removes: nothing
  */
+template <typename RunStage>
 struct InitializeCharacteristicEvolutionScri {
   using initialization_tags =
-      tmpl::list<InitializationTags::ScriInterpolationOrder>;
-  using const_global_cache_tags =
-      tmpl::list<Tags::LMax, Tags::NumberOfRadialPoints>;
+      tmpl::list<InitializationTags::ScriInterpolationOrder,
+                 Tags::LMax<RunStage>, Tags::NumberOfRadialPoints<RunStage>>;
+  using initialization_tags_to_keep =
+      tmpl::list<Tags::LMax<RunStage>, Tags::NumberOfRadialPoints<RunStage>>;
 
   template <
       typename DbTags, typename... InboxTags, typename Metavariables,

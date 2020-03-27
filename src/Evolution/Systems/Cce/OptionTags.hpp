@@ -11,6 +11,7 @@
 #include "Evolution/Systems/Cce/InterfaceManagers/GhInterfaceManager.hpp"
 #include "Evolution/Systems/Cce/InterfaceManagers/GhInterpolationStrategies.hpp"
 #include "Evolution/Systems/Cce/InterfaceManagers/GhLockstep.hpp"
+#include "Evolution/Systems/Cce/System.hpp"
 #include "Evolution/Systems/Cce/WorldtubeDataManager.hpp"
 #include "NumericalAlgorithms/Interpolation/SpanInterpolator.hpp"
 #include "Options/Options.hpp"
@@ -23,16 +24,43 @@ struct Cce {
   static constexpr OptionString help = {"Options for the Cce evolution system"};
 };
 
+struct Initialization {
+  static constexpr OptionString help = {
+      "Options for the initialization pre-run for CCE"};
+  using group = Cce;
+};
+
+template <typename RunStage = MainRun>
+struct CceGroup;
+
+template <>
+struct CceGroup<MainRun> {
+  using type = Cce;
+};
+
+template <>
+struct CceGroup<InitializationRun> {
+  using type = Initialization;
+};
+
 /// %Option group
 struct Filtering {
   static constexpr OptionString help = {"Options for the filtering in Cce"};
   using group = Cce;
 };
 
+template <typename RunStage = MainRun>
 struct LMax {
   using type = size_t;
   static constexpr OptionString help{
       "Maximum l value for spin-weighted spherical harmonics"};
+  using group = typename CceGroup<RunStage>::type;
+};
+
+struct ExtractionRadius {
+  using type = double;
+  static constexpr OptionString help{
+      "Extraction radius for the spherical CCE worldtube"};
   using group = Cce;
 };
 
@@ -62,28 +90,25 @@ struct ObservationLMax {
   using group = Cce;
 };
 
+template <typename RunStage = MainRun>
 struct NumberOfRadialPoints {
   using type = size_t;
   static constexpr OptionString help{
       "Number of radial grid points in the spherical domain"};
-  using group = Cce;
+  using group = typename CceGroup<RunStage>::type;
 };
 
-struct ExtractionRadius {
-  using type = double;
-  static constexpr OptionString help{"Extraction radius from the GH system."};
-  using group = Cce;
-};
-
+template <typename RunStage = MainRun>
 struct EndTime {
   using type = double;
   static constexpr OptionString help{"End time for the Cce Evolution."};
   static double default_value() noexcept {
     return std::numeric_limits<double>::infinity();
   }
-  using group = Cce;
+  using group = typename CceGroup<RunStage>::type;
 };
 
+template <typename RunStage = MainRun>
 struct StartTime {
   using type = double;
   static constexpr OptionString help{
@@ -91,20 +116,22 @@ struct StartTime {
   static double default_value() noexcept {
     return -std::numeric_limits<double>::infinity();
   }
-  using group = Cce;
+  using group = typename CceGroup<RunStage>::type;
 };
 
+template <typename RunStage = MainRun>
 struct TargetStepSize {
   using type = double;
   static constexpr OptionString help{"Target time step size for Cce Evolution"};
-  using group = Cce;
+  using group = typename CceGroup<RunStage>::type;
 };
 
+template <typename RunStage = MainRun>
 struct BoundaryDataFilename {
   using type = std::string;
   static constexpr OptionString help{
       "H5 file to read the wordltube data from."};
-  using group = Cce;
+  using group = typename CceGroup<RunStage>::type;
 };
 
 struct H5LookaheadTimes {
@@ -178,23 +205,14 @@ struct ScriInterpolationOrder : db::SimpleTag {
   }
 };
 
+template <typename RunStage = MainRun>
 struct TargetStepSize : db::SimpleTag {
   using type = double;
-  using option_tags = tmpl::list<OptionTags::TargetStepSize>;
+  using option_tags = tmpl::list<OptionTags::TargetStepSize<RunStage>>;
 
   static constexpr bool pass_metavariables = false;
   static double create_from_options(const double target_step_size) noexcept {
     return target_step_size;
-  }
-};
-
-struct ExtractionRadius : db::SimpleTag {
-  using type = double;
-  using option_tags = tmpl::list<OptionTags::ExtractionRadius>;
-
-  static constexpr bool pass_metavariables = false;
-  static double create_from_options(const double extraction_radius) noexcept {
-    return extraction_radius;
   }
 };
 
@@ -210,11 +228,16 @@ struct ScriOutputDensity : db::SimpleTag {
 }  // namespace InitializationTags
 
 namespace Tags {
+template <typename RunStage = MainRun>
+struct H5WorldtubeBoundaryDataManager;
+
 /// A tag that constructs a `MetricWorldtubeDataManager` from options
-struct H5WorldtubeBoundaryDataManager : db::SimpleTag {
+template <>
+struct H5WorldtubeBoundaryDataManager<MainRun> : db::SimpleTag {
   using type = std::unique_ptr<WorldtubeDataManager>;
   using option_tags =
-      tmpl::list<OptionTags::LMax, OptionTags::BoundaryDataFilename,
+      tmpl::list<OptionTags::LMax<MainRun>,
+                 OptionTags::BoundaryDataFilename<MainRun>,
                  OptionTags::H5LookaheadTimes, OptionTags::H5Interpolator,
                  OptionTags::H5IsBondiData>;
 
@@ -236,9 +259,30 @@ struct H5WorldtubeBoundaryDataManager : db::SimpleTag {
   }
 };
 
+template <>
+struct H5WorldtubeBoundaryDataManager<InitializationRun> : db::SimpleTag {
+  using type = PnWorldtubeDataManager;
+  using option_tags =
+      tmpl::list<OptionTags::LMax<InitializationRun>,
+                 OptionTags::BoundaryDataFilename<InitializationRun>,
+                 OptionTags::H5LookaheadTimes, OptionTags::H5Interpolator>;
+
+  static constexpr bool pass_metavariables = false;
+  static PnWorldtubeDataManager create_from_options(
+      const size_t l_max, const std::string& filename,
+      const size_t number_of_lookahead_times,
+      const std::unique_ptr<intrp::SpanInterpolator>& interpolator) noexcept {
+    return PnWorldtubeDataManager{
+      std::make_unique<ModeSetBoundaryH5BufferUpdater>(filename, "/", 8_st,
+                                                       2_st),
+          l_max, number_of_lookahead_times, interpolator->get_clone()};
+  }
+};
+
+template <typename RunStage = MainRun>
 struct LMax : db::SimpleTag, Spectral::Swsh::Tags::LMaxBase {
   using type = size_t;
-  using option_tags = tmpl::list<OptionTags::LMax>;
+  using option_tags = tmpl::list<OptionTags::LMax<RunStage>>;
 
   static constexpr bool pass_metavariables = false;
   static size_t create_from_options(const size_t l_max) noexcept {
@@ -246,15 +290,26 @@ struct LMax : db::SimpleTag, Spectral::Swsh::Tags::LMaxBase {
   }
 };
 
+template <typename RunStage = MainRun>
 struct NumberOfRadialPoints : db::SimpleTag,
                               Spectral::Swsh::Tags::NumberOfRadialPointsBase {
   using type = size_t;
-  using option_tags = tmpl::list<OptionTags::NumberOfRadialPoints>;
+  using option_tags = tmpl::list<OptionTags::NumberOfRadialPoints<RunStage>>;
 
   static constexpr bool pass_metavariables = false;
   static size_t create_from_options(
       const size_t number_of_radial_points) noexcept {
     return number_of_radial_points;
+  }
+};
+
+struct ExtractionRadius : db::SimpleTag {
+  using type = double;
+  using option_tags = tmpl::list<OptionTags::ExtractionRadius>;
+
+  static constexpr bool pass_metavariables = false;
+  static double create_from_options(const double extraction_radius) noexcept {
+    return extraction_radius;
   }
 };
 
@@ -299,6 +354,9 @@ struct RadialFilterHalfPower : db::SimpleTag {
   }
 };
 
+template <typename RunStage = MainRun>
+struct StartTimeFromFile;
+
 /// \brief Represents the start time of a bounded CCE evolution, determined
 /// either from option specification or from the file
 ///
@@ -307,11 +365,11 @@ struct RadialFilterHalfPower : db::SimpleTag {
 /// `-std::numeric_limits<double>::%infinity()`), this will find the start time
 /// from the provided H5 file. If `OptionTags::StartTime` takes any other value,
 /// it will be used directly as the start time for the CCE evolution instead.
-struct StartTimeFromFile : Tags::StartTime, db::SimpleTag {
+struct StartTimeFromFile<MainRun> : Tags::StartTime, db::SimpleTag {
   using type = double;
-  using option_tags =
-      tmpl::list<OptionTags::StartTime, OptionTags::BoundaryDataFilename,
-                 OptionTags::H5IsBondiData>;
+  using option_tags = tmpl::list<OptionTags::StartTime<MainRun>,
+                                 OptionTags::BoundaryDataFilename<MainRun>,
+                                 OptionTags::H5IsBondiData>;
 
   static constexpr bool pass_metavariables = false;
   static double create_from_options(double start_time,
@@ -332,6 +390,17 @@ struct StartTimeFromFile : Tags::StartTime, db::SimpleTag {
   }
 };
 
+template <>
+struct StartTimeFromFile<InitializationRun> : Tags::StartTime, db::SimpleTag {
+  using type = double;
+  using option_tags = tmpl::list<OptionTags::StartTime<InitializationRun>>;
+
+  static constexpr bool pass_metavariables = false;
+  static double create_from_options(double start_time) noexcept {
+    return start_time;
+  }
+};
+
 /// \brief Represents the start time of a bounded CCE evolution that must be
 /// supplied in the input file (for e.g. analytic tests).
 struct SpecifiedStartTime : Tags::StartTime, db::SimpleTag {
@@ -344,6 +413,9 @@ struct SpecifiedStartTime : Tags::StartTime, db::SimpleTag {
   }
 };
 
+template <typename RunStage = MainRun>
+struct EndTimeFromFile;
+
 /// \brief Represents the final time of a bounded CCE evolution, determined
 /// either from option specification or from the file
 ///
@@ -352,11 +424,12 @@ struct SpecifiedStartTime : Tags::StartTime, db::SimpleTag {
 /// `std::numeric_limits<double>::%infinity()`), this will find the end time
 /// from the provided H5 file. If `OptionTags::EndTime` takes any other value,
 /// it will be used directly as the final time for the CCE evolution instead.
-struct EndTimeFromFile : Tags::EndTime, db::SimpleTag {
+template <>
+struct EndTimeFromFile<MainRun> : Tags::EndTime, db::SimpleTag {
   using type = double;
-  using option_tags =
-      tmpl::list<OptionTags::EndTime, OptionTags::BoundaryDataFilename,
-                 OptionTags::H5IsBondiData>;
+  using option_tags = tmpl::list<OptionTags::EndTime<MainRun>,
+                                 OptionTags::BoundaryDataFilename<MainRun>,
+                                 OptionTags::H5IsBondiData>;
 
   static constexpr bool pass_metavariables = false;
   static double create_from_options(double end_time,
@@ -373,6 +446,17 @@ struct EndTimeFromFile : Tags::EndTime, db::SimpleTag {
         end_time = time_buffer[time_buffer.size() - 1];
       }
     }
+    return end_time;
+  }
+};
+
+template <>
+struct EndTimeFromFile<InitializationRun> : db::SimpleTag {
+  using type = double;
+  using option_tags = tmpl::list<OptionTags::EndTime<InitializationRun>>;
+
+  static constexpr bool pass_metavariables = false;
+  static double create_from_options(const double end_time) noexcept {
     return end_time;
   }
 };

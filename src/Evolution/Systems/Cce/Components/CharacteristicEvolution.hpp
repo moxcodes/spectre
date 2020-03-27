@@ -24,6 +24,7 @@
 #include "Evolution/Systems/Cce/PrecomputeCceDependencies.hpp"
 #include "Evolution/Systems/Cce/ScriPlusValues.hpp"
 #include "Evolution/Systems/Cce/SwshDerivatives.hpp"
+#include "Evolution/Systems/Cce/System.hpp"
 #include "IO/Observer/ObserverComponent.hpp"
 #include "Parallel/Actions/TerminatePhase.hpp"
 #include "Parallel/GlobalCache.hpp"
@@ -87,31 +88,24 @@ namespace Cce {
  * `::Actions::MutateApply`) that is used to compute the initial hypersurface
  * data from the boundary data.
  */
-template <class Metavariables>
+template <typename RunStage, typename BoundaryComponent, class Metavariables>
 struct CharacteristicEvolution {
   using chare_type = Parallel::Algorithms::Singleton;
   using metavariables = Metavariables;
 
-  using pre_initialize_action_list =
-      tmpl::list<Actions::InitializeCharacteristicEvolutionVariables,
-                 Actions::InitializeCharacteristicEvolutionTime,
-                 Actions::RequestBoundaryData<
-                   typename Metavariables::cce_boundary_component,
-                   CharacteristicEvolution<Metavariables>>,
-                 Actions::ReceiveWorldtubeData<Metavariables>,
-                 Actions::InitializeFirstHypersurface,
-                 Initialization::Actions::RemoveOptionsAndTerminatePhase>;
-
-  using initialize_action_list =
-      tmpl::list<Actions::InitializeCharacteristicEvolutionVariables,
-                 Actions::InitializeCharacteristicEvolutionTime,
-                 Actions::InitializeCharacteristicEvolutionScri,
-                 Actions::RequestBoundaryData<
-                     typename Metavariables::cce_boundary_component,
-                     CharacteristicEvolution<Metavariables>>,
-                 Actions::ReceiveWorldtubeData<Metavariables>,
-                 Actions::InitializeFirstHypersurface,
-                 Initialization::Actions::RemoveOptionsAndTerminatePhase>;
+  using initialize_action_list = tmpl::list<
+      Actions::InitializeCharacteristicEvolutionVariables<RunStage>,
+      Actions::InitializeCharacteristicEvolutionTime<RunStage>,
+      tmpl::conditional_t<
+          cpp17::is_same_v<RunStage, MainRun>,
+          Actions::InitializeCharacteristicEvolutionScri<RunStage>,
+          tmpl::list<>>,
+      Actions::RequestBoundaryData<
+          BoundaryComponent,
+          CharacteristicEvolution<RunStage, BoundaryComponent, Metavariables>>,
+      Actions::ReceiveWorldtubeData<Metavariables>,
+      Actions::InitializeFirstHypersurface<RunStage>,
+      Initialization::Actions::RemoveOptionsAndTerminatePhase>;
 
   using initialization_tags =
       Parallel::get_initialization_tags<initialize_action_list>;
@@ -163,34 +157,27 @@ struct CharacteristicEvolution {
                      tmpl::list<typename Metavariables::evolved_swsh_tag>>>,
                  ::Actions::AdvanceTime>;
 
-  template <typename RunVariables>
   using extract_action_list = tmpl::list<
       Actions::RequestNextBoundaryData<
-          typename Metavariables::cce_boundary_component,
-          CharacteristicEvolution<Metavariables>>,
+          BoundaryComponent,
+          CharacteristicEvolution<RunStage, BoundaryComponent, Metavariables>>,
       Actions::UpdateGauge, Actions::PrecomputeGlobalCceDependencies,
       tmpl::transform<bondi_hypersurface_step_tags,
                       tmpl::bind<hypersurface_computation, tmpl::_1>>,
       Actions::FilterSwshVolumeQuantity<Tags::BondiH>,
-      tmpl::conditional_t<
-          cpp17::is_same_v<RunVariables, typename Metavariables::main_run>,
-          compute_scri_quantities_and_observe, tmpl::list<>>,
-      record_time_stepper_data_and_step, Actions::ExitIfEndTimeReached,
+      tmpl::conditional_t<cpp17::is_same_v<RunStage, MainRun>,
+                          compute_scri_quantities_and_observe, tmpl::list<>>,
+      record_time_stepper_data_and_step,
+      Actions::ExitIfEndTimeReached<RunStage>,
       Actions::ReceiveWorldtubeData<Metavariables>>;
 
-  using phase_dependent_action_list = tmpl::list<
-      Parallel::PhaseActions<typename Metavariables::Phase,
-                             Metavariables::Phase::PreInitialization,
-                             pre_initialize_action_list>,
-      Parallel::PhaseActions<
-          typename Metavariables::Phase, Metavariables::Phase::InitRun,
-          extract_action_list<typename Metavariables::initialization_run>>,
-      Parallel::PhaseActions<typename Metavariables::Phase,
-                             Metavariables::Phase::Initialization,
-                             initialize_action_list>,
-      Parallel::PhaseActions<
-          typename Metavariables::Phase, Metavariables::Phase::Evolve,
-          extract_action_list<typename Metavariables::main_run>>>;
+  using phase_dependent_action_list =
+      tmpl::list<Parallel::PhaseActions<typename Metavariables::Phase,
+                                        Metavariables::Phase::Initialization,
+                                        initialize_action_list>,
+                 Parallel::PhaseActions<typename Metavariables::Phase,
+                                        Metavariables::Phase::Evolve,
+                                        extract_action_list>>;
 
   using const_global_cache_tag_list =
       Parallel::get_const_global_cache_tags_from_actions<
@@ -204,7 +191,8 @@ struct CharacteristicEvolution {
       const Parallel::CProxy_GlobalCache<Metavariables>&
           global_cache) noexcept {
     auto& local_cache = *(global_cache.ckLocalBranch());
-    Parallel::get_parallel_component<CharacteristicEvolution<Metavariables>>(
+    Parallel::get_parallel_component<
+        CharacteristicEvolution<RunStage, BoundaryComponent, Metavariables>>(
         local_cache)
         .start_phase(next_phase);
   }

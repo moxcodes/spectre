@@ -114,7 +114,8 @@ struct RadialIntegrateBondi {
   using return_tags = tmpl::list<Tag>;
   using argument_tags =
       tmpl::append<integrand_tags, boundary_tags,
-                   tmpl::list<Tags::LMax, Tags::NumberOfRadialPoints>>;
+                   tmpl::list<Spectral::Swsh::Tags::LMaxBase,
+                              Spectral::Swsh::Tags::NumberOfRadialPointsBase>>;
   static void apply(
       gsl::not_null<
           Scalar<SpinWeighted<ComplexDataVector, Tag::type::type::spin>>*>
@@ -136,7 +137,8 @@ struct RadialIntegrateBondi<BoundaryPrefix, Tags::BondiQ> {
   using return_tags = tmpl::list<Tags::BondiQ>;
   using argument_tags =
       tmpl::append<integrand_tags, boundary_tags, integration_independent_tags,
-                   tmpl::list<Tags::LMax, Tags::NumberOfRadialPoints>>;
+                   tmpl::list<Spectral::Swsh::Tags::LMaxBase,
+                              Spectral::Swsh::Tags::NumberOfRadialPointsBase>>;
   static void apply(
       gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*>
           integral_result,
@@ -157,7 +159,8 @@ struct RadialIntegrateBondi<BoundaryPrefix, Tags::BondiW> {
   using return_tags = tmpl::list<Tags::BondiW>;
   using argument_tags =
       tmpl::append<integrand_tags, boundary_tags, integration_independent_tags,
-                   tmpl::list<Tags::LMax, Tags::NumberOfRadialPoints>>;
+                   tmpl::list<Spectral::Swsh::Tags::LMaxBase,
+                              Spectral::Swsh::Tags::NumberOfRadialPointsBase>>;
   static void apply(
       gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*>
           integral_result,
@@ -181,7 +184,8 @@ struct RadialIntegrateBondi<BoundaryPrefix, Tags::BondiH> {
   using return_tags = tmpl::list<Tags::BondiH>;
   using argument_tags =
       tmpl::append<integrand_tags, boundary_tags, integration_independent_tags,
-                   tmpl::list<Tags::LMax, Tags::NumberOfRadialPoints>>;
+                   tmpl::list<Spectral::Swsh::Tags::LMaxBase,
+                              Spectral::Swsh::Tags::NumberOfRadialPointsBase>>;
   static void apply(
       gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*>
           integral_result,

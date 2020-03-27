@@ -113,6 +113,11 @@
  */
 namespace Cce {
 
+// labels for the run stages of Cce
+struct MainRun {};
+
+struct InitializationRun {};
+
 struct System {
   using variables_tag = ::Tags::Variables<Tags::BondiJ>;
 };

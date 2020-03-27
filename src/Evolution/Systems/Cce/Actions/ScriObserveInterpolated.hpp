@@ -110,7 +110,7 @@ struct ScriObserveInterpolated {
       const ArrayIndex& /*array_index*/, const ActionList /*meta*/,
       const ParallelComponent* const /*meta*/) noexcept {
     const size_t observation_l_max = db::get<Tags::ObservationLMax>(box);
-    const size_t l_max = db::get<Tags::LMax>(box);
+    const size_t l_max = db::get<Spectral::Swsh::Tags::LMaxBase>(box);
     std::vector<double> data_to_write(2 * square(observation_l_max + 1) + 1);
     ComplexModalVector goldberg_modes{square(l_max + 1)};
     std::vector<std::string> file_legend;

@@ -81,13 +81,19 @@ struct RequestBoundaryData {
  * - Modifies: nothing
  */
 template <typename WorldtubeBoundaryComponent, typename EvolutionComponent>
-struct RequestNextBoundaryData {
+struct RequestNextBoundaryData;
+
+template <typename WorldtubeBoundaryComponent,
+          template <typename...> class EvolutionTemplate, typename RunStage,
+          typename Metavariables>
+struct RequestNextBoundaryData<
+    WorldtubeBoundaryComponent,
+    EvolutionTemplate<RunStage, WorldtubeBoundaryComponent, Metavariables>> {
   using const_global_cache_tags =
       tmpl::list<typename WorldtubeBoundaryComponent::end_time_tag>;
 
-  template <typename DbTags, typename... InboxTags, typename Metavariables,
-            typename ArrayIndex, typename ActionList,
-            typename ParallelComponent>
+  template <typename DbTags, typename... InboxTags, typename ArrayIndex,
+            typename ActionList, typename ParallelComponent>
   static auto apply(db::DataBox<DbTags>& box,
                     const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
                     Parallel::GlobalCache<Metavariables>& cache,
@@ -96,9 +102,11 @@ struct RequestNextBoundaryData {
                     const ParallelComponent* const /*meta*/) noexcept {
     // only request the data if the next step is not after the end time.
     if (db::get<::Tags::Next<::Tags::TimeStepId>>(box).substep_time().value() <
-        db::get<Tags::EndTime>(box)) {
+        db::get<Tags::EndTime<RunStage>>(box)) {
       Parallel::simple_action<Actions::BoundaryComputeAndSendToEvolution<
-          WorldtubeBoundaryComponent, EvolutionComponent>>(
+          WorldtubeBoundaryComponent,
+          EvolutionTemplate<RunStage, WorldtubeBoundaryComponent,
+                            Metavariables>>>(
           Parallel::get_parallel_component<WorldtubeBoundaryComponent>(cache),
           db::get<::Tags::Next<::Tags::TimeStepId>>(box));
     }

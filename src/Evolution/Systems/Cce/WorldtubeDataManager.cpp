@@ -417,8 +417,236 @@ void BondiWorldtubeDataManager::pup(PUP::er& p) noexcept {
   }
 }
 
+template <typename TagList>
+bool PnWorldtubeDataManager::populate_hypersurface_boundary_data(
+    gsl::not_null<Variables<
+        Tags::characteristic_worldtube_boundary_tags<Tags::BoundaryValue>>*>
+        boundary_data_variables,
+    const double time) const noexcept {
+  if (buffer_updater_->time_is_outside_range(time)) {
+    return false;
+  }
+  buffer_updater_->update_buffer_for_time(
+      make_not_null(&coefficients_buffers_), make_not_null(&time_span_start_),
+      make_not_null(&time_span_end_), time, l_max_,
+      interpolator_->required_number_of_points_before_and_after(),
+      buffer_depth_);
+  auto interpolation_time_span = detail::create_span_for_time_value(
+      time, 0, interpolator_->required_number_of_points_before_and_after(),
+      time_span_start_, time_span_end_, buffer_updater_->get_time_buffer());
+
+  // search through and find the two interpolation points the time point is
+  // between. If we can, put the range for the interpolation centered on the
+  // desired point. If that can't be done (near the start or the end of the
+  // simulation), make the range terminated at the start or end of the cached
+  // data and extending for the desired range in the other direction.
+  const size_t buffer_span_size = time_span_end_ - time_span_start_;
+  const size_t interpolation_span_size =
+      interpolation_time_span.second - interpolation_time_span.first;
+
+  DataVector time_points{
+      buffer_updater_->get_time_buffer().data() + interpolation_time_span.first,
+      interpolation_span_size};
+
+  auto interpolate_from_column =
+      [&time_points, &buffer_span_size, &interpolation_time_span,
+       &interpolation_span_size,
+       this](auto data, size_t column, const double local_time) {
+        const auto interp_val = interpolator_->interpolate(
+            gsl::span<const double>(time_points.data(), time_points.size()),
+            gsl::span<const std::complex<double>>(
+                data + column * (buffer_span_size) +
+                    (interpolation_time_span.first - time_span_start_),
+                interpolation_span_size),
+            local_time);
+        return interp_val;
+      };
+
+  // optimization note: consider buffers for these as well. They are small
+  // allocations, but could probably be performed at construction
+  const DataVector time_collocation_points =
+      Spectral::collocation_points<Spectral::Basis::Legendre,
+                                   Spectral::Quadrature::GaussLobatto>(
+          interpolation_span_size);
+
+  ComplexModalVector plus_m_time_collocation_values{interpolation_span_size};
+  ComplexModalVector minus_m_time_collocation_values{interpolation_span_size};
+
+  const auto affine_transform_time_to_GL =
+      [&time_points,
+       &interpolation_span_size](const double local_time) noexcept {
+        return (local_time - time_points[0]) /
+                   (time_points[interpolation_span_size - 1] - time_points[0]) -
+               1.0;
+      };
+  const auto affine_transform_GL_to_time =
+      [&time_points,
+       &interpolation_span_size](const double collocation_point) noexcept {
+        return (collocation_point + 1.0) *
+                   (time_points[interpolation_span_size - 1] - time_points[0]) +
+               time_points[0];
+      };
+
+  const Matrix interpolate_derivative_matrix =
+      Spectral::interpolation_matrix<Spectral::Basis::Legendre,
+                                     Spectral::Quadrature::GaussLobatto>(
+          interpolation_span_size,
+          DataVector{1, affine_transform_time_to_GL(time)}) *
+      Spectral::differentiation_matrix<Spectral::Basis::Legendre,
+                                       Spectral::Quadrature::GaussLobatto>(
+          interpolation_span_size);
+
+  // the ComplexModalVectors should be provided from the buffer_updater_ in
+  // 'Goldberg' format, so we iterate over modes and convert to libsharp
+  // format.
+  for (const auto& libsharp_mode :
+       Spectral::Swsh::cached_coefficients_metadata(l_max_)) {
+    // optimization note: consider a larger buffer and apply_matrices
+    for (size_t i = 0; i < time_collocation_points.size(); ++i) {
+      plus_m_time_collocation_values[i] = interpolate_from_column(
+          coefficients_buffers_.data(),
+          Spectral::Swsh::goldberg_mode_index(
+              l_max_, libsharp_mode.l, static_cast<int>(libsharp_mode.m)),
+          affine_transform_GL_to_time(time_collocation_points[i]));
+      minus_m_time_collocation_values[i] = interpolate_from_column(
+          coefficients_buffers_.data(),
+          Spectral::Swsh::goldberg_mode_index(
+              l_max_, libsharp_mode.l, -static_cast<int>(libsharp_mode.m)),
+          affine_transform_GL_to_time(time_collocation_points[i]));
+    }
+    const auto plus_m_h_mode =
+        (interpolate_derivative_matrix * plus_m_time_collocation_values)[0] /
+        (time_points[interpolation_span_size - 1] - time_points[0]);
+    const auto minus_m_h_mode =
+        (interpolate_derivative_matrix * plus_m_time_collocation_values)[0] /
+        (time_points[interpolation_span_size - 1] - time_points[0]);
+
+    SpinWeighted<ComplexModalVector, 2> spin_2_view;
+    spin_2_view.set_data_ref(interpolated_h_coefficients_.data(),
+                             interpolated_h_coefficients_.size());
+
+    Spectral::Swsh::goldberg_modes_to_libsharp_modes_single_pair(
+        libsharp_mode, make_not_null(&spin_2_view), 0,
+        plus_m_h_mode, minus_m_h_mode);
+
+    spin_2_view.set_data_ref(interpolated_j_coefficients_.data(),
+                             interpolated_j_coefficients_.size());
+    Spectral::Swsh::goldberg_modes_to_libsharp_modes_single_pair(
+        libsharp_mode, make_not_null(&spin_2_view), 0,
+        interpolate_from_column(
+            coefficients_buffers_.data(),
+            Spectral::Swsh::goldberg_mode_index(
+                l_max_, libsharp_mode.l, static_cast<int>(libsharp_mode.m)),
+            time),
+        interpolate_from_column(
+            coefficients_buffers_.data(),
+            Spectral::Swsh::goldberg_mode_index(
+                l_max_, libsharp_mode.l, -static_cast<int>(libsharp_mode.m)),
+            time));
+  }
+
+  using tags_to_zero =
+      tmpl::list<Tags::BondiBeta, Tags::BondiU, Tags::BondiQ, Tags::BondiW,
+                 Tags::Du<Tags::BondiR>, Tags::DuRDividedByR>;
+  tmpl::for_each<tags_to_zero>([&boundary_data_variables](auto tag_v) noexcept {
+    using tag = typename decltype(tag_v)::type;
+    get(get<Tags::BoundaryValue<tag>>(boundary_data_variables)).data() =
+        std::complex<double>(0.0, 0.0);
+  });
+  get(get<Tags::BoundaryValue<Tags::BondiR>>(boundary_data_variables)).data() =
+      std::complex<double>(1.0, 0.0) * extraction_radius_;
+
+  SpinWeighted<ComplexModalVector, 2> spin_weighted_view;
+  spin_weighted_view.set_data_ref(interpolated_j_coefficients_.data(),
+                                  interpolated_j_coefficients_.size());
+  Spectral::Swsh::inverse_swsh_transform(
+      l_max_, 1,
+      make_not_null(&get(
+          get<Tags::BoundaryValue<Tags::BondiJ>>(boundary_data_variables))),
+      spin_weighted_view);
+
+  get(get<Tags::BoundaryValue<Tags::BondiJ>>(boundary_data_variables)) =
+      get(get<Tags::BoundaryValue<Tags::BondiJ>>(boundary_data_variables)) /
+      extraction_radius_;
+  get(get<Tags::BoundaryValue<Tags::Dr<Tags::BondiJ>>>(
+      boundary_data_variables)) =
+      -get(get<Tags::BoundaryValue<Tags::BondiJ>>(boundary_data_variables)) /
+      extraction_radius_;
+
+  SpinWeighted<ComplexModalVector, 2> spin_weighted_view;
+  spin_weighted_view.set_data_ref(interpolated_h_coefficients_.data(),
+                                  interpolated_h_coefficients_.size());
+  Spectral::Swsh::inverse_swsh_transform(
+      l_max_, 1,
+      make_not_null(&get(
+          get<Tags::BoundaryValue<Tags::BondiH>>(boundary_data_variables))),
+      spin_weighted_view);
+  get(get<Tags::BoundaryValue<Tags::BondiH>>(boundary_data_variables)) =
+      get(get<Tags::BoundaryValue<Tags::BondiH>>(boundary_data_variables)) /
+      extraction_radius_;
+  get(get<Tags::BoundaryValue<Tags::Du<Tags::BondiJ>>>(
+      boundary_data_variables)) =
+      get(get<Tags::BoundaryValue<Tags::BondiH>>(boundary_data_variables));
+
+  return true;
+}
+
+PnWorldtubeDataManager::PnWorldtubeDataManager(
+    std::unique_ptr<ModeSetBoundaryH5BufferUpdater> buffer_updater,
+    const size_t l_max, const size_t buffer_depth,
+    std::unique_ptr<intrp::SpanInterpolator> interpolator) noexcept
+    : buffer_updater_{std::move(buffer_updater)},
+      l_max_{l_max},
+      interpolated_j_coefficients_{
+          Spectral::Swsh::size_of_libsharp_coefficient_vector(l_max)},
+      interpolated_h_coefficients_{
+          Spectral::Swsh::size_of_libsharp_coefficient_vector(l_max)},
+      buffer_depth_{buffer_depth},
+      interpolator_{std::move(interpolator)} {
+  if (UNLIKELY(buffer_updater_->get_time_buffer().size() <
+               2 * interpolator_->required_number_of_points_before_and_after() +
+                   buffer_depth)) {
+    ERROR(
+        "The specified buffer updater doesn't have enough time points to "
+        "supply the requested interpolation buffer. This almost certainly "
+        "indicates that the corresponding file hasn't been created properly, "
+        "but might indicate that the `buffer_depth` template parameter is "
+        "too large or the specified SpanInterpolator requests too many "
+        "points");
+  }
+  coefficients_buffers_ = ComplexModalVector{
+      square(l_max + 1) *
+      (buffer_depth +
+       2 * interpolator_->required_number_of_points_before_and_after())};
+}
+
+void PnWorldtubeDataManager::pup(PUP::er& p) noexcept {
+  p | buffer_updater_;
+  p | time_span_start_;
+  p | time_span_end_;
+  p | l_max_;
+  p | buffer_depth_;
+  p | interpolator_;
+  if (p.isUnpacking()) {
+    time_span_start_ = 0;
+    time_span_end_ = 0;
+    const size_t size_of_buffer =
+        square(l_max_ + 1) *
+        (buffer_depth_ +
+         2 * interpolator_->required_number_of_points_before_and_after());
+    coefficients_buffers_ =
+        ComplexModalVector{size_of_buffer};
+    interpolated_j_coefficients_ = ComplexModalVector{
+        Spectral::Swsh::size_of_libsharp_coefficient_vector(l_max_)};
+    interpolated_h_coefficients_ = ComplexModalVector{
+      Spectral::Swsh::size_of_libsharp_coefficient_vector(l_max_)};
+  }
+}
+
+
 /// \cond
 PUP::able::PUP_ID MetricWorldtubeDataManager::my_PUP_ID = 0;
 PUP::able::PUP_ID BondiWorldtubeDataManager::my_PUP_ID = 0;
+PUP::able::PUP_ID PnWorldtubeDataManager::my_PUP_ID = 0;
 /// \endcond
 }  // namespace Cce

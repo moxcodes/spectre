@@ -35,13 +35,13 @@ namespace Cce {
  * from the worldtube to the evolution component. This will typically be
  * `Cce::Tags::characteristic_worldtube_boundary_tags<Tags::BoundaryValue>`.
  */
-template <class Metavariables>
+template <typename RunStage, class Metavariables>
 struct H5WorldtubeBoundary {
   using end_time_tag = Tags::EndTimeFromFile;
   using chare_type = Parallel::Algorithms::Singleton;
   using metavariables = Metavariables;
   using initialize_action_list =
-      tmpl::list<Actions::InitializeH5WorldtubeBoundary,
+      tmpl::list<Actions::InitializeH5WorldtubeBoundary<RunStage>,
                  Initialization::Actions::RemoveOptionsAndTerminatePhase>;
   using initialization_tags =
       Parallel::get_initialization_tags<initialize_action_list>;
@@ -76,6 +76,7 @@ struct H5WorldtubeBoundary {
     }
   }
 };
+
 
 /*!
  * \brief Component that supplies CCE worldtube boundary data sourced from a

@@ -82,6 +82,7 @@ struct GaugeAdjustInitialJ {
 /// \cond
 struct NoIncomingRadiation;
 struct ZeroNonSmooth;
+struct InitializeJCoordinatesForVolumeValue;
 struct InverseCubic;
 /// \endcond
 
@@ -112,7 +113,8 @@ struct InitializeJ : public PUP::able {
       tmpl::push_back<boundary_tags, Tags::LMax, Tags::NumberOfRadialPoints>;
 
   using creatable_classes =
-      tmpl::list<InverseCubic, NoIncomingRadiation, ZeroNonSmooth>;
+      tmpl::list<InverseCubic, NoIncomingRadiation, ZeroNonSmooth,
+                 InitializeJCoordinatesForVolumeValue>;
 
   WRAPPED_PUPable_abstract(InitializeJ);  // NOLINT
 

@@ -34,7 +34,7 @@ namespace Actions {
  *
  * \details Uses:
  * - initialization tag
- * `Cce::InitializationTags::H5WorldtubeBoundaryDataManager`,
+ * `Cce::InitializationTags::WorldtubeBoundaryDataManager<RunStage>`,
  * - const global cache tag `Cce::Tags::LMax`.
  *
  * Databox changes:
@@ -45,20 +45,25 @@ namespace Actions {
  * - Removes: nothing
  * - Modifies: nothing
  */
+template <typename RunStage>
 struct InitializeH5WorldtubeBoundary {
   using initialization_tags =
-      tmpl::list<Tags::H5WorldtubeBoundaryDataManager>;
+      tmpl::list<Tags::WorldtubeBoundaryDataManager<RunStage>,
+                 Tags::LMax<RunStage>>;
   using initialization_tags_to_keep =
-      tmpl::list<Tags::H5WorldtubeBoundaryDataManager>;
+      tmpl::list<Tags::WorldtubeBoundaryDataManager<RunStage>,
+                 Tags::LMax<RunStage>>;
   using const_global_cache_tags =
-      tmpl::list<Tags::LMax, Tags::EndTimeFromFile, Tags::StartTimeFromFile>;
+      tmpl::list<Tags::LMax, Tags::EndTimeFromFile, Tags::StartTimeFromFile,
+                 Tags::ExtractionRadius>;
 
   template <class Metavariables>
   using h5_boundary_manager_simple_tags = db::AddSimpleTags<::Tags::Variables<
       typename Metavariables::cce_boundary_communication_tags>>;
 
   template <class Metavariables>
-  using return_tag_list = h5_boundary_manager_simple_tags<Metavariables>;
+  using h5_boundary_manager_simple_tags = db::AddSimpleTags<::Tags::Variables<
+      typename Metavariables::cce_boundary_communication_tags>>;
 
   template <typename DbTags, typename... InboxTags, typename Metavariables,
             typename ArrayIndex, typename ActionList,
@@ -71,7 +76,7 @@ struct InitializeH5WorldtubeBoundary {
                     const ArrayIndex& /*array_index*/,
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
-    const size_t l_max = db::get<Tags::LMax>(box);
+    const size_t l_max = db::get<Tags::LMax<RunStage>>(box);
     Variables<typename Metavariables::cce_boundary_communication_tags>
         boundary_variables{
             Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
@@ -85,17 +90,20 @@ struct InitializeH5WorldtubeBoundary {
     return std::make_tuple(std::move(initial_box));
   }
 
-  template <typename DbTags, typename... InboxTags, typename Metavariables,
-            typename ArrayIndex, typename ActionList,
-            typename ParallelComponent,
-            Requires<not tmpl::list_contains_v<
-                DbTags, Tags::H5WorldtubeBoundaryDataManager>> = nullptr>
+  template <
+      typename DbTags, typename... InboxTags, typename Metavariables,
+      typename ArrayIndex, typename ActionList, typename ParallelComponent,
+      Requires<not tmpl::list_contains_v<
+          DbTags, Tags::WorldtubeBoundaryDataManager<RunStage>>> = nullptr>
   static auto apply(db::DataBox<DbTags>& box,
                     const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
                     const Parallel::GlobalCache<Metavariables>& /*cache*/,
                     const ArrayIndex& /*array_index*/,
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
+    ERROR(
+        "Required tag `Tags::H5WorldtubeBoundaryDataManager<RunStage>` not "
+        "found");
     return std::make_tuple(std::move(box));
   }
 };
@@ -108,7 +116,7 @@ struct InitializeH5WorldtubeBoundary {
  * - initialization tag
  * `Cce::InitializationTags::GhWorldtubeBoundaryDataManager`,
  * - const global cache tags `InitializationTags::LMax`,
- * `InitializationTags::ExtractionRadius`.
+ * `Tags::ExtractionRadius`.
  *
  * Databox changes:
  * - Adds:
@@ -120,9 +128,12 @@ struct InitializeH5WorldtubeBoundary {
  * - Modifies: nothing
  */
 struct InitializeGhWorldtubeBoundary {
-  using initialization_tags = tmpl::list<Tags::GhInterfaceManager>;
+  using initialization_tags =
+      tmpl::list<Tags::GhInterfaceManager, Tags::LMax<MainRun>>;
 
-  using initialization_tags_to_keep = tmpl::list<Tags::GhInterfaceManager>;
+  using initialization_tags_to_keep =
+      tmpl::list<Tags::GhInterfaceManager, Tags::LMax<MainRun>>;
+
 
   using const_global_cache_tags =
       tmpl::list<Tags::LMax, InitializationTags::ExtractionRadius,
@@ -150,7 +161,6 @@ struct InitializeGhWorldtubeBoundary {
     Variables<typename Metavariables::cce_boundary_communication_tags>
         boundary_variables{
             Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
-
     auto initial_box = Initialization::merge_into_databox<
         InitializeGhWorldtubeBoundary,
         gh_boundary_manager_simple_tags<Metavariables>, db::AddComputeTags<>,
@@ -160,7 +170,6 @@ struct InitializeGhWorldtubeBoundary {
 
     return std::make_tuple(std::move(initial_box));
   }
-
   template <
       typename DbTags, typename... InboxTags, typename Metavariables,
       typename ArrayIndex, typename ActionList, typename ParallelComponent,
@@ -177,5 +186,6 @@ struct InitializeGhWorldtubeBoundary {
     return std::make_tuple(std::move(box));
   }
 };
+
 }  // namespace Actions
 }  // namespace Cce

@@ -290,7 +290,8 @@ struct PreSwshDerivatives<Tags::Dy<Tag>> {
 
   using return_tags = tmpl::list<Tags::Dy<Tag>>;
   using argument_tags =
-      tmpl::append<pre_swsh_derivative_tags, tmpl::list<Tags::LMax>>;
+      tmpl::append<pre_swsh_derivative_tags,
+                   tmpl::list<Spectral::Swsh::Tags::LMaxBase>>;
 
   static void apply(
       const gsl::not_null<
@@ -401,7 +402,8 @@ struct PreSwshDerivatives<
   using return_tags =
       tmpl::list<Tags::Dy<Spectral::Swsh::Tags::Derivative<Tag, DerivKind>>>;
   using argument_tags =
-      tmpl::append<swsh_derivative_tags, tmpl::list<Tags::LMax>>;
+      tmpl::append<swsh_derivative_tags,
+                   tmpl::list<Spectral::Swsh::Tags::LMaxBase>>;
 
   static constexpr int spin =
       Spectral::Swsh::Tags::Derivative<Tag, DerivKind>::spin;
@@ -434,20 +436,20 @@ struct PreSwshDerivatives<
  * spin-weighted derivatives needed for the same CCE integrand. Provided a
  * `DataBox` with the appropriate tags (including
  * `all_pre_swsh_derivative_tags`, `all_swsh_derivative_tags` and
- * `Tags::LMax`), this function will apply all of the necessary
- * mutations to update `all_pre_swsh_derivatives_for_tag<BondiValueTag>` to
- * their correct values for the current values for the remaining (input) tags.
+ * `Spectral::Swsh::Tags::LMaxBase`), this function will apply all of the
+ * necessary mutations to update
+ * `all_pre_swsh_derivatives_for_tag<BondiValueTag>` to their correct values for
+ * the current values for the remaining (input) tags.
  */
 template <typename BondiValueTag, typename DataBoxType>
 void mutate_all_pre_swsh_derivatives_for_tag(
     const gsl::not_null<DataBoxType*> box) noexcept {
-  tmpl::for_each<
-      pre_swsh_derivative_tags_to_compute_for_t<BondiValueTag>>([&box](
-      auto pre_swsh_derivative_tag_v) noexcept {
-    using pre_swsh_derivative_tag =
-        typename decltype(pre_swsh_derivative_tag_v)::type;
-    using mutation = PreSwshDerivatives<pre_swsh_derivative_tag>;
-    db::mutate_apply<mutation>(box);
-  });
+  tmpl::for_each<pre_swsh_derivative_tags_to_compute_for_t<BondiValueTag>>(
+      [&box](auto pre_swsh_derivative_tag_v) noexcept {
+        using pre_swsh_derivative_tag =
+            typename decltype(pre_swsh_derivative_tag_v)::type;
+        using mutation = PreSwshDerivatives<pre_swsh_derivative_tag>;
+        db::mutate_apply<mutation>(box);
+      });
 }
 }  // namespace Cce

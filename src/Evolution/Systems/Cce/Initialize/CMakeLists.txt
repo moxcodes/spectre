@@ -6,6 +6,7 @@ spectre_target_sources(
   PRIVATE
   InitializeJ.cpp
   InverseCubic.cpp
+  InitializeJCoordinatesForVolumeValue.cpp
   NoIncomingRadiation.cpp
   ZeroNonSmooth.cpp
   )
@@ -16,6 +17,7 @@ spectre_target_headers(
   HEADERS
   InitializeJ.hpp
   InverseCubic.hpp
+  InitializeJCoordinatesForVolumeValue.hpp
   NoIncomingRadiation.hpp
   ZeroNonSmooth.hpp
   )

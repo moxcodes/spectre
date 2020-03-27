@@ -87,25 +87,22 @@ struct EvolutionMetavars {
   using cce_angular_coordinate_tags =
       tmpl::list<Cce::Tags::CauchyAngularCoords>;
 
-  using cce_boundary_component = Cce::H5WorldtubeBoundary<EvolutionMetavars>;
-
-  struct initialization_run {
-    using boundary_component = Cce::PNWorldtubeBoundary<EvolutionMetavars>;
-    using l_max = Cce::Tags::InitializationRunLMax;
-    using radial_points = Cce::Tags::InitializationRunRadialPoints;
+  template <typename RunStage>
+  struct cce_boundary_component {
+    using type = Cce::H5WorldtubeBoundary<RunStage, EvolutionMetavars>;
   };
 
-  struct main_run {
-    using boundary_component = Cce::H5WorldtubeBoundary<EvolutionMetavars>;
-    using l_max = Tags::LMax;
-    using radial_points = Tags::NumberOfRadialPoints;
-  };
-
-  using component_list =
-      tmpl::list<observers::ObserverWriter<EvolutionMetavars>,
-                 cce_boundary_component,
-                 Cce::PnWorldtubeBoundary<EvolutionMetavars>,
-                 Cce::CharacteristicEvolution<EvolutionMetavars>>;
+  using component_list = tmpl::list<
+      observers::ObserverWriter<EvolutionMetavars>,
+      typename cce_boundary_component<Cce::MainRun>::type,
+      typename cce_boundary_component<Cce::InitializationRun>::type,
+      Cce::CharacteristicEvolution<
+          Cce::MainRun, typename cce_boundary_component<Cce::MainRun>::type,
+          EvolutionMetavars>,
+      Cce::CharacteristicEvolution<
+          Cce::InitializationRun,
+          typename cce_boundary_component<Cce::InitializationRun>::type,
+          EvolutionMetavars>>;
 
   using observed_reduction_data_tags = tmpl::list<>;
 
@@ -113,7 +110,7 @@ struct EvolutionMetavars {
       "Perform Cauchy Characteristic Extraction using .h5 input data.\n"
       "Uses regularity-preserving formulation."};
 
-  enum class Phase { Initialization, Evolve, Exit };
+  enum class Phase { PreInitialization, InitRun, Initialization, Evolve, Exit };
 
   static Phase determine_next_phase(
       const Phase& current_phase,

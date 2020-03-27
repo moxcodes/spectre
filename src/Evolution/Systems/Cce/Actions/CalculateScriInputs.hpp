@@ -36,9 +36,6 @@ namespace Actions {
  * calculations to perform.
  */
 struct CalculateScriInputs {
-  using const_global_cache_tags =
-      tmpl::list<Tags::LMax, Tags::NumberOfRadialPoints>;
-
   template <typename DbTags, typename... InboxTags, typename Metavariables,
             typename ArrayIndex, typename ActionList,
             typename ParallelComponent>
@@ -61,7 +58,7 @@ struct CalculateScriInputs {
     db::mutate_apply<
         Spectral::Swsh::AngularDerivatives<all_swsh_derivative_tags_for_scri>>(
         make_not_null(&box));
-    boundary_derivative_impl(box, db::get<Tags::LMax>(box),
+    boundary_derivative_impl(box, db::get<Spectral::Swsh::Tags::LMaxBase>(box),
                              all_boundary_swsh_derivative_tags_for_scri{});
 
     tmpl::for_each<all_swsh_derivative_tags_for_scri>([&box](
