@@ -89,9 +89,22 @@ struct EvolutionMetavars {
 
   using cce_boundary_component = Cce::H5WorldtubeBoundary<EvolutionMetavars>;
 
+  struct initialization_run {
+    using boundary_component = Cce::PNWorldtubeBoundary<EvolutionMetavars>;
+    using l_max = Cce::Tags::InitializationRunLMax;
+    using radial_points = Cce::Tags::InitializationRunRadialPoints;
+  };
+
+  struct main_run {
+    using boundary_component = Cce::H5WorldtubeBoundary<EvolutionMetavars>;
+    using l_max = Tags::LMax;
+    using radial_points = Tags::NumberOfRadialPoints;
+  };
+
   using component_list =
       tmpl::list<observers::ObserverWriter<EvolutionMetavars>,
                  cce_boundary_component,
+                 Cce::PnWorldtubeBoundary<EvolutionMetavars>,
                  Cce::CharacteristicEvolution<EvolutionMetavars>>;
 
   using observed_reduction_data_tags = tmpl::list<>;

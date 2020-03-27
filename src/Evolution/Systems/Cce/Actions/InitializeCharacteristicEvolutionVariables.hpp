@@ -58,9 +58,11 @@ namespace Actions {
  *  - `Spectral::Swsh::Tags::SwshInterpolator< Tags::CauchyAngularCoords>`
  * - Removes: nothing
  */
+template <typename RunVariables>
 struct InitializeCharacteristicEvolutionVariables {
   using const_global_cache_tags =
-      tmpl::list<Tags::LMax, Tags::NumberOfRadialPoints>;
+      tmpl::list<typename RunVariables::l_max,
+                 typename RunVariables::radial_points>;
 
   template <
       typename DbTags, typename... InboxTags, typename Metavariables,
@@ -109,6 +111,9 @@ struct InitializeCharacteristicEvolutionVariables {
     const size_t transform_buffer_size =
         number_of_radial_points *
         Spectral::Swsh::size_of_libsharp_coefficient_vector(l_max);
+
+    if(cpp17::is_same_v)
+
     return std::make_tuple(
         Initialization::merge_into_databox<
             InitializeCharacteristicEvolutionVariables,

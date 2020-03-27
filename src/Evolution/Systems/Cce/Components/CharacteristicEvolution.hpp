@@ -92,6 +92,16 @@ struct CharacteristicEvolution {
   using chare_type = Parallel::Algorithms::Singleton;
   using metavariables = Metavariables;
 
+  using pre_initialize_action_list =
+      tmpl::list<Actions::InitializeCharacteristicEvolutionVariables,
+                 Actions::InitializeCharacteristicEvolutionTime,
+                 Actions::RequestBoundaryData<
+                   typename Metavariables::cce_boundary_component,
+                   CharacteristicEvolution<Metavariables>>,
+                 Actions::ReceiveWorldtubeData<Metavariables>,
+                 Actions::InitializeFirstHypersurface,
+                 Initialization::Actions::RemoveOptionsAndTerminatePhase>;
+
   using initialize_action_list =
       tmpl::list<Actions::InitializeCharacteristicEvolutionVariables,
                  Actions::InitializeCharacteristicEvolutionTime,
@@ -153,6 +163,7 @@ struct CharacteristicEvolution {
                      tmpl::list<typename Metavariables::evolved_swsh_tag>>>,
                  ::Actions::AdvanceTime>;
 
+  template <typename RunVariables>
   using extract_action_list = tmpl::list<
       Actions::RequestNextBoundaryData<
           typename Metavariables::cce_boundary_component,
@@ -161,17 +172,25 @@ struct CharacteristicEvolution {
       tmpl::transform<bondi_hypersurface_step_tags,
                       tmpl::bind<hypersurface_computation, tmpl::_1>>,
       Actions::FilterSwshVolumeQuantity<Tags::BondiH>,
-      compute_scri_quantities_and_observe, record_time_stepper_data_and_step,
-      Actions::ExitIfEndTimeReached,
+      tmpl::conditional_t<
+          cpp17::is_same_v<RunVariables, typename Metavariables::main_run>,
+          compute_scri_quantities_and_observe, tmpl::list<>>,
+      record_time_stepper_data_and_step, Actions::ExitIfEndTimeReached,
       Actions::ReceiveWorldtubeData<Metavariables>>;
 
-  using phase_dependent_action_list =
-      tmpl::list<Parallel::PhaseActions<typename Metavariables::Phase,
-                                        Metavariables::Phase::Initialization,
-                                        initialize_action_list>,
-                 Parallel::PhaseActions<typename Metavariables::Phase,
-                                        Metavariables::Phase::Evolve,
-                                        extract_action_list>>;
+  using phase_dependent_action_list = tmpl::list<
+      Parallel::PhaseActions<typename Metavariables::Phase,
+                             Metavariables::Phase::PreInitialization,
+                             pre_initialize_action_list>,
+      Parallel::PhaseActions<
+          typename Metavariables::Phase, Metavariables::Phase::InitRun,
+          extract_action_list<typename Metavariables::initialization_run>>,
+      Parallel::PhaseActions<typename Metavariables::Phase,
+                             Metavariables::Phase::Initialization,
+                             initialize_action_list>,
+      Parallel::PhaseActions<
+          typename Metavariables::Phase, Metavariables::Phase::Evolve,
+          extract_action_list<typename Metavariables::main_run>>>;
 
   using const_global_cache_tag_list =
       Parallel::get_const_global_cache_tags_from_actions<
