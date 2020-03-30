@@ -28,6 +28,7 @@
 #include "Time/Tags.hpp"
 #include "Time/TimeSteppers/TimeStepper.hpp"
 
+template <typename WorldtubeManager>
 struct EvolutionMetavars {
   using system = Cce::System;
 
@@ -87,6 +88,7 @@ struct EvolutionMetavars {
   using cce_angular_coordinate_tags =
       tmpl::list<Cce::Tags::CauchyAngularCoords>;
 
+  using cce_worldtube_data_manager = WorldtubeManager;
   using cce_boundary_component = Cce::H5WorldtubeBoundary<EvolutionMetavars>;
 
   using component_list =

@@ -337,11 +337,6 @@ struct BondiR : db::SimpleTag {
   static std::string name() noexcept { return "R"; }
 };
 
-/// A simple tag for the `WorldtubeDataManager`
-struct H5WorldtubeBoundaryDataManager : db::SimpleTag {
-  using type = WorldtubeDataManager;
-};
-
 struct EndTime : db::BaseTag {};
 
 struct StartTime : db::BaseTag {};

@@ -3,4 +3,10 @@
 
 #pragma once
 
+namespace Cce {
+class WorldtubeDataManager;
+class ReducedWorldtubeDataManager;
+}  // namespace Cce
+
+template <typename WorldtubeManager>
 struct EvolutionMetavars;

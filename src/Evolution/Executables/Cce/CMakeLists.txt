@@ -12,9 +12,17 @@ set(LIBS_TO_LINK
   )
 
 add_spectre_parallel_executable(
-  CharacteristicExtract
+  BondiCharacteristicExtract
   CharacteristicExtract
   Evolution/Executables/Cce
-  EvolutionMetavars
+  EvolutionMetavars<Cce::ReducedWorldtubeDataManager>
+  "${LIBS_TO_LINK}"
+  )
+
+add_spectre_parallel_executable(
+  MetricCharacteristicExtract
+  CharacteristicExtract
+  Evolution/Executables/Cce
+  EvolutionMetavars<Cce::WorldtubeDataManager>
   "${LIBS_TO_LINK}"
   )

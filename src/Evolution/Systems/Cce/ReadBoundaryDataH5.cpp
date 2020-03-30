@@ -205,6 +205,7 @@ void SpecWorldtubeH5BufferUpdater::pup(PUP::er& p) noexcept {
   p | radial_derivatives_need_renormalization_;
   p | filename_;
   p | l_max_;
+  p | radial_derivatives_need_renormalization_;
   p | extraction_radius_;
   p | dataset_names_;
   if (p.isUnpacking()) {

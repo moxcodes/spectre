@@ -154,24 +154,6 @@ struct InitializeJ {
 }  // namespace OptionTags
 
 namespace InitializationTags {
-/// An initialization tag that constructs a `WorldtubeDataManager` from options
-struct H5WorldtubeBoundaryDataManager : db::SimpleTag {
-  using type = WorldtubeDataManager;
-  using option_tags =
-      tmpl::list<OptionTags::LMax, OptionTags::BoundaryDataFilename,
-                 OptionTags::H5LookaheadTimes, OptionTags::H5Interpolator>;
-
-  static constexpr bool pass_metavariables = false;
-  static WorldtubeDataManager create_from_options(
-      const size_t l_max, const std::string& filename,
-      const size_t number_of_lookahead_times,
-      const std::unique_ptr<intrp::SpanInterpolator>& interpolator) noexcept {
-    return WorldtubeDataManager{
-        std::make_unique<SpecWorldtubeH5BufferUpdater>(filename), l_max,
-        number_of_lookahead_times, interpolator->get_clone()};
-  }
-};
-
 struct ScriInterpolationOrder : db::SimpleTag {
   using type = size_t;
   using option_tags = tmpl::list<OptionTags::ScriInterpolationOrder>;
@@ -215,6 +197,28 @@ struct ScriOutputDensity : db::SimpleTag {
 }  // namespace InitializationTags
 
 namespace Tags {
+/// An initialization tag that constructs a `WorldtubeDataManager` from options
+template <typename Manager>
+struct H5WorldtubeBoundaryDataManager : db::SimpleTag {
+  using type = Manager;
+  using option_tags =
+      tmpl::list<OptionTags::LMax, OptionTags::BoundaryDataFilename,
+                 OptionTags::H5LookaheadTimes, OptionTags::H5Interpolator>;
+
+  static constexpr bool pass_metavariables = false;
+  static Manager create_from_options(
+      const size_t l_max, const std::string& filename,
+      const size_t number_of_lookahead_times,
+      const std::unique_ptr<intrp::SpanInterpolator>& interpolator) noexcept {
+    return Manager{
+        std::make_unique<tmpl::conditional_t<
+            std::is_same_v<Manager, WorldtubeDataManager>,
+            SpecWorldtubeH5BufferUpdater, ReducedSpecWorldtubeH5BufferUpdater>>(
+            filename),
+        l_max, number_of_lookahead_times, interpolator->get_clone()};
+  }
+};
+
 struct LMax : db::SimpleTag, Spectral::Swsh::Tags::LMaxBase {
   using type = size_t;
   using option_tags = tmpl::list<OptionTags::LMax>;
@@ -288,14 +292,20 @@ struct RadialFilterHalfPower : db::SimpleTag {
 /// it will be used directly as the start time for the CCE evolution instead.
 struct StartTimeFromFile : Tags::StartTime, db::SimpleTag {
   using type = double;
+  template <typename Metavariables>
   using option_tags =
       tmpl::list<OptionTags::StartTime, OptionTags::BoundaryDataFilename>;
 
-  static constexpr bool pass_metavariables = false;
+  static constexpr bool pass_metavariables = true;
+  template <typename Metavariables>
   static double create_from_options(double start_time,
                                     const std::string& filename) noexcept {
     if (start_time == -std::numeric_limits<double>::infinity()) {
-      SpecWorldtubeH5BufferUpdater h5_boundary_updater{filename};
+      tmpl::conditional_t<
+          std::is_same_v<typename Metavariables::cce_worldtube_data_manager,
+                           WorldtubeDataManager>,
+          SpecWorldtubeH5BufferUpdater, ReducedSpecWorldtubeH5BufferUpdater>
+          h5_boundary_updater{filename};
       const auto& time_buffer = h5_boundary_updater.get_time_buffer();
       start_time = time_buffer[0];
     }
@@ -325,14 +335,20 @@ struct SpecifiedStartTime : Tags::StartTime, db::SimpleTag {
 /// it will be used directly as the final time for the CCE evolution instead.
 struct EndTimeFromFile : Tags::EndTime, db::SimpleTag {
   using type = double;
+  template <typename Metavariables>
   using option_tags =
       tmpl::list<OptionTags::EndTime, OptionTags::BoundaryDataFilename>;
 
-  static constexpr bool pass_metavariables = false;
+  static constexpr bool pass_metavariables = true;
+  template <typename Metavariables>
   static double create_from_options(double end_time,
                                     const std::string& filename) {
     if (end_time == std::numeric_limits<double>::infinity()) {
-      SpecWorldtubeH5BufferUpdater h5_boundary_updater{filename};
+      tmpl::conditional_t<
+          std::is_same_v<typename Metavariables::cce_worldtube_data_manager,
+                         WorldtubeDataManager>,
+          SpecWorldtubeH5BufferUpdater, ReducedSpecWorldtubeH5BufferUpdater>
+          h5_boundary_updater{filename};
       const auto& time_buffer = h5_boundary_updater.get_time_buffer();
       end_time = time_buffer[time_buffer.size() - 1];
     }

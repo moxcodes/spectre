@@ -94,7 +94,8 @@ struct BoundaryComputeAndSendToEvolution<H5WorldtubeBoundary<Metavariables>,
                     Parallel::ConstGlobalCache<Metavariables>& cache,
                     const ArrayIndex& /*array_index*/,
                     const TimeStepId& time) noexcept {
-    if (not db::get<Tags::H5WorldtubeBoundaryDataManager>(box)
+    if (not db::get<Tags::H5WorldtubeBoundaryDataManager<
+                typename Metavariables::cce_worldtube_data_manager>>(box)
                 .populate_hypersurface_boundary_data(
                     make_not_null(&box), time.substep_time().value())) {
       ERROR("Insufficient boundary data to proceed, exiting early at time " +
