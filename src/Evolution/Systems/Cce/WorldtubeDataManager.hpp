@@ -23,6 +23,7 @@ namespace Cce {
 /// \cond
 class MetricWorldtubeDataManager;
 class BondiWorldtubeDataManager;
+class PnWorldtubeDataManager;
 /// \endcond
 
 /*!
@@ -51,7 +52,8 @@ class BondiWorldtubeDataManager;
 class WorldtubeDataManager : public PUP::able {
  public:
   using creatable_classes =
-      tmpl::list<MetricWorldtubeDataManager, BondiWorldtubeDataManager>;
+      tmpl::list<MetricWorldtubeDataManager, BondiWorldtubeDataManager,
+                 PnWorldtubeDataManager>;
 
   WRAPPED_PUPable_abstract(WorldtubeDataManager);  // NOLINT
 
@@ -243,8 +245,12 @@ class PnWorldtubeDataManager : public WorldtubeDataManager {
 
   PnWorldtubeDataManager(
       std::unique_ptr<ModeSetBoundaryH5BufferUpdater> buffer_updater,
-      size_t l_max, size_t buffer_depth,
+      size_t l_max, size_t buffer_depth, double extraction_radius,
       std::unique_ptr<intrp::SpanInterpolator> interpolator) noexcept;
+
+  WRAPPED_PUPable_decl_template(PnWorldtubeDataManager);  // NOLINT
+
+  explicit PnWorldtubeDataManager(CkMigrateMessage* /*unused*/) noexcept {}
 
   bool populate_hypersurface_boundary_data(
       gsl::not_null<Variables<
@@ -252,24 +258,27 @@ class PnWorldtubeDataManager : public WorldtubeDataManager {
           boundary_data_variables,
       double time) const noexcept override;
 
+  std::unique_ptr<WorldtubeDataManager> get_clone() const noexcept override;
+
   /// retrieves the l_max that will be supplied to the \ref DataBoxGroup in
   /// `populate_hypersurface_boundary_data()`
-  size_t get_l_max() const noexcept { return l_max_; }
+  size_t get_l_max() const noexcept override { return l_max_; }
 
   /// retrieves the current time span associated with the `buffer_updater_` for
   /// diagnostics
-  std::pair<size_t, size_t> get_time_span() const noexcept {
+  std::pair<size_t, size_t> get_time_span() const noexcept override {
     return std::make_pair(time_span_start_, time_span_end_);
   }
 
   /// Serialization for Charm++.
-  void pup(PUP::er& p) noexcept;  // NOLINT
+  void pup(PUP::er& p) noexcept override;  // NOLINT
 
  private:
   std::unique_ptr<ModeSetBoundaryH5BufferUpdater> buffer_updater_;
   mutable size_t time_span_start_ = 0;
   mutable size_t time_span_end_ = 0;
   size_t l_max_ = 0;
+  double extraction_radius_ = 0.0;
 
   // These buffers are just kept around to avoid allocations; they're
   // updated every time a time is requested

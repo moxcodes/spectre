@@ -1,7 +1,7 @@
 // Distributed under the MIT License.
 // See LICENSE.txt for details.
 
-#include "Evolution/Systems/Cce/Initialize/InverseCubic.hpp"
+#include "Evolution/Systems/Cce/Initialize/InitializeJCoordinatesForVolumeValue.hpp"
 
 #include <cstddef>
 #include <memory>
@@ -51,10 +51,10 @@ void InitializeJCoordinatesForVolumeValue::operator()(
   make_const_view(make_not_null(&j_boundary_view), get(*j), 0,
                   number_of_angular_points);
 
-  adjust_angular_coordinates_for_j(j, cartesian_cauchy_coordinates,
-                                   angular_cauchy_coordinates, get(boundary_j),
-                                   l_max, angular_coordinate_tolerance_,
-                                   max_iterations_, false, j_boundary_view);
+  detail::adjust_angular_coordinates_for_j(
+      j, cartesian_cauchy_coordinates, angular_cauchy_coordinates,
+      get(boundary_j), l_max, angular_coordinate_tolerance_, max_iterations_,
+      false, j_boundary_view);
 }
 
 void InitializeJCoordinatesForVolumeValue::pup(PUP::er& p) noexcept {

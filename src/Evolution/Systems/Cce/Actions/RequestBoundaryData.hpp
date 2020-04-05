@@ -12,6 +12,8 @@
 #include "Parallel/Invoke.hpp"
 #include "Time/Tags.hpp"
 
+#include "Parallel/Printf.hpp"
+
 namespace Cce {
 namespace Actions {
 
@@ -89,8 +91,6 @@ template <typename WorldtubeBoundaryComponent,
 struct RequestNextBoundaryData<
     WorldtubeBoundaryComponent,
     EvolutionTemplate<RunStage, WorldtubeBoundaryComponent, Metavariables>> {
-  using const_global_cache_tags =
-      tmpl::list<typename WorldtubeBoundaryComponent::end_time_tag>;
 
   template <typename DbTags, typename... InboxTags, typename ArrayIndex,
             typename ActionList, typename ParallelComponent>
@@ -101,8 +101,15 @@ struct RequestNextBoundaryData<
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
     // only request the data if the next step is not after the end time.
-    if (db::get<::Tags::Next<::Tags::TimeStepId>>(box).substep_time().value() <
-        db::get<Tags::EndTime<RunStage>>(box)) {
+    const bool end_time_reached =
+        (db::get<::Tags::TimeStepId>(box).step_time().value() +
+         db::get<::Tags::TimeStep>(box).value()) >=
+            db::get<Tags::EndTimeFromFile<RunStage>>(box) and
+        db::get<::Tags::TimeStepId>(box).is_at_slab_boundary();
+    if (end_time_reached) {
+      Parallel::printf("End time reached. not requesting the next time\n");
+    }
+    if (not end_time_reached) {
       Parallel::simple_action<Actions::BoundaryComputeAndSendToEvolution<
           WorldtubeBoundaryComponent,
           EvolutionTemplate<RunStage, WorldtubeBoundaryComponent,

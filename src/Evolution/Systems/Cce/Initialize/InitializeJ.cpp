@@ -3,6 +3,7 @@
 
 #include "Evolution/Systems/Cce/Initialize/InitializeJ.hpp"
 
+#include <boost/optional.hpp>
 #include <complex>
 #include <cstddef>
 #include <memory>
@@ -45,7 +46,9 @@ double adjust_angular_coordinates_for_j(
         angular_cauchy_coordinates,
     const SpinWeighted<ComplexDataVector, 2>& surface_j, const size_t l_max,
     const double tolerance, const size_t max_steps,
-    const bool adjust_volume_gauge) noexcept {
+    const bool adjust_volume_gauge,
+    boost::optional<const SpinWeighted<ComplexDataVector, 2>&>
+        target_j) noexcept {
   const size_t number_of_angular_points =
       Spectral::Swsh::number_of_swsh_collocation_points(l_max);
 
@@ -260,7 +263,12 @@ double adjust_angular_coordinates_for_j(
         square(get(gauge_omega).data());
 
     // check completion conditions
-    max_error = max(abs(evolution_gauge_surface_j.data()));
+    if(not target_j) {
+      max_error = max(abs(evolution_gauge_surface_j.data()));
+    } else {
+      max_error =
+          max(abs(evolution_gauge_surface_j.data() - (*target_j).data()));
+    }
     ++number_of_steps;
     if (max_error > 5.0e-3) {
       ERROR(
@@ -275,12 +283,22 @@ double adjust_angular_coordinates_for_j(
     }
     // The alteration in each of the spin-weighted Jacobian factors determined
     // by linearizing the system in small J
-    get(next_gauge_c).data() = -0.5 * evolution_gauge_surface_j.data() *
-                               square(get(gauge_omega).data()) /
-                               (get(gauge_d).data() * interpolated_k.data());
-    get(next_gauge_d).data() = get(next_gauge_c).data() *
-                               conj(get(gauge_c).data()) /
-                               conj(get(gauge_d).data());
+    if (not target_j) {
+      get(next_gauge_c).data() = -0.5 * evolution_gauge_surface_j.data() *
+          square(get(gauge_omega).data()) /
+          (get(gauge_d).data() * interpolated_k.data());
+      get(next_gauge_d).data() = get(next_gauge_c).data() *
+          conj(get(gauge_c).data()) /
+          conj(get(gauge_d).data());
+    } else {
+      get(next_gauge_c).data() =
+          -0.5 * (evolution_gauge_surface_j.data() - (*target_j).data()) *
+          square(get(gauge_omega).data()) /
+          (get(gauge_d).data() * interpolated_k.data());
+      get(next_gauge_d).data() = get(next_gauge_c).data() *
+          conj(get(gauge_c).data()) /
+          conj(get(gauge_d).data());
+    }
 
     iteration_interpolator.interpolate(make_not_null(&evolution_gauge_eth_x),
                                        eth_x);

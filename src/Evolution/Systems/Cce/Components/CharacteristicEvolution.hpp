@@ -26,6 +26,7 @@
 #include "Evolution/Systems/Cce/SwshDerivatives.hpp"
 #include "Evolution/Systems/Cce/System.hpp"
 #include "IO/Observer/ObserverComponent.hpp"
+#include "Parallel/Actions/Goto.hpp"
 #include "Parallel/Actions/TerminatePhase.hpp"
 #include "Parallel/GlobalCache.hpp"
 #include "ParallelAlgorithms/Actions/MutateApply.hpp"
@@ -36,6 +37,10 @@
 #include "Utilities/TMPL.hpp"
 
 namespace Cce {
+
+
+struct CceEvolutionIterationTag {};
+
 
 /*!
  * \brief The component for handling the CCE evolution and waveform output.
@@ -93,19 +98,14 @@ struct CharacteristicEvolution {
   using chare_type = Parallel::Algorithms::Singleton;
   using metavariables = Metavariables;
 
-  using initialize_action_list = tmpl::list<
-      Actions::InitializeCharacteristicEvolutionVariables<RunStage>,
-      Actions::InitializeCharacteristicEvolutionTime<RunStage>,
-      tmpl::conditional_t<
-          cpp17::is_same_v<RunStage, MainRun>,
-          Actions::InitializeCharacteristicEvolutionScri<RunStage>,
-          tmpl::list<>>,
-      Actions::RequestBoundaryData<
-          BoundaryComponent,
-          CharacteristicEvolution<RunStage, BoundaryComponent, Metavariables>>,
-      Actions::ReceiveWorldtubeData<Metavariables>,
-      Actions::InitializeFirstHypersurface<RunStage>,
-      Initialization::Actions::RemoveOptionsAndTerminatePhase>;
+  using initialize_action_list =
+      tmpl::list<Actions::InitializeCharacteristicEvolutionVariables<RunStage>,
+                 Actions::InitializeCharacteristicEvolutionTime<RunStage>,
+                 tmpl::conditional_t<
+                     std::is_same_v<RunStage, MainRun>,
+                     Actions::InitializeCharacteristicEvolutionScri<RunStage>,
+                     tmpl::list<>>,
+                 Initialization::Actions::RemoveOptionsAndTerminatePhase>;
 
   using initialization_tags =
       Parallel::get_initialization_tags<initialize_action_list>;
@@ -134,8 +134,6 @@ struct CharacteristicEvolution {
           tmpl::list<>>>;
 
   using compute_scri_quantities_and_observe = tmpl::list<
-      ::Actions::MutateApply<
-          CalculateScriPlusValue<::Tags::dt<Tags::InertialRetardedTime>>>,
       Actions::CalculateScriInputs,
       tmpl::transform<typename metavariables::cce_scri_tags,
                       tmpl::bind<::Actions::MutateApply,
@@ -158,6 +156,12 @@ struct CharacteristicEvolution {
                  ::Actions::AdvanceTime>;
 
   using extract_action_list = tmpl::list<
+      Actions::RequestBoundaryData<
+          BoundaryComponent,
+          CharacteristicEvolution<RunStage, BoundaryComponent, Metavariables>>,
+      Actions::ReceiveWorldtubeData<Metavariables>,
+      Actions::InitializeFirstHypersurface<RunStage>,
+      ::Actions::Label<CceEvolutionIterationTag>,
       Actions::RequestNextBoundaryData<
           BoundaryComponent,
           CharacteristicEvolution<RunStage, BoundaryComponent, Metavariables>>,
@@ -165,11 +169,14 @@ struct CharacteristicEvolution {
       tmpl::transform<bondi_hypersurface_step_tags,
                       tmpl::bind<hypersurface_computation, tmpl::_1>>,
       Actions::FilterSwshVolumeQuantity<Tags::BondiH>,
-      tmpl::conditional_t<cpp17::is_same_v<RunStage, MainRun>,
+      ::Actions::MutateApply<
+          CalculateScriPlusValue<::Tags::dt<Tags::InertialRetardedTime>>>,
+      tmpl::conditional_t<std::is_same_v<RunStage, MainRun>,
                           compute_scri_quantities_and_observe, tmpl::list<>>,
-      record_time_stepper_data_and_step,
       Actions::ExitIfEndTimeReached<RunStage>,
-      Actions::ReceiveWorldtubeData<Metavariables>>;
+      record_time_stepper_data_and_step,
+      Actions::ReceiveWorldtubeData<Metavariables>,
+      ::Actions::Goto<CceEvolutionIterationTag>>;
 
   using phase_dependent_action_list =
       tmpl::list<Parallel::PhaseActions<typename Metavariables::Phase,

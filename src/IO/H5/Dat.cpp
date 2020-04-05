@@ -83,8 +83,8 @@ Dat::Dat(const bool exists, detail::OpenGroup&& group, const hid_t location,
       ERROR("Invalid number of dimensions in file on disk.");  // LCOV_EXCL_LINE
     }
     CHECK_H5(H5Sclose(space_id), "Failed to close dataspace");
-    legend_ = read_rank1_attribute<std::string>(dataset_id_, "Legend"s);
-    size_[1] = legend_.size();
+    // legend_ = read_rank1_attribute<std::string>(dataset_id_, "Legend"s);
+    // size_[1] = legend_.size();
   } else {  // file does not exist
     dataset_id_ = h5::detail::create_extensible_dataset(
         location, name_, size_, std::array<hsize_t, 2>{{4, legend_.size()}},

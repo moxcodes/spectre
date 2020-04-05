@@ -417,9 +417,69 @@ void BondiWorldtubeDataManager::pup(PUP::er& p) noexcept {
   }
 }
 
-template <typename TagList>
+PnWorldtubeDataManager::PnWorldtubeDataManager(
+    std::unique_ptr<ModeSetBoundaryH5BufferUpdater> buffer_updater,
+    const size_t l_max, const size_t buffer_depth,
+    const double extraction_radius,
+    std::unique_ptr<intrp::SpanInterpolator> interpolator) noexcept
+    : buffer_updater_{std::move(buffer_updater)},
+      l_max_{l_max},
+      extraction_radius_{extraction_radius},
+      interpolated_j_coefficients_{
+          Spectral::Swsh::size_of_libsharp_coefficient_vector(l_max)},
+      interpolated_h_coefficients_{
+          Spectral::Swsh::size_of_libsharp_coefficient_vector(l_max)},
+      buffer_depth_{buffer_depth},
+      interpolator_{std::move(interpolator)} {
+  if (UNLIKELY(buffer_updater_->get_time_buffer().size() <
+               2 * interpolator_->required_number_of_points_before_and_after() +
+                   buffer_depth)) {
+    ERROR(
+        "The specified buffer updater doesn't have enough time points to "
+        "supply the requested interpolation buffer. This almost certainly "
+        "indicates that the corresponding file hasn't been created properly, "
+        "but might indicate that the `buffer_depth` template parameter is "
+        "too large or the specified SpanInterpolator requests too many "
+        "points");
+  }
+  coefficients_buffers_ = ComplexModalVector{
+      square(l_max + 1) *
+      (buffer_depth +
+       2 * interpolator_->required_number_of_points_before_and_after())};
+}
+
+void PnWorldtubeDataManager::pup(PUP::er& p) noexcept {
+  p | buffer_updater_;
+  p | time_span_start_;
+  p | time_span_end_;
+  p | l_max_;
+  p | extraction_radius_;
+  p | buffer_depth_;
+  p | interpolator_;
+  if (p.isUnpacking()) {
+    time_span_start_ = 0;
+    time_span_end_ = 0;
+    const size_t size_of_buffer =
+        square(l_max_ + 1) *
+        (buffer_depth_ +
+         2 * interpolator_->required_number_of_points_before_and_after());
+    coefficients_buffers_ = ComplexModalVector{size_of_buffer};
+    interpolated_j_coefficients_ = ComplexModalVector{
+        Spectral::Swsh::size_of_libsharp_coefficient_vector(l_max_)};
+    interpolated_h_coefficients_ = ComplexModalVector{
+        Spectral::Swsh::size_of_libsharp_coefficient_vector(l_max_)};
+  }
+}
+
+std::unique_ptr<WorldtubeDataManager> PnWorldtubeDataManager::get_clone()
+    const noexcept {
+  return std::make_unique<PnWorldtubeDataManager>(
+      buffer_updater_->get_clone(), l_max_, buffer_depth_, extraction_radius_,
+      interpolator_->get_clone());
+}
+
 bool PnWorldtubeDataManager::populate_hypersurface_boundary_data(
-    gsl::not_null<Variables<
+    const gsl::not_null<Variables<
         Tags::characteristic_worldtube_boundary_tags<Tags::BoundaryValue>>*>
         boundary_data_variables,
     const double time) const noexcept {
@@ -526,8 +586,8 @@ bool PnWorldtubeDataManager::populate_hypersurface_boundary_data(
                              interpolated_h_coefficients_.size());
 
     Spectral::Swsh::goldberg_modes_to_libsharp_modes_single_pair(
-        libsharp_mode, make_not_null(&spin_2_view), 0,
-        plus_m_h_mode, minus_m_h_mode);
+        libsharp_mode, make_not_null(&spin_2_view), 0, plus_m_h_mode,
+        minus_m_h_mode);
 
     spin_2_view.set_data_ref(interpolated_j_coefficients_.data(),
                              interpolated_j_coefficients_.size());
@@ -545,15 +605,15 @@ bool PnWorldtubeDataManager::populate_hypersurface_boundary_data(
             time));
   }
 
-  using tags_to_zero =
-      tmpl::list<Tags::BondiBeta, Tags::BondiU, Tags::BondiQ, Tags::BondiW,
-                 Tags::Du<Tags::BondiR>, Tags::DuRDividedByR>;
+  using tags_to_zero = tmpl::list<Tags::BondiBeta, Tags::BondiU, Tags::BondiQ,
+                                  Tags::Dr<Tags::BondiU>, Tags::BondiW,
+                                  Tags::Du<Tags::BondiR>, Tags::DuRDividedByR>;
   tmpl::for_each<tags_to_zero>([&boundary_data_variables](auto tag_v) noexcept {
     using tag = typename decltype(tag_v)::type;
-    get(get<Tags::BoundaryValue<tag>>(boundary_data_variables)).data() =
+    get(get<Tags::BoundaryValue<tag>>(*boundary_data_variables)).data() =
         std::complex<double>(0.0, 0.0);
   });
-  get(get<Tags::BoundaryValue<Tags::BondiR>>(boundary_data_variables)).data() =
+  get(get<Tags::BoundaryValue<Tags::BondiR>>(*boundary_data_variables)).data() =
       std::complex<double>(1.0, 0.0) * extraction_radius_;
 
   SpinWeighted<ComplexModalVector, 2> spin_weighted_view;
@@ -562,87 +622,33 @@ bool PnWorldtubeDataManager::populate_hypersurface_boundary_data(
   Spectral::Swsh::inverse_swsh_transform(
       l_max_, 1,
       make_not_null(&get(
-          get<Tags::BoundaryValue<Tags::BondiJ>>(boundary_data_variables))),
+          get<Tags::BoundaryValue<Tags::BondiJ>>(*boundary_data_variables))),
       spin_weighted_view);
 
-  get(get<Tags::BoundaryValue<Tags::BondiJ>>(boundary_data_variables)) =
-      get(get<Tags::BoundaryValue<Tags::BondiJ>>(boundary_data_variables)) /
+  get(get<Tags::BoundaryValue<Tags::BondiJ>>(*boundary_data_variables)) =
+      get(get<Tags::BoundaryValue<Tags::BondiJ>>(*boundary_data_variables)) /
       extraction_radius_;
   get(get<Tags::BoundaryValue<Tags::Dr<Tags::BondiJ>>>(
-      boundary_data_variables)) =
-      -get(get<Tags::BoundaryValue<Tags::BondiJ>>(boundary_data_variables)) /
+      *boundary_data_variables)) =
+      -get(get<Tags::BoundaryValue<Tags::BondiJ>>(*boundary_data_variables)) /
       extraction_radius_;
 
-  SpinWeighted<ComplexModalVector, 2> spin_weighted_view;
   spin_weighted_view.set_data_ref(interpolated_h_coefficients_.data(),
                                   interpolated_h_coefficients_.size());
   Spectral::Swsh::inverse_swsh_transform(
       l_max_, 1,
       make_not_null(&get(
-          get<Tags::BoundaryValue<Tags::BondiH>>(boundary_data_variables))),
+          get<Tags::BoundaryValue<Tags::BondiH>>(*boundary_data_variables))),
       spin_weighted_view);
-  get(get<Tags::BoundaryValue<Tags::BondiH>>(boundary_data_variables)) =
-      get(get<Tags::BoundaryValue<Tags::BondiH>>(boundary_data_variables)) /
+  get(get<Tags::BoundaryValue<Tags::BondiH>>(*boundary_data_variables)) =
+      get(get<Tags::BoundaryValue<Tags::BondiH>>(*boundary_data_variables)) /
       extraction_radius_;
   get(get<Tags::BoundaryValue<Tags::Du<Tags::BondiJ>>>(
-      boundary_data_variables)) =
-      get(get<Tags::BoundaryValue<Tags::BondiH>>(boundary_data_variables));
+      *boundary_data_variables)) =
+      get(get<Tags::BoundaryValue<Tags::BondiH>>(*boundary_data_variables));
 
   return true;
 }
-
-PnWorldtubeDataManager::PnWorldtubeDataManager(
-    std::unique_ptr<ModeSetBoundaryH5BufferUpdater> buffer_updater,
-    const size_t l_max, const size_t buffer_depth,
-    std::unique_ptr<intrp::SpanInterpolator> interpolator) noexcept
-    : buffer_updater_{std::move(buffer_updater)},
-      l_max_{l_max},
-      interpolated_j_coefficients_{
-          Spectral::Swsh::size_of_libsharp_coefficient_vector(l_max)},
-      interpolated_h_coefficients_{
-          Spectral::Swsh::size_of_libsharp_coefficient_vector(l_max)},
-      buffer_depth_{buffer_depth},
-      interpolator_{std::move(interpolator)} {
-  if (UNLIKELY(buffer_updater_->get_time_buffer().size() <
-               2 * interpolator_->required_number_of_points_before_and_after() +
-                   buffer_depth)) {
-    ERROR(
-        "The specified buffer updater doesn't have enough time points to "
-        "supply the requested interpolation buffer. This almost certainly "
-        "indicates that the corresponding file hasn't been created properly, "
-        "but might indicate that the `buffer_depth` template parameter is "
-        "too large or the specified SpanInterpolator requests too many "
-        "points");
-  }
-  coefficients_buffers_ = ComplexModalVector{
-      square(l_max + 1) *
-      (buffer_depth +
-       2 * interpolator_->required_number_of_points_before_and_after())};
-}
-
-void PnWorldtubeDataManager::pup(PUP::er& p) noexcept {
-  p | buffer_updater_;
-  p | time_span_start_;
-  p | time_span_end_;
-  p | l_max_;
-  p | buffer_depth_;
-  p | interpolator_;
-  if (p.isUnpacking()) {
-    time_span_start_ = 0;
-    time_span_end_ = 0;
-    const size_t size_of_buffer =
-        square(l_max_ + 1) *
-        (buffer_depth_ +
-         2 * interpolator_->required_number_of_points_before_and_after());
-    coefficients_buffers_ =
-        ComplexModalVector{size_of_buffer};
-    interpolated_j_coefficients_ = ComplexModalVector{
-        Spectral::Swsh::size_of_libsharp_coefficient_vector(l_max_)};
-    interpolated_h_coefficients_ = ComplexModalVector{
-      Spectral::Swsh::size_of_libsharp_coefficient_vector(l_max_)};
-  }
-}
-
 
 /// \cond
 PUP::able::PUP_ID MetricWorldtubeDataManager::my_PUP_ID = 0;

@@ -110,7 +110,7 @@ struct EvolutionMetavars {
       "Perform Cauchy Characteristic Extraction using .h5 input data.\n"
       "Uses regularity-preserving formulation."};
 
-  enum class Phase { PreInitialization, InitRun, Initialization, Evolve, Exit };
+  enum class Phase { Initialization, Evolve, Exit };
 
   static Phase determine_next_phase(
       const Phase& current_phase,

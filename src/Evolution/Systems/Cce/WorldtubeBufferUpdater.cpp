@@ -26,6 +26,7 @@
 #include "Parallel/CharmPupable.hpp"
 #include "Utilities/Gsl.hpp"
 #include "Utilities/Literals.hpp"
+#include "Utilities/MakeString.hpp"
 #include "Utilities/Numeric.hpp"
 #include "Utilities/TMPL.hpp"
 
@@ -442,7 +443,6 @@ void BondiWorldtubeH5BufferUpdater::pup(PUP::er& p) noexcept {
   }
 }
 
-=======
 ModeSetBoundaryH5BufferUpdater::ModeSetBoundaryH5BufferUpdater(
     const std::string& cce_data_filename, const std::string& dataset_name,
     const size_t input_l_max, const size_t input_l_min) noexcept

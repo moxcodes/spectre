@@ -403,8 +403,8 @@ struct CalculateScriPlusValue<::Tags::dt<Tags::InertialRetardedTime>> {
 template <>
 struct CalculateScriPlusValue<Tags::EthInertialRetardedTime> {
   using return_tags = tmpl::list<Tags::EthInertialRetardedTime>;
-  using argument_tags =
-      tmpl::list<Tags::ComplexInertialRetardedTime, Tags::LMax>;
+  using argument_tags = tmpl::list<Tags::ComplexInertialRetardedTime,
+                                   Spectral::Swsh::Tags::LMaxBase>;
 
   static void apply(
       gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*>

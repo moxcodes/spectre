@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <cstddef>
 #include <memory>
 #include <string>
@@ -22,12 +23,6 @@ class ComplexDataVector;
 /// \endcond
 
 namespace Cce {
-namespace Tags {
-/// \cond
-struct LMax;
-struct NumberOfRadialPoints;
-/// \endcond
-}  // namespace Tags
 
 /// Contains utilities and \ref DataBoxGroup mutators for generating data for
 /// \f$J\f$ on the initial CCE hypersurface.
@@ -41,7 +36,9 @@ double adjust_angular_coordinates_for_j(
         tnsr::i<DataVector, 2, ::Frame::Spherical<::Frame::Inertial>>*>
         angular_cauchy_coordinates,
     const SpinWeighted<ComplexDataVector, 2>& surface_j, size_t l_max,
-    double tolerance, size_t max_steps, bool adjust_volume_gauge) noexcept;
+    double tolerance, size_t max_steps, bool adjust_volume_gauge,
+    boost::optional<const SpinWeighted<ComplexDataVector, 2>&> target_j =
+        boost::none) noexcept;
 }  // namespace detail
 
 /*!
@@ -65,7 +62,7 @@ double adjust_angular_coordinates_for_j(
 struct GaugeAdjustInitialJ {
   using boundary_tags =
       tmpl::list<Tags::GaugeC, Tags::GaugeD, Tags::GaugeOmega,
-                 Tags::CauchyAngularCoords, Spectral::Swsh::Tags::LMax>;
+                 Tags::CauchyAngularCoords, Spectral::Swsh::Tags::LMaxBase>;
   using return_tags = tmpl::list<Tags::BondiJ>;
   using argument_tags = tmpl::append<boundary_tags>;
 
@@ -82,7 +79,6 @@ struct GaugeAdjustInitialJ {
 /// \cond
 struct NoIncomingRadiation;
 struct ZeroNonSmooth;
-struct InitializeJCoordinatesForVolumeValue;
 struct InverseCubic;
 /// \endcond
 
@@ -110,11 +106,11 @@ struct InitializeJ : public PUP::able {
   using mutate_tags = tmpl::list<Tags::BondiJ, Tags::CauchyCartesianCoords,
                                  Tags::CauchyAngularCoords>;
   using argument_tags =
-      tmpl::push_back<boundary_tags, Tags::LMax, Tags::NumberOfRadialPoints>;
+      tmpl::push_back<boundary_tags, Spectral::Swsh::Tags::LMaxBase,
+                      Spectral::Swsh::Tags::NumberOfRadialPointsBase>;
 
   using creatable_classes =
-      tmpl::list<InverseCubic, NoIncomingRadiation, ZeroNonSmooth,
-                 InitializeJCoordinatesForVolumeValue>;
+      tmpl::list<InverseCubic, NoIncomingRadiation, ZeroNonSmooth>;
 
   WRAPPED_PUPable_abstract(InitializeJ);  // NOLINT
 

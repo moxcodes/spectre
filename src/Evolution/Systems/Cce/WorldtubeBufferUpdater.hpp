@@ -361,6 +361,11 @@ class ModeSetBoundaryH5BufferUpdater {
            time > time_buffer_[time_buffer_.size() - 1];
   }
 
+  std::unique_ptr<ModeSetBoundaryH5BufferUpdater> get_clone() const noexcept {
+    return std::make_unique<ModeSetBoundaryH5BufferUpdater>(
+        filename_, dataset_name_, l_max_, l_min_);
+  }
+
   size_t get_l_max() const noexcept { return l_max_; }
 
   DataVector& get_time_buffer() noexcept { return time_buffer_; }

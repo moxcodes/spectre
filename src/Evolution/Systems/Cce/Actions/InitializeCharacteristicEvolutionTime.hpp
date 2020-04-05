@@ -57,9 +57,11 @@ template <typename RunStage>
 struct InitializeCharacteristicEvolutionTime {
   using initialization_tags =
       tmpl::list<InitializationTags::TargetStepSize<RunStage>,
-                 Tags::StartTime<RunStage>, Tags::EndTime<RunStage>>;
+                 Tags::StartTimeFromFile<RunStage>,
+                 Tags::EndTimeFromFile<RunStage>>;
   using initialization_tags_to_keep =
-      tmpl::list<Tags::StartTime<RunStage>, Tags::EndTime<RunStage>>;
+      tmpl::list<Tags::StartTimeFromFile<RunStage>,
+                 Tags::EndTimeFromFile<RunStage>>;
   using const_global_cache_tags = tmpl::list<::Tags::TimeStepper<TimeStepper>>;
 
   template <
@@ -84,7 +86,8 @@ struct InitializeCharacteristicEvolutionTime {
     using evolution_compute_tags =
         db::AddComputeTags<::Tags::SubstepTimeCompute>;
 
-    const double initial_time_value = db::get<Tags::StartTime<RunStage>>(box);
+    const double initial_time_value =
+        db::get<Tags::StartTimeFromFile<RunStage>>(box);
     const double step_size =
         db::get<InitializationTags::TargetStepSize<RunStage>>(box);
 

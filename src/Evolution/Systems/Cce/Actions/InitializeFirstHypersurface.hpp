@@ -9,6 +9,7 @@
 
 #include "DataStructures/DataBox/DataBox.hpp"
 #include "Evolution/Systems/Cce/Initialize/InitializeJ.hpp"
+#include "Evolution/Systems/Cce/Initialize/InitializeJCoordinatesForVolumeValue.hpp"
 #include "Evolution/Systems/Cce/OptionTags.hpp"
 #include "Evolution/Systems/Cce/ScriPlusValues.hpp"
 #include "Evolution/Systems/Cce/System.hpp"
@@ -56,6 +57,9 @@ struct InitializeFirstHypersurface<InitializationRun> {
     db::mutate_apply<InitializeJ::InitializeJ::mutate_tags,
                      InitializeJ::InitializeJ::argument_tags>(
         db::get<Tags::InitializeJ>(box), make_not_null(&box));
+    db::mutate_apply<InitializeScriPlusValue<Tags::InertialRetardedTime>>(
+        make_not_null(&box),
+        db::get<::Tags::TimeStepId>(box).substep_time().value());
     return {std::move(box)};
   }
 };
@@ -72,7 +76,7 @@ struct InitializeFirstHypersurface<MainRun> {
           nullptr>
   static std::tuple<db::DataBox<DbTags>&&> apply(
       db::DataBox<DbTags>& box, tuples::TaggedTuple<InboxTags...>& inboxes,
-      const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
+      const Parallel::GlobalCache<Metavariables>& /*cache*/,
       const ArrayIndex& /*array_index*/, const ActionList /*meta*/,
       const ParallelComponent* const /*meta*/) noexcept {
     const auto& initialization_j_hypersurface_data =
@@ -137,8 +141,9 @@ struct InitializeFirstHypersurface<MainRun> {
                          shell_interpolated_j.data(), mesh.extents());
         });
 
-    db::mutate_apply<InitializeJ::mutate_tags, InitializeJ::argument_tags>(
-        InitializeJCoordinatesForVolumeValue{1.0e-10, 1000_st},
+    db::mutate_apply<InitializeJ::InitializeJ::mutate_tags,
+                     InitializeJ::InitializeJ::argument_tags>(
+        InitializeJ::InitializeJCoordinatesForVolumeValue{1.0e-10, 1000_st},
         make_not_null(&box));
     db::mutate_apply<InitializeScriPlusValue<Tags::InertialRetardedTime>>(
         make_not_null(&box),
@@ -155,7 +160,7 @@ struct InitializeFirstHypersurface<MainRun> {
   static std::tuple<db::DataBox<DbTags>&&> apply(
       db::DataBox<DbTags>& /*box*/,
       tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
-      const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
+      const Parallel::GlobalCache<Metavariables>& /*cache*/,
       const ArrayIndex& /*array_index*/, const ActionList /*meta*/,
       const ParallelComponent* const /*meta*/) noexcept {
     ERROR(
@@ -172,8 +177,11 @@ struct InitializeFirstHypersurface<MainRun> {
   static bool is_ready(
       const db::DataBox<DbTags>& /*box*/,
       const tuples::TaggedTuple<InboxTags...>& inboxes,
-      const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
+      const Parallel::GlobalCache<Metavariables>& /*cache*/,
       const ArrayIndex& /*array_index*/) noexcept {
+    Parallel::printf("checking readiness : %d\n",
+                     tuples::get<ReceiveTags::JHypersurfaceData>(inboxes).count(
+                         0_st) == 1_st);
     return tuples::get<ReceiveTags::JHypersurfaceData>(inboxes).count(0_st) ==
            1_st;
   }
@@ -187,8 +195,9 @@ struct InitializeFirstHypersurface<MainRun> {
   static bool is_ready(
       const db::DataBox<DbTags>& /*box*/,
       const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
-      const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
+      const Parallel::GlobalCache<Metavariables>& /*cache*/,
       const ArrayIndex& /*array_index*/) noexcept {
+    Parallel::printf("not ready, appropriate tag not present\n");
     return false;
   }
 };

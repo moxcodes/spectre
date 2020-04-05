@@ -58,7 +58,7 @@ struct ExitIfEndTimeReached<MainRun> {
     return std::tuple<db::DataBox<DbTags>&&, bool>(
         std::move(box),
         db::get<::Tags::TimeStepId>(box).substep_time().value() >=
-            db::get<Tags::EndTime<MainRun>>(box));
+            db::get<Tags::EndTimeFromFile<MainRun>>(box));
   }
 };
 
@@ -69,7 +69,7 @@ struct ExitIfEndTimeReached<InitializationRun> {
             typename ParallelComponent>
   static auto apply(db::DataBox<DbTags>& box,
                     const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
-                    Parallel::ConstGlobalCache<Metavariables>& cache,
+                    Parallel::GlobalCache<Metavariables>& cache,
                     const ArrayIndex& /*array_index*/,
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
@@ -77,12 +77,15 @@ struct ExitIfEndTimeReached<InitializationRun> {
                      db::get<::Tags::TimeStepId>(box).substep_time().value());
 
     const bool end_time_reached =
-        db::get<::Tags::TimeStepId>(box).substep_time().value() >=
-            db::get<Tags::EndTime<InitializationRun>>(box) and
-        db::get<::Tags::TimeStepId>(box).substep() == 0;
+        (db::get<::Tags::TimeStepId>(box).step_time().value() +
+         db::get<::Tags::TimeStep>(box).value()) >=
+            db::get<Tags::EndTimeFromFile<InitializationRun>>(box) and
+        db::get<::Tags::TimeStepId>(box).is_at_slab_boundary();
     // If the initialization run is complete, send the J hypersurface data to
     // the initialization routine.
     if (end_time_reached) {
+      Parallel::printf(
+          "Sending data to main evolution component for initialization\n");
       Parallel::receive_data<Cce::ReceiveTags::JHypersurfaceData>(
           Parallel::get_parallel_component<CharacteristicEvolution<
               MainRun, H5WorldtubeBoundary<MainRun, Metavariables>,

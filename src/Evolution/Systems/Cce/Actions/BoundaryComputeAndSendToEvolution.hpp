@@ -95,9 +95,23 @@ struct BoundaryComputeAndSendToEvolution<
                     Parallel::GlobalCache<Metavariables>& cache,
                     const ArrayIndex& /*array_index*/,
                     const TimeStepId& time) noexcept {
-    if (not db::get<Tags::WorldtubeBoundaryDataManager<RunStage>>(box)
-                .populate_hypersurface_boundary_data(
-                    make_not_null(&box), time.substep_time().value())) {
+    bool successfully_populated = false;
+    db::mutate<Tags::H5WorldtubeBoundaryDataManager<RunStage>,
+               ::Tags::Variables<
+                   typename Metavariables::cce_boundary_communication_tags>>(
+        make_not_null(&box),
+        [&successfully_populated, &time](
+            const gsl::not_null<std::unique_ptr<Cce::WorldtubeDataManager>*>
+                worldtube_data_manager,
+            const gsl::not_null<Variables<
+                typename Metavariables::cce_boundary_communication_tags>*>
+                boundary_variables) noexcept {
+          successfully_populated =
+              (*worldtube_data_manager)
+                  ->populate_hypersurface_boundary_data(
+                      boundary_variables, time.substep_time().value());
+        });
+    if (not successfully_populated) {
       ERROR("Insufficient boundary data to proceed, exiting early at time " +
             std::to_string(time.substep_time().value()));
     }
@@ -194,8 +208,7 @@ struct SendToEvolution<GhWorldtubeBoundary<Metavariables>, EvolutionComponent> {
                   gh_variables),
               extraction_radius, l_max);
         },
-        db::get<InitializationTags::ExtractionRadius>(box),
-        db::get<Tags::LMax>(box));
+        db::get<Tags::ExtractionRadius>(box), db::get<Tags::LMax>(box));
     Parallel::receive_data<Cce::ReceiveTags::BoundaryData<
         typename Metavariables::cce_boundary_communication_tags>>(
         Parallel::get_parallel_component<EvolutionComponent>(cache), time,

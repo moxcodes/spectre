@@ -22,12 +22,6 @@
 
 namespace Cce {
 
-namespace Tags {
-/// \cond
-struct LMax;
-/// \endcond
-}  // namespace Tags
-
 /// The set of tags that should be calculated before the initial data is
 /// computed on the first hypersurface.
 using gauge_adjustments_setup_tags =

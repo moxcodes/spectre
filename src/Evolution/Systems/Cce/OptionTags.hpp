@@ -261,21 +261,24 @@ struct H5WorldtubeBoundaryDataManager<MainRun> : db::SimpleTag {
 
 template <>
 struct H5WorldtubeBoundaryDataManager<InitializationRun> : db::SimpleTag {
-  using type = PnWorldtubeDataManager;
+  using type = std::unique_ptr<WorldtubeDataManager>;
   using option_tags =
       tmpl::list<OptionTags::LMax<InitializationRun>,
                  OptionTags::BoundaryDataFilename<InitializationRun>,
-                 OptionTags::H5LookaheadTimes, OptionTags::H5Interpolator>;
+                 OptionTags::H5LookaheadTimes, OptionTags::H5Interpolator,
+                 OptionTags::ExtractionRadius>;
 
   static constexpr bool pass_metavariables = false;
-  static PnWorldtubeDataManager create_from_options(
+  static type create_from_options(
       const size_t l_max, const std::string& filename,
       const size_t number_of_lookahead_times,
-      const std::unique_ptr<intrp::SpanInterpolator>& interpolator) noexcept {
-    return PnWorldtubeDataManager{
-      std::make_unique<ModeSetBoundaryH5BufferUpdater>(filename, "/", 8_st,
-                                                       2_st),
-          l_max, number_of_lookahead_times, interpolator->get_clone()};
+      const std::unique_ptr<intrp::SpanInterpolator>& interpolator,
+      const double extraction_radius) noexcept {
+    return std::make_unique<PnWorldtubeDataManager>(
+        std::make_unique<ModeSetBoundaryH5BufferUpdater>(filename, "/", 8_st,
+                                                         2_st),
+        l_max, number_of_lookahead_times, extraction_radius,
+        interpolator->get_clone());
   }
 };
 
@@ -365,6 +368,7 @@ struct StartTimeFromFile;
 /// `-std::numeric_limits<double>::%infinity()`), this will find the start time
 /// from the provided H5 file. If `OptionTags::StartTime` takes any other value,
 /// it will be used directly as the start time for the CCE evolution instead.
+template <>
 struct StartTimeFromFile<MainRun> : Tags::StartTime, db::SimpleTag {
   using type = double;
   using option_tags = tmpl::list<OptionTags::StartTime<MainRun>,
@@ -405,7 +409,7 @@ struct StartTimeFromFile<InitializationRun> : Tags::StartTime, db::SimpleTag {
 /// supplied in the input file (for e.g. analytic tests).
 struct SpecifiedStartTime : Tags::StartTime, db::SimpleTag {
   using type = double;
-  using option_tags = tmpl::list<OptionTags::StartTime>;
+  using option_tags = tmpl::list<OptionTags::StartTime<>>;
 
   static constexpr bool pass_metavariables = false;
   static double create_from_options(const double start_time) noexcept {
@@ -477,7 +481,7 @@ struct NoEndTime : Tags::EndTime, db::SimpleTag {
 /// supplied in the input file (for e.g. analytic tests).
 struct SpecifiedEndTime : Tags::EndTime, db::SimpleTag {
   using type = double;
-  using option_tags = tmpl::list<OptionTags::EndTime>;
+  using option_tags = tmpl::list<OptionTags::EndTime<>>;
 
   static constexpr bool pass_metavariables = false;
   static double create_from_options(const double end_time) noexcept {

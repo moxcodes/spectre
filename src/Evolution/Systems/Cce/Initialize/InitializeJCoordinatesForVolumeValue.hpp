@@ -19,6 +19,7 @@ class ComplexDataVector;
 /// \endcond
 
 namespace Cce {
+namespace InitializeJ {
 // Note: not actually options-creatable, but does satisfy the interface
 // requirements
 struct InitializeJCoordinatesForVolumeValue : InitializeJ {
@@ -49,4 +50,5 @@ struct InitializeJCoordinatesForVolumeValue : InitializeJ {
   double angular_coordinate_tolerance_ = 1.0e-10;
   size_t max_iterations_ = 300;
 };
+}  // namespace InitializeJ
 }  // namespace Cce
