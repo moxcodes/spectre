@@ -27,6 +27,7 @@ spectre_unload_modules() {
     module unload charm/6.8.0-smp
     module unload python/anaconda2-4.1.1
     module unload pybind11/2.4.3
+    module unload hdf5/1.12.0
 }
 
 spectre_load_modules() {
@@ -49,6 +50,7 @@ spectre_load_modules() {
     module load charm/6.8.0-smp
     module load python/anaconda2-4.1.1
     module load pybind11/2.4.3
+    module load hdf5/1.12.0
 }
 
 spectre_run_cmake() {
