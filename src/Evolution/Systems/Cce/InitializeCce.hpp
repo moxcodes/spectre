@@ -83,6 +83,8 @@ struct InitializeJZeroNonSmooth;
 
 struct InitializeJInverseCubic;
 
+struct InitializeJInverseQuartic;
+
 /*!
  * \brief Abstract base class for an initial hypersurface data generator for
  * Cce.
@@ -111,7 +113,8 @@ struct InitializeJ : public PUP::able {
 
   using creatable_classes =
       tmpl::list<InitializeJNoIncomingRadiation, InitializeJZeroNonSmooth,
-                 InitializeJInverseCubic, InitializeJImportModes>;
+                 InitializeJInverseCubic, InitializeJInverseQuartic,
+                 InitializeJImportModes>;
 
   WRAPPED_PUPable_abstract(InitializeJ);  // NOLINT
 
@@ -407,4 +410,43 @@ struct InitializeJInverseCubic : InitializeJ {
 
   void pup(PUP::er& /*p*/) noexcept override;
 };
+
+/*!
+ * \brief Initialize \f$J\f$ on the first hypersurface from provided boundary
+ * values of \f$J\f$, \f$R\f$, and \f$\partial_r J\f$.
+ *
+ * \details This initial data is chosen to take the function:
+ *
+ * \f[ J = \frac{A}{r^3} + \frac{B}{r^4},\f]
+ */
+struct InitializeJInverseQuartic : InitializeJ {
+  using options = tmpl::list<>;
+  static constexpr OptionString help = {
+      "Initialization process where J is set to a simple Ansatz with a\n"
+      " A/r^3 + B/r^4 piece such that it is smooth with the Cauchy data at the "
+      "\n worldtube"};
+
+  static std::string name() noexcept { return "InverseQuartic"; }
+
+  WRAPPED_PUPable_decl_template(InitializeJInverseQuartic);  // NOLINT
+  explicit InitializeJInverseQuartic(CkMigrateMessage* /*unused*/) noexcept {}
+
+  InitializeJInverseQuartic() = default;
+
+  std::unique_ptr<InitializeJ> get_clone() const noexcept override;
+
+  void operator()(
+      gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> j,
+      gsl::not_null<tnsr::i<DataVector, 3>*> cartesian_cauchy_coordinates,
+      gsl::not_null<
+          tnsr::i<DataVector, 2, ::Frame::Spherical<::Frame::Inertial>>*>
+          angular_cauchy_coordinates,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& boundary_j,
+      const Scalar<SpinWeighted<ComplexDataVector, 2>>& boundary_dr_j,
+      const Scalar<SpinWeighted<ComplexDataVector, 0>>& r, size_t l_max,
+      size_t number_of_radial_points) const noexcept override;
+
+  void pup(PUP::er& /*p*/) noexcept override;
+};
+
 }  // namespace Cce
