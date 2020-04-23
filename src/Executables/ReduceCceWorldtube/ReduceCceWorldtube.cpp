@@ -16,6 +16,7 @@
 #include "Evolution/Systems/Cce/ReducedWorldtubeModeRecorder.hpp"
 #include "Evolution/Systems/Cce/SpecBoundaryData.hpp"
 #include "Evolution/Systems/Cce/Tags.hpp"
+#include "NumericalAlgorithms/Interpolation/BarycentricRationalSpanInterpolator.hpp"
 #include "NumericalAlgorithms/Spectral/SwshCoefficients.hpp"
 #include "NumericalAlgorithms/Spectral/SwshCollocation.hpp"
 #include "Parallel/Exit.hpp"
@@ -154,7 +155,8 @@ void slice_buffers_to_libsharp_modes(
 void perform_cce_worldtube_reduction(const std::string& input_file,
                                      const std::string& output_file,
                                      const size_t buffer_depth,
-                                     const size_t l_max_factor) noexcept {
+                                     const size_t l_max_factor,
+                                     const double interpolation_step) noexcept {
   Cce::SpecWorldtubeH5BufferUpdater buffer_updater{input_file};
   const size_t l_max = buffer_updater.get_l_max();
   // Perform the boundary computation to scalars at twice the input l_max to be
@@ -199,7 +201,55 @@ void perform_cce_worldtube_reduction(const std::string& input_file,
   ComplexModalVector output_libsharp_mode_buffer{
       Spectral::Swsh::size_of_libsharp_coefficient_vector(computation_l_max)};
 
+  // A data manager used for performing the interpolation to intermediate points
+  Cce::WorldtubeDataManager data_manager{
+      std::make_unique<Cce::SpecWorldtubeH5BufferUpdater>(input_file),
+      computation_l_max, buffer_depth,
+      std::make_unique<intrp::BarycentricRationalSpanInterpolator>(9u, 11u)};
+
+  double interpolation_time = interpolation_step;
   for (size_t i = 0; i < time_buffer.size(); ++i) {
+    while (interpolation_step != 0.0 and interpolation_time < time_buffer[i]) {
+      Parallel::printf("reducing data at time : %f / %f \r", interpolation_time,
+                       time_buffer[time_buffer.size() - 1]);
+      data_manager.populate_hypersurface_boundary_data(
+          make_not_null(&boundary_data_box), interpolation_time);
+      // write the current intermediate timestep data to file
+      tmpl::for_each<reduced_boundary_tags>([&recorder, &boundary_data_box,
+                                             &output_goldberg_mode_buffer,
+                                             &output_libsharp_mode_buffer,
+                                             &l_max, &computation_l_max,
+                                             &interpolation_time](
+                                                auto tag_v) noexcept {
+        using tag = typename decltype(tag_v)::type;
+        SpinWeighted<ComplexModalVector, db::item_type<tag>::type::spin>
+            spin_weighted_libsharp_view;
+        spin_weighted_libsharp_view.set_data_ref(
+            output_libsharp_mode_buffer.data(),
+            output_libsharp_mode_buffer.size());
+        Spectral::Swsh::swsh_transform(
+            computation_l_max, 1, make_not_null(&spin_weighted_libsharp_view),
+            get(db::get<tag>(boundary_data_box)));
+        SpinWeighted<ComplexModalVector, db::item_type<tag>::type::spin>
+            spin_weighted_goldberg_view;
+        spin_weighted_goldberg_view.set_data_ref(
+            output_goldberg_mode_buffer.data(),
+            output_goldberg_mode_buffer.size());
+        Spectral::Swsh::libsharp_to_goldberg_modes(
+            make_not_null(&spin_weighted_goldberg_view),
+            spin_weighted_libsharp_view, computation_l_max);
+
+        // The goldberg format type is in strictly increasing l modes, so to
+        // reduce to a smaller l_max, we can just take the first (l_max + 1)^2
+        // values.
+        ComplexModalVector reduced_goldberg_view{
+            output_goldberg_mode_buffer.data(), square(l_max + 1)};
+        recorder.append_worldtube_mode_data(
+            "/" + Cce::dataset_label_for_tag<tag>(), interpolation_time,
+            reduced_goldberg_view, l_max, db::item_type<tag>::type::spin == 0);
+      });
+      interpolation_time += interpolation_step;
+    }
     const double time = time_buffer[i];
     Parallel::printf("reducing data at time : %f / %f \r", time,
                      time_buffer[time_buffer.size() - 1]);
@@ -302,7 +352,10 @@ int main(int argc, char** argv) {
       "routines. Higher values mean fewer, larger loads from file into RAM.")(
       "lmax_factor", boost::program_options::value<size_t>()->default_value(2),
       "the boundary computations will be performed at a resolution that is "
-      "lmax_factor times the input file lmax to avoid aliasing");
+      "lmax_factor times the input file lmax to avoid aliasing")(
+      "interpolation_steps",
+      boost::program_options::value<double>()->default_value(0.0),
+      "size of fixed timesteps to include interpolated data for");
 
   boost::program_options::variables_map vars;
 
@@ -321,5 +374,6 @@ int main(int argc, char** argv) {
   perform_cce_worldtube_reduction(vars["input_file"].as<std::string>(),
                                   vars["output_file"].as<std::string>(),
                                   vars["buffer_depth"].as<size_t>(),
-                                  vars["lmax_factor"].as<size_t>());
+                                  vars["lmax_factor"].as<size_t>(),
+                                  vars["interpolation_steps"].as<double>());
 }
