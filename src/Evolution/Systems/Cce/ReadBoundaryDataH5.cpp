@@ -205,6 +205,7 @@ void SpecWorldtubeH5BufferUpdater::pup(PUP::er& p) noexcept {
   p | filename_;
   p | l_max_;
   p | extraction_radius_;
+  p | radial_derivatives_need_renormalization_;
   p | dataset_names_;
   if (p.isUnpacking()) {
     cce_data_file_ = h5::H5File<h5::AccessType::ReadOnly>{filename_};
