@@ -302,7 +302,7 @@ struct StartTime : db::SimpleTag {
 /// `std::numeric_limits<double>::%infinity()`, this will find the end time from
 /// the provided H5 file. If `OptionTags::EndTime` takes any other value, it
 /// will be used directly as the end time for the CCE evolution instead.
-struct EndTime : db::SimpleTag {
+struct EndTimeFromFile : Tags::EndTime, db::SimpleTag {
   using type = double;
   using option_tags =
       tmpl::list<OptionTags::EndTime, OptionTags::BoundaryDataFilename>;
@@ -317,6 +317,29 @@ struct EndTime : db::SimpleTag {
     }
     return end_time;
   }
+};
+
+/// \brief Represents the final time of a CCE evolution that should just proceed
+/// until it receives no more boundary data and becomes quiescent.
+struct NoEndTime : Tags::EndTime, db::SimpleTag {
+  using type = double;
+  using option_tags = tmpl::list<>;
+
+  static constexpr bool pass_metavariables = false;
+  static double create_from_options() {
+    return std::numeric_limits<double>::infinity();
+  }
+};
+
+/// \brief Represents the final time of a bounded CCE evolution that must be
+/// supplied in the input file (for e.g. analytic tests).
+struct SpecifiedEndTime : Tags::EndTime, db::SimpleTag {
+  using type = double;
+  using option_tags =
+      tmpl::list<OptionTags::EndTime>;
+
+  static constexpr bool pass_metavariables = false;
+  static double create_from_options(double end_time) { return end_time; }
 };
 
 struct GhInterfaceManager : db::SimpleTag {
