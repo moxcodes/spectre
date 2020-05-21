@@ -3,6 +3,7 @@
 
 set(LIBS_TO_LINK
   ApparentHorizons
+  Cce
   CoordinateMaps
   DiscontinuousGalerkin
   Domain
@@ -18,6 +19,7 @@ set(LIBS_TO_LINK
   LinearOperators
   MathFunctions
   Options
+  Spectral
   Time
   Utilities
   )
