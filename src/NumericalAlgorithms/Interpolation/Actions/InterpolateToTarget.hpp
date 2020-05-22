@@ -37,6 +37,10 @@ namespace Actions {
 ///   - `Tags::Mesh<Metavariables::volume_dim>`
 ///   - Variables tagged by
 ///     InterpolationTargetTag::vars_to_interpolate_to_target
+///   - `::Tags::TimeStepId`
+///   - `::Tags::HistoryEvolvedVariables<>`
+/// - ConstGlobalCache
+///   - `::Tags::TimeStepper<>`
 ///
 /// DataBox changes:
 /// - Adds: nothing
@@ -53,6 +57,11 @@ struct InterpolateToTarget {
       Parallel::ConstGlobalCache<Metavariables>& cache,
       const ArrayIndex& array_index, const ActionList /*meta*/,
       const ParallelComponent* const /*meta*/) noexcept {
+    // Exit early if we are on a substep and we don't want to interpolate
+    // substeps
+    if (not InterpolationTargetTag::should_interpolate(box)) {
+      return std::forward_as_tuple(std::move(box));
+    }
     static constexpr size_t dim = Metavariables::volume_dim;
 
     // Get element logical coordinates.

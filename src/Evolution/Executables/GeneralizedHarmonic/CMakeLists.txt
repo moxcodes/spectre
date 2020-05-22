@@ -31,3 +31,11 @@ add_spectre_parallel_executable(
   EvolutionMetavars
   "${LIBS_TO_LINK}"
   )
+
+add_spectre_parallel_executable(
+  EvolveGeneralizedHarmonicCce
+  EvolveGeneralizedHarmonicCce
+  Evolution/Executables/GeneralizedHarmonic
+  EvolutionMetavarsWithCce
+  "${LIBS_TO_LINK}"
+  )

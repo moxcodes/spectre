@@ -107,18 +107,8 @@
 #include "Utilities/Functional.hpp"
 #include "Utilities/TMPL.hpp"
 
-/// \cond
-namespace Frame {
-// IWYU pragma: no_forward_declare MathFunction
-struct Inertial;
-}  // namespace Frame
-namespace Parallel {
-template <typename Metavariables>
-class CProxy_ConstGlobalCache;
-}  // namespace Parallel
-/// \endcond
-
-struct EvolutionMetavars {
+template <typename EvolutionMetavarsDerived>
+struct EvolutionMetavarsBase {
   static constexpr int volume_dim = 3;
   using frame = Frame::Inertial;
   using system = GeneralizedHarmonic::System<volume_dim>;
@@ -240,7 +230,7 @@ struct EvolutionMetavars {
   using element_observation_type = ObservationType;
 
   using observed_reduction_data_tags = observers::collect_reduction_data_tags<
-      tmpl::push_back<Event<observation_events>::creatable_classes,
+      tmpl::push_back<typename Event<observation_events>::creatable_classes,
                       typename AhA::post_horizon_find_callback>>;
 
   using step_actions = tmpl::flatten<tmpl::list<
@@ -254,7 +244,7 @@ struct EvolutionMetavars {
       evolution::Actions::AddMeshVelocityNonconservative,
       dg::Actions::ComputeNonconservativeBoundaryFluxes<
           domain::Tags::BoundaryDirectionsInterior<volume_dim>>,
-      dg::Actions::ImposeDirichletBoundaryConditions<EvolutionMetavars>,
+      dg::Actions::ImposeDirichletBoundaryConditions<EvolutionMetavarsDerived>,
       dg::Actions::CollectDataForFluxes<
           boundary_scheme,
           domain::Tags::BoundaryDirectionsInterior<volume_dim>>,
@@ -275,12 +265,12 @@ struct EvolutionMetavars {
   };
 
   using initialization_actions = tmpl::list<
-      Initialization::Actions::TimeAndTimeStep<EvolutionMetavars>,
+      Initialization::Actions::TimeAndTimeStep<EvolutionMetavarsDerived>,
       evolution::dg::Initialization::Domain<volume_dim>,
       Initialization::Actions::NonconservativeSystem,
       evolution::Initialization::Actions::SetVariables<
           domain::Tags::Coordinates<volume_dim, Frame::Logical>>,
-      Initialization::Actions::TimeStepperHistory<EvolutionMetavars>,
+      Initialization::Actions::TimeStepperHistory<EvolutionMetavarsDerived>,
       GeneralizedHarmonic::Actions::InitializeGhAnd3Plus1Variables<volume_dim>,
       dg::Actions::InitializeInterfaces<
           system,
@@ -324,16 +314,16 @@ struct EvolutionMetavars {
           volume_dim>,
       GeneralizedHarmonic::Actions::InitializeConstraints<volume_dim>,
       dg::Actions::InitializeMortars<boundary_scheme, true>,
-      Initialization::Actions::DiscontinuousGalerkin<EvolutionMetavars>,
+      Initialization::Actions::DiscontinuousGalerkin<EvolutionMetavarsDerived>,
       Initialization::Actions::RemoveOptionsAndTerminatePhase>;
 
   using component_list = tmpl::list<
-      observers::Observer<EvolutionMetavars>,
-      observers::ObserverWriter<EvolutionMetavars>,
-      intrp::Interpolator<EvolutionMetavars>,
-      intrp::InterpolationTarget<EvolutionMetavars, AhA>,
+      observers::Observer<EvolutionMetavarsDerived>,
+      observers::ObserverWriter<EvolutionMetavarsDerived>,
+      intrp::Interpolator<EvolutionMetavarsDerived>,
+      intrp::InterpolationTarget<EvolutionMetavarsDerived, AhA>,
       DgElementArray<
-          EvolutionMetavars,
+          EvolutionMetavarsDerived,
           tmpl::list<
               Parallel::PhaseActions<Phase, Phase::Initialization,
                                      initialization_actions>,
@@ -364,7 +354,7 @@ struct EvolutionMetavars {
   static Phase determine_next_phase(
       const Phase& current_phase,
       const Parallel::CProxy_ConstGlobalCache<
-          EvolutionMetavars>& /*cache_proxy*/) noexcept {
+          EvolutionMetavarsDerived>& /*cache_proxy*/) noexcept {
     switch (current_phase) {
       case Phase::Initialization:
         return Phase::InitializeTimeStepperHistory;
@@ -385,22 +375,3 @@ struct EvolutionMetavars {
     }
   }
 };
-
-static const std::vector<void (*)()> charm_init_node_funcs{
-    &setup_error_handling,
-    &domain::creators::time_dependence::register_derived_with_charm,
-    &domain::FunctionsOfTime::register_derived_with_charm,
-    &domain::creators::register_derived_with_charm,
-    &Parallel::register_derived_classes_with_charm<
-        Event<EvolutionMetavars::events>>,
-    &Parallel::register_derived_classes_with_charm<
-        StepChooser<EvolutionMetavars::slab_choosers>>,
-    &Parallel::register_derived_classes_with_charm<
-        StepChooser<EvolutionMetavars::step_choosers>>,
-    &Parallel::register_derived_classes_with_charm<StepController>,
-    &Parallel::register_derived_classes_with_charm<TimeStepper>,
-    &Parallel::register_derived_classes_with_charm<
-        Trigger<EvolutionMetavars::triggers>>};
-
-static const std::vector<void (*)()> charm_init_proc_funcs{
-    &enable_floating_point_exceptions};

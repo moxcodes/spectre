@@ -78,13 +78,21 @@ struct initialize_elements_and_queue_simple_actions {
     for (const auto& element_id : element_ids) {
       ActionTesting::next_action<elem_component>(make_not_null(&runner),
                                                  element_id);
+      if (not Metavariables::should_interpolate_setting) {
+        CHECK(ActionTesting::is_simple_action_queue_empty<
+              InterpolateOnElementTestHelpers::mock_interpolation_target<
+                  Metavariables, typename Metavariables::InterpolationTargetA>>(
+            runner, 0));
+      }
     }
   }
 };
 
-template <bool HaveComputeItemsOnSource, bool AddComputeItemToBox>
+template <bool HaveComputeItemsOnSource, bool AddComputeItemToBox,
+          bool ShouldInterpolate>
 struct MockMetavariables {
   static constexpr bool add_compute_item_to_box = AddComputeItemToBox;
+  static constexpr bool should_interpolate_setting = ShouldInterpolate;
   struct InterpolationTargetA {
     using vars_to_interpolate_to_target = tmpl::list<tmpl::conditional_t<
         HaveComputeItemsOnSource,
@@ -95,6 +103,11 @@ struct MockMetavariables {
         tmpl::list<
             InterpolateOnElementTestHelpers::Tags::MultiplyByTwoComputeItem>,
         tmpl::list<>>;
+    template <typename DbTagList>
+    static bool should_interpolate(
+        const db::DataBox<DbTagList>& /*box*/) noexcept {
+      return ShouldInterpolate;
+    }
   };
   using temporal_id = ::Tags::TimeStepId;
   static constexpr size_t volume_dim = 3;
@@ -119,10 +132,13 @@ void run_test() noexcept {
 
 SPECTRE_TEST_CASE("Unit.NumericalAlgorithms.Interpolator.InterpolateToTarget",
                   "[Unit]") {
-  run_test<MockMetavariables<false,false>>();
-  run_test<MockMetavariables<true,true>>();
-  run_test<MockMetavariables<true,false>>();
-  run_test<MockMetavariables<false,true>>();
+  run_test<MockMetavariables<false, false, true>>();
+  run_test<MockMetavariables<true, true, true>>();
+  run_test<MockMetavariables<true, false, true>>();
+  run_test<MockMetavariables<false, true, true>>();
+  run_test<MockMetavariables<false, false, false>>();
+  run_test<MockMetavariables<true, true, false>>();
+  run_test<MockMetavariables<true, false, false>>();
+  run_test<MockMetavariables<false, true, false>>();
 }
-
 }  // namespace
