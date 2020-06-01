@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <cstddef>
 #include <tuple>
 
@@ -57,16 +58,29 @@ struct ElementInitInterpPoints {
           "it should not be there because ElementInitInterpPoints adds it.");
       return std::forward_as_tuple(std::move(box));
     } else {  // NOLINT clang-tidy thinks 'if' and 'else' not indented the same
-      using point_info_type = tuples::tagged_tuple_from_typelist<
-          db::wrap_tags_in<Tags::point_info_detail::WrappedPointInfoTag,
-                           typename Metavariables::interpolation_target_tags,
-                           Metavariables>>;
-      return std::make_tuple(
-          db::create_from<
-              db::RemoveTags<>,
-              db::AddSimpleTags<intrp::Tags::InterpPointInfo<Metavariables>>>(
-              std::move(box), point_info_type{}));
+      return init_impl<Metavariables>(
+          box, typename Metavariables::interpolation_target_tags{});
     }
+  }
+  template <typename Metavariables, typename DbTags, typename... TagSet>
+  static auto init_impl(db::DataBox<DbTags>& box,
+                        tmpl::list<TagSet...> /*meta*/) noexcept {
+    using point_info_type = tuples::tagged_tuple_from_typelist<
+        db::wrap_tags_in<Tags::point_info_detail::WrappedPointInfoTag,
+                         tmpl::list<TagSet...>, Metavariables>>;
+    Parallel::printf("Initializing!\n");
+    return std::make_tuple(
+        db::create_from<
+            db::RemoveTags<>,
+            db::AddSimpleTags<
+                intrp::Tags::InterpPointInfo<Metavariables>,
+                intrp::Tags::NextInterpolationTimeInFuture<TagSet>...,
+                intrp::Tags::NextInterpolationTimeStepId<TagSet>...>>(
+            std::move(box), point_info_type{},
+            db::item_type<intrp::Tags::NextInterpolationTimeInFuture<TagSet>>{
+                false}...,
+            db::item_type<intrp::Tags::NextInterpolationTimeStepId<TagSet>>{
+                boost::none}...));
   }
 };
 }  // namespace Actions

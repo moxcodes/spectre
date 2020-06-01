@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <cstddef>
 #include <deque>
 #include <string>
@@ -16,6 +17,8 @@
 #include "Domain/Mesh.hpp"
 #include "NumericalAlgorithms/Interpolation/InterpolatedVars.hpp"
 #include "Options/Options.hpp"
+#include "Parallel/InboxInserters.hpp"
+#include "Time/TimeStepId.hpp"
 #include "Utilities/TaggedTuple.hpp"
 
 /// \cond
@@ -71,6 +74,16 @@ struct CompletedTemporalIds : db::SimpleTag {
   using type = std::deque<TemporalId>;
 };
 
+template <typename InterpolationTargetTag>
+struct NextInterpolationTimeInFuture : db::SimpleTag {
+  using type = bool;
+};
+
+template <typename InterpolationTargetTag>
+struct NextInterpolationTimeStepId : db::SimpleTag {
+  using type = boost::optional<::TimeStepId>;
+};
+
 /// Holds interpolated variables on an InterpolationTarget.
 template <typename InterpolationTargetTag, typename TemporalId>
 struct InterpolatedVars : db::SimpleTag {
@@ -122,4 +135,13 @@ struct NumberOfElements : db::SimpleTag {
 };
 
 }  // namespace Tags
+
+namespace ReceiveTags {
+template <typename InterpolationTargetTag>
+struct NextTime
+    : Parallel::InboxInserters::Value<NextTime<InterpolationTargetTag>> {
+  using temporal_id = ::TimeStepId;
+  using type = std::map<temporal_id, temporal_id>;
+};
+}  // namespace ReceiveTags
 }  // namespace intrp

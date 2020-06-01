@@ -102,11 +102,12 @@ struct H5WorldtubeBoundary {
  * from the worldtube to the evolution component. This will typically be
  * `Cce::Tags::characteristic_worldtube_boundary_tags<Tags::BoundaryValue>`.
  */
-template <class Metavariables>
+template <class Metavariables, typename InterpolationTarget>
 struct GhWorldtubeBoundary {
   using end_time_tag = Tags::NoEndTime;
   using chare_type = Parallel::Algorithms::Singleton;
   using metavariables = Metavariables;
+  using gh_interpolation_target = InterpolationTarget;
   using initialize_action_list =
       tmpl::list<Actions::InitializeGhWorldtubeBoundary,
                  Initialization::Actions::RemoveOptionsAndTerminatePhase>;

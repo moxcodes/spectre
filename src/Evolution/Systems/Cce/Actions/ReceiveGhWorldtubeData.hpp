@@ -35,9 +35,9 @@ namespace Actions {
  *
  * \details If the new data fulfills a prior request submitted to the
  * `Cce::InterfaceManagers::GhInterfaceManager`, this will dispatch the result
- * to `Cce::Actions::SendToEvolution<GhWorldtubeBoundary<Metavariables>,
- * EvolutionComponent>` for sending the processed boundary data to
- * the `EvolutionComponent`.
+ * to `Cce::Actions::SendToEvolution<GhWorldtubeBoundary<Metavariables,
+ * InterpolationTargetTag>, EvolutionComponent>` for sending the processed
+ * boundary data to the `EvolutionComponent`.
  *
  * \ref DataBoxGroup changes:
  * - Adds: nothing
@@ -45,7 +45,7 @@ namespace Actions {
  * - Modifies:
  *   - `Tags::GhInterfaceManager`
  */
-template <typename EvolutionComponent>
+template <typename EvolutionComponent, typename InterpolationTargetTag>
 struct ReceiveGhWorldtubeData {
   template <typename ParallelComponent, typename... DbTags,
             typename Metavariables, typename ArrayIndex,
@@ -77,9 +77,11 @@ struct ReceiveGhWorldtubeData {
               (*interface_manager)->retrieve_and_remove_first_ready_gh_data();
           if (static_cast<bool>(gh_data)) {
             Parallel::simple_action<Actions::SendToEvolution<
-                GhWorldtubeBoundary<Metavariables>, EvolutionComponent>>(
+                GhWorldtubeBoundary<Metavariables, InterpolationTargetTag>,
+                EvolutionComponent>>(
                 Parallel::get_parallel_component<
-                    GhWorldtubeBoundary<Metavariables>>(cache),
+                    GhWorldtubeBoundary<Metavariables, InterpolationTargetTag>>(
+                    cache),
                 get<0>(*gh_data), get<1>(*gh_data));
           }
         });

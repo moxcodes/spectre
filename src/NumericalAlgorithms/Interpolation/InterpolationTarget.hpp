@@ -9,6 +9,7 @@
 #include "DataStructures/DataBox/DataBox.hpp"
 #include "IO/Observer/ObservationId.hpp"
 #include "IO/Observer/TypeOfObservation.hpp"
+#include "NumericalAlgorithms/Interpolation/Actions/InterpolationTargetSendPoints.hpp"
 #include "Parallel/Actions/TerminatePhase.hpp"
 #include "Parallel/ConstGlobalCache.hpp"
 #include "Parallel/ParallelComponentHelpers.hpp"
@@ -142,15 +143,24 @@ struct InterpolationTarget {
                      Parallel::Actions::TerminatePhase>>,
       Parallel::PhaseActions<
           typename Metavariables::Phase, Metavariables::Phase::Register,
-          tmpl::conditional_t<
-              std::is_same_v<typename InterpolationTargetTag::
-                                 post_interpolation_callback::observation_types,
-                             tmpl::list<>>,
-              tmpl::list<Parallel::Actions::TerminatePhase>,
-              tmpl::list<
-                  ::observers::Actions::RegisterSingletonWithObserverWriter<
-                      RegistrationHelper>,
-                  Parallel::Actions::TerminatePhase>>>>;
+          tmpl::list<
+              tmpl::conditional_t<
+                  InterpolationTargetTag::compute_target_points::is_sequential::
+                      value,
+                  tmpl::list<>,
+                  tmpl::list<
+                      Actions::InterpolationTargetSendTimeIndepPointsToElements<
+                          InterpolationTargetTag>>>,
+              tmpl::conditional_t<
+                  std::is_same_v<
+                      typename InterpolationTargetTag::
+                          post_interpolation_callback::observation_types,
+                      tmpl::list<>>,
+                  tmpl::list<Parallel::Actions::TerminatePhase>,
+                  tmpl::list<
+                      ::observers::Actions::RegisterSingletonWithObserverWriter<
+                          RegistrationHelper>,
+                      Parallel::Actions::TerminatePhase>>>>>;
 
   using initialization_tags = Parallel::get_initialization_tags<
       Parallel::get_initialization_actions_list<phase_dependent_action_list>>;

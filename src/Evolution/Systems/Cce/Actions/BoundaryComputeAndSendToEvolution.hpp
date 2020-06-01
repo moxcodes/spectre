@@ -131,9 +131,11 @@ struct BoundaryComputeAndSendToEvolution<H5WorldtubeBoundary<Metavariables>,
  * - Modifies:
  *   - `Tags::GhInterfaceManager`
  */
-template <typename Metavariables, typename EvolutionComponent>
-struct BoundaryComputeAndSendToEvolution<GhWorldtubeBoundary<Metavariables>,
-                                         EvolutionComponent> {
+template <typename Metavariables, typename EvolutionComponent,
+          typename InterpolationTargetTag>
+struct BoundaryComputeAndSendToEvolution<
+    GhWorldtubeBoundary<Metavariables, InterpolationTargetTag>,
+    EvolutionComponent> {
   template <typename ParallelComponent, typename... DbTags, typename ArrayIndex,
             Requires<tmpl2::flat_any_v<std::is_same_v<
                 ::Tags::Variables<
@@ -143,28 +145,47 @@ struct BoundaryComputeAndSendToEvolution<GhWorldtubeBoundary<Metavariables>,
                     Parallel::ConstGlobalCache<Metavariables>& cache,
                     const ArrayIndex& /*array_index*/,
                     const TimeStepId& time) noexcept {
+    // This action does two things: 1. Broadcasts the time to the relevant dg
+    // elements; 2. insert the requested time into the interface manager. These
+    // two actions are for distinct boundary communication strategies, and in
+    // most cases they will not both do something significant; either the
+    // broadcast or the insertion will often be a no-op.
+    if (time.substep() == 0) {
+      auto& receiver_proxy = Parallel::get_parallel_component<
+          typename InterpolationTargetTag::interpolating_dg_component>(cache);
+      Parallel::receive_data<
+          intrp::ReceiveTags::NextTime<InterpolationTargetTag>>(
+          receiver_proxy, time, time, true);
+    }
+
     db::mutate<Tags::GhInterfaceManager>(
-        make_not_null(&box),
-        [&time, &cache](const gsl::not_null<
-                        std::unique_ptr<InterfaceManagers::GhInterfaceManager>*>
-                            interface_manager) noexcept {
-          (*interface_manager)->request_gh_data(time);
-          const auto gh_data =
-              (*interface_manager)->retrieve_and_remove_first_ready_gh_data();
-          if (static_cast<bool>(gh_data)) {
-            Parallel::simple_action<Actions::SendToEvolution<
-                GhWorldtubeBoundary<Metavariables>, EvolutionComponent>>(
-                Parallel::get_parallel_component<
-                    GhWorldtubeBoundary<Metavariables>>(cache),
-                get<0>(*gh_data), get<1>(*gh_data));
-          }
-        });
+            make_not_null(&box),
+            [&time,
+             &cache](const gsl::not_null<
+                     std::unique_ptr<InterfaceManagers::GhInterfaceManager>*>
+                         interface_manager) noexcept {
+              (*interface_manager)->request_gh_data(time);
+              const auto gh_data =
+                  (*interface_manager)
+                      ->retrieve_and_remove_first_ready_gh_data();
+              if (static_cast<bool>(gh_data)) {
+                Parallel::simple_action<Actions::SendToEvolution<
+                    GhWorldtubeBoundary<Metavariables, InterpolationTargetTag>,
+                    EvolutionComponent>>(
+                    Parallel::get_parallel_component<GhWorldtubeBoundary<
+                        Metavariables, InterpolationTargetTag>>(cache),
+                    get<0>(*gh_data), get<1>(*gh_data));
+              }
+            });
   }
 };
 
 /// \cond
-template <typename Metavariables, typename EvolutionComponent>
-struct SendToEvolution<GhWorldtubeBoundary<Metavariables>, EvolutionComponent> {
+template <typename Metavariables, typename EvolutionComponent,
+          typename InterpolationTargetTag>
+struct SendToEvolution<
+    GhWorldtubeBoundary<Metavariables, InterpolationTargetTag>,
+    EvolutionComponent> {
   template <typename ParallelComponent, typename... DbTags, typename ArrayIndex,
             Requires<tmpl2::flat_any_v<std::is_same_v<
                 ::Tags::Variables<

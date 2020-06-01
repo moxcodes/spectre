@@ -54,6 +54,7 @@
 #include "NumericalAlgorithms/DiscontinuousGalerkin/BoundarySchemes/FirstOrder/FirstOrderSchemeLts.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/Tags.hpp"
 #include "NumericalAlgorithms/Interpolation/Actions/ElementInitInterpPoints.hpp"
+#include "NumericalAlgorithms/Interpolation/Actions/ElementReceiveInterpolationTime.hpp"
 #include "NumericalAlgorithms/Interpolation/Actions/InterpolateToTarget.hpp"
 #include "NumericalAlgorithms/Interpolation/AddTemporalIdsToInterpolationTarget.hpp"
 #include "NumericalAlgorithms/Interpolation/BarycentricRationalSpanInterpolator.hpp"
@@ -194,8 +195,12 @@ struct EvolutionMetavarsWithCce
   using cce_angular_coordinate_tags =
       tmpl::list<Cce::Tags::CauchyAngularCoords>;
 
+  struct Horizon;
+
+  struct CceWorldtubeTarget;
+
   using cce_boundary_component =
-      Cce::GhWorldtubeBoundary<EvolutionMetavarsWithCce>;
+      Cce::GhWorldtubeBoundary<EvolutionMetavarsWithCce, CceWorldtubeTarget>;
 
   using EvolutionMetavarsBase<EvolutionMetavarsWithCce>::volume_dim;
   using EvolutionMetavarsBase<EvolutionMetavarsWithCce>::frame;
@@ -218,49 +223,6 @@ struct EvolutionMetavarsWithCce
   using EvolutionMetavarsBase<EvolutionMetavarsWithCce>::observe_fields;
 
   using EvolutionMetavarsBase<EvolutionMetavarsWithCce>::Unity;
-
-  struct Horizon {
-    using tags_to_observe =
-        tmpl::list<StrahlkorperGr::Tags::SurfaceIntegral<Unity, frame>>;
-    using compute_items_on_source = tmpl::list<
-        gr::Tags::SpatialMetricCompute<volume_dim, frame, DataVector>,
-        ah::Tags::InverseSpatialMetricCompute<volume_dim, frame>,
-        ah::Tags::ExtrinsicCurvatureCompute<volume_dim, frame>,
-        ah::Tags::SpatialChristoffelSecondKindCompute<volume_dim, frame>>;
-    using vars_to_interpolate_to_target =
-        tmpl::list<gr::Tags::SpatialMetric<volume_dim, frame, DataVector>,
-                   gr::Tags::InverseSpatialMetric<volume_dim, frame>,
-                   gr::Tags::ExtrinsicCurvature<volume_dim, frame>,
-                   gr::Tags::SpatialChristoffelSecondKind<volume_dim, frame>>;
-    using compute_items_on_target = tmpl::append<
-        tmpl::list<StrahlkorperGr::Tags::AreaElement<frame>, Unity>,
-        tags_to_observe>;
-    using compute_target_points =
-        intrp::TargetPoints::ApparentHorizon<Horizon, ::Frame::Inertial>;
-    using post_interpolation_callback =
-        intrp::callbacks::FindApparentHorizon<Horizon>;
-    using post_horizon_find_callback =
-        intrp::callbacks::ObserveTimeSeriesOnSurface<tags_to_observe, Horizon,
-                                                     Horizon>;
-  };
-
-  struct CceWorldtubeTarget {
-    using compute_items_on_source = tmpl::list<>;
-    using compute_items_on_target = tmpl::list<>;
-    using compute_target_points =
-        intrp::TargetPoints::KerrHorizon<CceWorldtubeTarget, ::Frame::Inertial>;
-    using post_interpolation_callback = intrp::callbacks::SendGhWorldtubeData<
-        Cce::CharacteristicEvolution<EvolutionMetavarsWithCce>>;
-    using vars_to_interpolate_to_target =
-        tmpl::list<gr::Tags::SpacetimeMetric<volume_dim, frame>,
-                   GeneralizedHarmonic::Tags::Pi<volume_dim, frame>,
-                   GeneralizedHarmonic::Tags::Phi<volume_dim, frame>>;
-    template <typename DbTagList>
-    static bool should_interpolate(const db::DataBox<DbTagList>& box) noexcept {
-      return Cce::InterfaceManagers::should_interpolate_for_strategy(
-          box, db::get<Cce::Tags::InterfaceManagerInterpolationStrategy>(box));
-    }
-  };
 
   using interpolation_target_tags = tmpl::list<Horizon, CceWorldtubeTarget>;
   using EvolutionMetavarsBase<
@@ -288,10 +250,6 @@ struct EvolutionMetavarsWithCce
   struct ObservationType {};
   using element_observation_type = ObservationType;
 
-  using observed_reduction_data_tags = observers::collect_reduction_data_tags<
-      tmpl::push_back<typename Event<observation_events>::creatable_classes,
-                      typename Horizon::post_horizon_find_callback>>;
-
   using step_actions = tmpl::flatten<tmpl::list<
       dg::Actions::ComputeNonconservativeBoundaryFluxes<
           domain::Tags::InternalDirections<volume_dim>>,
@@ -313,7 +271,13 @@ struct EvolutionMetavarsWithCce
                                      Actions::MutateApply<boundary_scheme>>,
                           tmpl::list<Actions::MutateApply<boundary_scheme>,
                                      Actions::RecordTimeStepperData<>>>,
-      intrp::Actions::InterpolateToTarget<CceWorldtubeTarget>,
+      intrp::Actions::ElementReceiveInterpolationTime<CceWorldtubeTarget>,
+      Actions::RepeatUntil<
+          intrp::Tags::NextInterpolationTimeInFuture<CceWorldtubeTarget>,
+          tmpl::list<intrp::Actions::InterpolateDenseOutputToTarget<
+                         CceWorldtubeTarget>,
+                     intrp::Actions::ElementReceiveInterpolationTime<
+                         CceWorldtubeTarget>>>,
       Actions::UpdateU<>>>;
 
   enum class Phase {
@@ -378,6 +342,31 @@ struct EvolutionMetavarsWithCce
       intrp::Actions::ElementInitInterpPoints,
       Initialization::Actions::RemoveOptionsAndTerminatePhase>;
 
+  using gh_dg_element_array = DgElementArray<
+      EvolutionMetavarsWithCce,
+      tmpl::list<
+          Parallel::PhaseActions<Phase, Phase::Initialization,
+                                 initialization_actions>,
+
+          Parallel::PhaseActions<Phase, Phase::InitializeTimeStepperHistory,
+                                 SelfStart::self_start_procedure<step_actions>>,
+
+          Parallel::PhaseActions<
+              Phase, Phase::Register,
+              tmpl::flatten<
+                  tmpl::list<intrp::Actions::RegisterElementWithInterpolator,
+                             observers::Actions::RegisterWithObservers<
+                                 observers::RegisterObservers<
+                                     Tags::Time, element_observation_type>>,
+                             Parallel::Actions::TerminatePhase>>>,
+          Parallel::PhaseActions<
+              Phase, Phase::Evolve,
+              tmpl::list<Actions::RunEventsAndTriggers, Actions::ChangeSlabSize,
+                         step_actions, Actions::AdvanceTime>>>>;
+
+  using components_to_receive_cce_next_time_steps =
+      tmpl::list<gh_dg_element_array>;
+
   using component_list = tmpl::list<
       observers::Observer<EvolutionMetavarsWithCce>,
       observers::ObserverWriter<EvolutionMetavarsWithCce>,
@@ -386,28 +375,51 @@ struct EvolutionMetavarsWithCce
       intrp::InterpolationTarget<EvolutionMetavarsWithCce, CceWorldtubeTarget>,
       cce_boundary_component,
       Cce::CharacteristicEvolution<EvolutionMetavarsWithCce>,
-      DgElementArray<
-          EvolutionMetavarsWithCce,
-          tmpl::list<Parallel::PhaseActions<Phase, Phase::Initialization,
-                                            initialization_actions>,
+      gh_dg_element_array>;
 
-                     Parallel::PhaseActions<
-                         Phase, Phase::InitializeTimeStepperHistory,
-                         SelfStart::self_start_procedure<step_actions>>,
+  struct Horizon {
+    using tags_to_observe =
+        tmpl::list<StrahlkorperGr::Tags::SurfaceIntegral<Unity, frame>>;
+    using compute_items_on_source = tmpl::list<
+        gr::Tags::SpatialMetricCompute<volume_dim, frame, DataVector>,
+        ah::Tags::InverseSpatialMetricCompute<volume_dim, frame>,
+        ah::Tags::ExtrinsicCurvatureCompute<volume_dim, frame>,
+        ah::Tags::SpatialChristoffelSecondKindCompute<volume_dim, frame>>;
+    using vars_to_interpolate_to_target =
+        tmpl::list<gr::Tags::SpatialMetric<volume_dim, frame, DataVector>,
+                   gr::Tags::InverseSpatialMetric<volume_dim, frame>,
+                   gr::Tags::ExtrinsicCurvature<volume_dim, frame>,
+                   gr::Tags::SpatialChristoffelSecondKind<volume_dim, frame>>;
+    using compute_items_on_target = tmpl::append<
+        tmpl::list<StrahlkorperGr::Tags::AreaElement<frame>, Unity>,
+        tags_to_observe>;
+    using compute_target_points =
+        intrp::TargetPoints::ApparentHorizon<Horizon, ::Frame::Inertial>;
+    using post_interpolation_callback =
+        intrp::callbacks::FindApparentHorizon<Horizon>;
+    using post_horizon_find_callback =
+        intrp::callbacks::ObserveTimeSeriesOnSurface<tags_to_observe, Horizon,
+                                                     Horizon>;
+  };
 
-                     Parallel::PhaseActions<
-                         Phase, Phase::Register,
-                         tmpl::flatten<tmpl::list<
-                             intrp::Actions::RegisterElementWithInterpolator,
-                             observers::Actions::RegisterWithObservers<
-                                 observers::RegisterObservers<
-                                     Tags::Time, element_observation_type>>,
-                             Parallel::Actions::TerminatePhase>>>,
-                     Parallel::PhaseActions<
-                         Phase, Phase::Evolve,
-                         tmpl::list<Actions::RunEventsAndTriggers,
-                                    Actions::ChangeSlabSize, step_actions,
-                                    Actions::AdvanceTime>>>>>;
+  struct CceWorldtubeTarget {
+    using compute_items_on_source = tmpl::list<>;
+    using compute_items_on_target = tmpl::list<>;
+    using compute_target_points =
+        intrp::TargetPoints::KerrHorizon<CceWorldtubeTarget, ::Frame::Inertial>;
+    using post_interpolation_callback = intrp::callbacks::SendGhWorldtubeData<
+        Cce::CharacteristicEvolution<EvolutionMetavarsWithCce>,
+        CceWorldtubeTarget>;
+    using vars_to_interpolate_to_target =
+        tmpl::list<gr::Tags::SpacetimeMetric<volume_dim, frame>,
+                   GeneralizedHarmonic::Tags::Pi<volume_dim, frame>,
+                   GeneralizedHarmonic::Tags::Phi<volume_dim, frame>>;
+    using interpolating_dg_component = gh_dg_element_array;
+  };
+
+  using observed_reduction_data_tags = observers::collect_reduction_data_tags<
+      tmpl::push_back<typename Event<observation_events>::creatable_classes,
+                      typename Horizon::post_horizon_find_callback>>;
 
   static constexpr OptionString help{
       "Evolve a generalized harmonic analytic solution.\n\n"
@@ -444,6 +456,8 @@ static const std::vector<void (*)()> charm_init_node_funcs{
     &domain::creators::register_derived_with_charm,
     &Parallel::register_derived_classes_with_charm<
         Cce::ReducedWorldtubeBufferUpdater>,
+    &Parallel::register_derived_classes_with_charm<
+        Cce::InitializeJ::InitializeJ>,
     &Parallel::register_derived_classes_with_charm<
         Cce::InterfaceManagers::GhInterfaceManager>,
     &Parallel::register_derived_classes_with_charm<Cce::WorldtubeBufferUpdater>,

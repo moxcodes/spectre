@@ -279,7 +279,7 @@ struct RadialFilterHalfPower : db::SimpleTag {
   }
 };
 
-struct StartTime : db::SimpleTag {
+struct StartTimeFromFile : Tags::StartTime, db::SimpleTag {
   using type = double;
   using option_tags =
       tmpl::list<OptionTags::StartTime, OptionTags::BoundaryDataFilename>;
@@ -294,6 +294,14 @@ struct StartTime : db::SimpleTag {
     }
     return start_time;
   }
+};
+
+struct SpecifiedStartTime : Tags::StartTime, db::SimpleTag {
+  using type = double;
+  using option_tags = tmpl::list<OptionTags::StartTime>;
+
+  static constexpr bool pass_metavariables = false;
+  static double create_from_options(double start_time) { return start_time; }
 };
 
 /// \brief Represents the final time of a bounded CCE evolution, determined
