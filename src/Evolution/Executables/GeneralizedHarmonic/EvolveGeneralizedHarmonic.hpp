@@ -47,7 +47,8 @@ struct EvolutionMetavars
   using component_list = typename GeneralizedHarmonicTemplateBase<
       EvolutionMetavars<InitialData, BoundaryConditions>>::component_list;
 
-  static constexpr OptionString help{"Evolve a generalized harmonic system.\n"};
+  static constexpr Options::String help{
+      "Evolve a generalized harmonic system.\n"};
 };
 
 static const std::vector<void (*)()> charm_init_node_funcs{
