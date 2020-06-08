@@ -10,11 +10,28 @@
 #include "Domain/FunctionsOfTime/RegisterDerivedWithCharm.hpp"
 #include "ErrorHandling/Error.hpp"
 #include "ErrorHandling/FloatingPointExceptions.hpp"
+#include "Evolution/Executables/GeneralizedHarmonic/GeneralizedHarmonicBase.hpp"
+#include "Evolution/Systems/GeneralizedHarmonic/ConstraintDamping/RegisterDerivedWithCharm.hpp"
+#include "Options/Options.hpp"
+#include "Time/StepControllers/StepController.hpp"
+#include "Time/TimeSteppers/TimeStepper.hpp"
 
+/// \cond
+namespace Frame {
+// IWYU pragma: no_forward_declare MathFunction
+struct Inertial;
+}  // namespace Frame
+namespace Parallel {
+template <typename Metavariables>
+class CProxy_GlobalCache;
+}  // namespace Parallel
+/// \endcond
+
+template <typename InitialData, typename BoundaryConditions>
 struct EvolutionMetavars
-    : public GeneralizedHarmonicTemplateBase<
-          EvolutionMetavars<InitialData, BoundaryConditions>>,
-      public virtual GeneralizedHarmonicDefaults {
+    : public virtual GeneralizedHarmonicDefaults,
+      public GeneralizedHarmonicTemplateBase<
+          EvolutionMetavars<InitialData, BoundaryConditions>> {
   using events = typename GeneralizedHarmonicTemplateBase<
       EvolutionMetavars<InitialData, BoundaryConditions>>::events;
 
@@ -31,7 +48,8 @@ struct EvolutionMetavars
   using component_list = typename GeneralizedHarmonicTemplateBase<
       EvolutionMetavars<InitialData, BoundaryConditions>>::component_list;
 
-  static constexpr OptionString help{"Evolve a generalized harmonic system.\n"};
+  static constexpr Options::String help{
+      "Evolve a generalized harmonic system.\n"};
 };
 
 static const std::vector<void (*)()> charm_init_node_funcs{
