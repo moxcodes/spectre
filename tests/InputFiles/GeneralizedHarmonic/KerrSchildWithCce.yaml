@@ -1,0 +1,102 @@
+# Distributed under the MIT License.
+# See LICENSE.txt for details.
+
+# Executable: EvolveKerrSchildWithCce
+# Check: parse;execute
+# Timeout: 8
+# ExpectedOutput:
+#   GhKerrSchildReductionData.h5
+#   GhKerrSchildVolumeData0.h5
+
+Evolution:
+  InitialTime: 0.0
+  InitialTimeStep: 0.01
+  TimeStepper:
+    AdamsBashforthN:
+      Order: 3
+
+Cce:
+  LMax: 16
+  ExtractionRadius: 48.0
+  NumberOfRadialPoints: 12
+  ObservationLMax: 8
+
+  InitializeJ:
+    InverseCubic
+
+  StartTime: 0.0
+  TargetStepSize: 0.17
+
+  Filtering:
+    RadialFilterHalfPower: 24
+    RadialFilterAlpha: 35.0
+    FilterLMax: 14
+
+  GhInterfaceManager:
+    GhLocalTimeStepping:
+      AdamsBashforthOrder: 3
+
+  ScriInterpOrder: 5
+  ScriOutputDensity: 1
+
+ApparentHorizons:
+  Horizon:
+    InitialGuess:
+      Lmax: 4
+      Radius: 2.2
+      Center: [0.0, 0.0, 0.0]
+    FastFlow:
+      Flow: Fast
+    Verbosity: Verbose
+
+DomainCreator:
+    Shell:
+      InnerRadius: 1.9
+      OuterRadius: 200.0
+      InitialRefinement: 0
+      InitialGridPoints: [5, 5]
+      UseEquiangularMap: true
+      AspectRatio: 1.0
+      UseLogarithmicMap: true
+      RadialBlockLayers: 1
+
+AnalyticSolution:
+  KerrSchild:
+    Mass: 1.0
+    Spin: [0.0, 0.0, 0.0]
+    Center: [0.0, 0.0, 0.0]
+
+EvolutionSystem:
+  GeneralizedHarmonic:
+    Gauge:
+      RollOnStartTime: 100000.0
+      RollOnTimeWindow: 100.0
+      SpatialDecayWidth: 50.0
+
+NumericalFlux:
+  UpwindPenalty:
+
+EventsAndTriggers:
+  ? EveryNSlabs:
+      N: 2
+      Offset: 0
+  : - ObserveErrorNorms
+  ? EveryNSlabs:
+      N: 5
+      Offset: 0
+  : - ObserveFields
+  ? SpecifiedSlabs:
+      Slabs: [3]
+  : - Completion
+
+Observers:
+  VolumeFileName: "GhKerrSchildVolumeData"
+  ReductionFileName: "GhKerrSchildReductionData"
+
+InterpolationTargets:
+  CceWorldtubeTarget:
+        Lmax: 16
+        Center: [0.0, 0.0, 0.0]
+        DimensionlessSpin: [0.0, 0.0, 0.0]
+        Mass: 24.0
+        ThetaVariesFastest: false

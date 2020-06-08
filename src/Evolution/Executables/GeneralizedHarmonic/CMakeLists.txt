@@ -3,6 +3,7 @@
 
 set(LIBS_TO_LINK
   ApparentHorizons
+  Cce
   CoordinateMaps
   DiscontinuousGalerkin
   Domain
@@ -17,6 +18,7 @@ set(LIBS_TO_LINK
   LinearOperators
   MathFunctions
   Options
+  Spectral
   Time
   Utilities
   )
@@ -32,6 +34,17 @@ function(add_generalized_harmonic_executable
     )
 endfunction(add_generalized_harmonic_executable)
 
+function(add_generalized_harmonic_cce_executable
+  EXECUTABLE_NAME INITIAL_DATA BOUNDARY_CONDITIONS)
+  add_spectre_parallel_executable(
+    "Evolve${EXECUTABLE_NAME}WithCce"
+    EvolveGeneralizedHarmonicCce
+    Evolution/Executables/GeneralizedHarmonic
+    "EvolutionMetavars<${INITIAL_DATA}, ${BOUNDARY_CONDITIONS}>"
+    "${LIBS_TO_LINK}"
+    )
+endfunction(add_generalized_harmonic_cce_executable)
+
 add_generalized_harmonic_executable(
   KerrSchild
   GeneralizedHarmonic::Solutions::WrappedGr<gr::Solutions::KerrSchild>
@@ -39,6 +52,16 @@ add_generalized_harmonic_executable(
 )
 target_link_libraries(
   EvolveGhKerrSchild
+  PRIVATE
+  GeneralRelativitySolutions
+  )
+add_generalized_harmonic_cce_executable(
+  KerrSchild
+  GeneralizedHarmonic::Solutions::WrappedGr<gr::Solutions::KerrSchild>
+  GeneralizedHarmonic::Solutions::WrappedGr<gr::Solutions::KerrSchild>
+)
+target_link_libraries(
+  EvolveKerrSchildWithCce
   PRIVATE
   GeneralRelativitySolutions
   )
@@ -50,6 +73,16 @@ add_generalized_harmonic_executable(
 )
 target_link_libraries(
   EvolveGhKerrSchildNumericInitialData
+  PRIVATE
+  GeneralRelativitySolutions
+  )
+add_generalized_harmonic_cce_executable(
+  KerrSchildNumericInitialData
+  evolution::NumericInitialData<GeneralizedHarmonic::System<3>>
+  GeneralizedHarmonic::Solutions::WrappedGr<gr::Solutions::KerrSchild>
+)
+target_link_libraries(
+  EvolveKerrSchildNumericInitialDataWithCce
   PRIVATE
   GeneralRelativitySolutions
   )
