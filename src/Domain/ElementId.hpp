@@ -115,13 +115,13 @@ bool operator!=(const ElementId<VolumeDim>& lhs,
 // ######################################################################
 
 template <size_t VolumeDim>
-size_t hash_value(const ElementId<VolumeDim>& c) noexcept;
+size_t hash_value(const ElementId<VolumeDim>& id) noexcept;
 
 // clang-tidy: do not modify namespace std
 namespace std {  // NOLINT
 template <size_t VolumeDim>
 struct hash<ElementId<VolumeDim>> {
-  size_t operator()(const ElementId<VolumeDim>& c) const noexcept;
+  size_t operator()(const ElementId<VolumeDim>& id) const noexcept;
 };
 }  // namespace std
 

@@ -193,9 +193,9 @@ class ConstGlobalCache : public CBase_ConstGlobalCache<Metavariables> {
               ParallelComponentTag>>&;  // NOLINT
 
   tuples::tagged_tuple_from_typelist<get_const_global_cache_tags<Metavariables>>
-      const_global_cache_;
+      const_global_cache_{};
   tuples::tagged_tuple_from_typelist<parallel_component_tag_list>
-      parallel_components_;
+      parallel_components_{};
   bool parallel_components_have_been_set_{false};
 };
 

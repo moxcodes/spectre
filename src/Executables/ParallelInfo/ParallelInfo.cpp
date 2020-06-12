@@ -59,7 +59,7 @@ void ParallelInfo::start_node_group_check() const {
       CkCallback(CkIndex_ParallelInfo::end_report(), this->thisProxy));
 }
 
-[[noreturn]] void ParallelInfo::end_report() const {
+[[noreturn]] void ParallelInfo::end_report() {
   Parallel::printf("\nReport finished.\n");
   Parallel::exit();
 }
@@ -67,7 +67,9 @@ void ParallelInfo::start_node_group_check() const {
 // Helper print function so that both node and pe group prints can be changed
 // easily.
 void print_info() {
+  // NOLINTNEXTLINE(cppcoreguidelines-init-variables) false positive
   const int digits_in_node = number_of_digits(Parallel::number_of_nodes() - 1);
+  // NOLINTNEXTLINE(cppcoreguidelines-init-variables) false positive
   const int digits_in_pe = number_of_digits(Parallel::number_of_procs() - 1);
   // The format string is generated based on the number of procs and nodes
   // available so that the output is aligned over all nodes and procs

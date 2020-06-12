@@ -20,9 +20,7 @@
 // IWYU pragma: no_forward_declare Tensor
 
 /// \cond
-namespace RadiationTransport {
-namespace M1Grey {
-namespace Solutions {
+namespace RadiationTransport::M1Grey::Solutions {
 
 ConstantM1::ConstantM1(const std::array<double, 3>& mean_velocity,
                        const double comoving_energy_density) noexcept
@@ -196,7 +194,5 @@ GENERATE_INSTANTIATIONS(
 #undef EBIN
 #undef GENERATE_LIST
 
-}  // namespace Solutions
-}  // namespace M1Grey
-}  // namespace RadiationTransport
+}  // namespace RadiationTransport::M1Grey::Solutions
 /// \endcond

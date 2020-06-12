@@ -22,8 +22,7 @@
 // IWYU pragma:  no_include "DataStructures/Tensor/TypeAliases.hpp"
 
 /// \cond
-namespace grmhd {
-namespace Solutions {
+namespace grmhd::Solutions {
 
 AlfvenWave::AlfvenWave(
     const double wavenumber, const double pressure,
@@ -252,6 +251,5 @@ GENERATE_INSTANTIATIONS(INSTANTIATE_VECTORS, (double, DataVector),
 #undef TAG
 #undef INSTANTIATE_SCALARS
 #undef INSTANTIATE_VECTORS
-}  // namespace Solutions
-}  // namespace grmhd
+}  // namespace grmhd::Solutions
 /// \endcond

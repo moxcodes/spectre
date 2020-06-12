@@ -16,8 +16,7 @@
 #include "Utilities/GenerateInstantiations.hpp"
 #include "Utilities/MakeWithValue.hpp"
 
-namespace domain {
-namespace CoordinateMaps {
+namespace domain::CoordinateMaps {
 
 Wedge3D::Wedge3D(const double radius_inner, const double radius_outer,
                  const OrientationMap<3> orientation_of_wedge,
@@ -150,14 +149,12 @@ boost::optional<std::array<double, 3>> Wedge3D::inverse(
     return boost::none;
   }
   const auto z_zero = (scaled_frustum_zero_ + sphere_zero_ * one_over_rho);
-  double zeta;
-  if (with_logarithmic_map_) {
-    zeta = (log(physical_z * sqrt(1.0 + square(cap_xi) + square(cap_eta))) -
-            sphere_zero_) /
-           sphere_rate_;
-  } else {
-    zeta = (physical_z - z_zero) / zeta_coefficient;
-  }
+  const double zeta =
+      with_logarithmic_map_
+          ? (log(physical_z * sqrt(1.0 + square(cap_xi) + square(cap_eta))) -
+             sphere_zero_) /
+                sphere_rate_
+          : (physical_z - z_zero) / zeta_coefficient;
   double xi = with_equiangular_map_ ? atan(cap_xi) / M_PI_4 : cap_xi;
   double eta =
       with_equiangular_map_ ? atan(cap_eta) / M_PI_4 : cap_eta;
@@ -402,5 +399,4 @@ GENERATE_INSTANTIATIONS(INSTANTIATE, (double, DataVector,
 #undef DTYPE
 #undef INSTANTIATE
 /// \endcond
-}  // namespace CoordinateMaps
-}  // namespace domain
+}  // namespace domain::CoordinateMaps

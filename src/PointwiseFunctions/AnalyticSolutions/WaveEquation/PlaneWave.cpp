@@ -14,8 +14,7 @@
 #include "Utilities/MakeWithValue.hpp"
 #include "Utilities/StdArrayHelpers.hpp"
 
-namespace ScalarWave {
-namespace Solutions {
+namespace ScalarWave::Solutions {
 
 template <size_t Dim>
 PlaneWave<Dim>::PlaneWave(std::array<double, Dim> wave_vector,
@@ -133,8 +132,7 @@ T PlaneWave<Dim>::u(const tnsr::I<T, Dim>& x, const double t) const noexcept {
   return result;
 }
 
-}  // namespace Solutions
-}  // namespace ScalarWave
+}  // namespace ScalarWave::Solutions
 
 /// \cond
 #define DIM(data) BOOST_PP_TUPLE_ELEM(0, data)

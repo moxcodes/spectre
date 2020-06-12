@@ -36,7 +36,7 @@ class ParallelInfo : public CBase_ParallelInfo {
  public:
   explicit ParallelInfo(CkArgMsg* msg);
   void start_node_group_check() const;
-  [[noreturn]] void end_report() const;
+  [[noreturn]] static void end_report();
 
  private:
   void start_pe_group_check() const;

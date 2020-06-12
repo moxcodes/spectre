@@ -13,9 +13,6 @@
 #include "Utilities/MakeArray.hpp"
 #include "Utilities/StdHelpers.hpp"  // IWYU pragma: keep
 
-template <size_t VolumeDim>
-constexpr size_t ElementId<VolumeDim>::volume_dim;
-
 // The `static_assert`s verify that `ElementId` satisfies the constraints
 // imposed by Charm++ to make `ElementId` able to act as an index into Charm++'s
 // arrays. These constraints are:
@@ -104,8 +101,8 @@ size_t hash_value(const ElementId<VolumeDim>& id) noexcept {
 namespace std {  // NOLINT
 template <size_t VolumeDim>
 size_t hash<ElementId<VolumeDim>>::operator()(
-    const ElementId<VolumeDim>& c) const noexcept {
-  return hash_value(c);
+    const ElementId<VolumeDim>& id) const noexcept {
+  return hash_value(id);
 }
 }  // namespace std
 // LCOV_EXCL_STOP

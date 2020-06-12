@@ -20,8 +20,7 @@
 #include "Utilities/StdHelpers.hpp"
 
 /// \cond
-namespace gr {
-namespace Solutions {
+namespace gr::Solutions {
 
 KerrSchild::KerrSchild(const double mass,
                        KerrSchild::Spin::type dimensionless_spin,
@@ -554,6 +553,5 @@ template class KerrSchild::IntermediateVars<DataVector>;
 template class KerrSchild::IntermediateVars<double>;
 template class KerrSchild::IntermediateComputer<DataVector>;
 template class KerrSchild::IntermediateComputer<double>;
-}  // namespace Solutions
-}  // namespace gr
+}  // namespace gr::Solutions
 /// \endcond

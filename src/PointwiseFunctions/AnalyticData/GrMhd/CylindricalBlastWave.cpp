@@ -50,8 +50,7 @@ Scalar<DataType> compute_piecewise(const tnsr::I<DataType, 3>& x,
 }  // namespace
 
 /// \cond
-namespace grmhd {
-namespace AnalyticData {
+namespace grmhd::AnalyticData {
 
 CylindricalBlastWave::CylindricalBlastWave(
     const double inner_radius, const double outer_radius,
@@ -220,6 +219,5 @@ GENERATE_INSTANTIATIONS(INSTANTIATE_VECTORS, (double, DataVector),
 #undef TAG
 #undef INSTANTIATE_SCALARS
 #undef INSTANTIATE_VECTORS
-}  // namespace AnalyticData
-}  // namespace grmhd
+}  // namespace grmhd::AnalyticData
 /// \endcond

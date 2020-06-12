@@ -38,7 +38,7 @@ OrientationMap<VolumeDim>::OrientationMap(
       is_aligned_ = false;
     }
   }
-  ASSERT(set_of_dimensions(mapped_directions).size() == VolumeDim,
+  ASSERT(set_of_dimensions(mapped_directions_).size() == VolumeDim,
          "This OrientationMap fails to map Directions one-to-one.");
 }
 

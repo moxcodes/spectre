@@ -89,10 +89,10 @@ void test_brick_construction(
 
 void test_brick() {
   INFO("Brick");
-  const std::vector<std::array<size_t, 3>> grid_points{{{4, 6, 3}}},
-      refinement_level{{{3, 2, 4}}};
-  const std::array<double, 3> lower_bound{{-1.2, 3.0, 2.5}},
-      upper_bound{{0.8, 5.0, 3.0}};
+  const std::vector<std::array<size_t, 3>> grid_points{{{4, 6, 3}}};
+  const std::vector<std::array<size_t, 3>> refinement_level{{{3, 2, 4}}};
+  const std::array<double, 3> lower_bound{{-1.2, 3.0, 2.5}};
+  const std::array<double, 3> upper_bound{{0.8, 5.0, 3.0}};
   // Default OrientationMap is aligned.
   const OrientationMap<3> aligned_orientation{};
 

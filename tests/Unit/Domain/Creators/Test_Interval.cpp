@@ -76,9 +76,10 @@ void test_interval_construction(
 
 void test_interval() {
   INFO("Interval");
-  const std::vector<std::array<size_t, 1>> grid_points{{{4}}},
-      refinement_level{{{3}}};
-  const std::array<double, 1> lower_bound{{-1.2}}, upper_bound{{0.8}};
+  const std::vector<std::array<size_t, 1>> grid_points{{{4}}};
+  const std::vector<std::array<size_t, 1>> refinement_level{{{3}}};
+  const std::array<double, 1> lower_bound{{-1.2}};
+  const std::array<double, 1> upper_bound{{0.8}};
   // default Orientation is aligned
   const OrientationMap<1> aligned_orientation{};
 

@@ -24,8 +24,7 @@
 // IWYU pragma: no_include <complex>
 
 /// \cond
-namespace grmhd {
-namespace AnalyticData {
+namespace grmhd::AnalyticData {
 
 MagneticFieldLoop::MagneticFieldLoop(
     const double pressure, const double rest_mass_density,
@@ -220,6 +219,5 @@ GENERATE_INSTANTIATIONS(INSTANTIATE_VECTORS, (double, DataVector),
 #undef TAG
 #undef INSTANTIATE_SCALARS
 #undef INSTANTIATE_VECTORS
-}  // namespace AnalyticData
-}  // namespace grmhd
+}  // namespace grmhd::AnalyticData
 /// \endcond

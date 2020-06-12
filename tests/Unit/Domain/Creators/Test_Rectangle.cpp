@@ -87,9 +87,10 @@ void test_rectangle_construction(
 
 void test_rectangle() {
   INFO("Rectangle");
-  const std::vector<std::array<size_t, 2>> grid_points{{{4, 6}}},
-      refinement_level{{{3, 2}}};
-  const std::array<double, 2> lower_bound{{-1.2, 3.0}}, upper_bound{{0.8, 5.0}};
+  const std::vector<std::array<size_t, 2>> grid_points{{{4, 6}}};
+  const std::vector<std::array<size_t, 2>> refinement_level{{{3, 2}}};
+  const std::array<double, 2> lower_bound{{-1.2, 3.0}};
+  const std::array<double, 2> upper_bound{{0.8, 5.0}};
   // default OrientationMap is aligned
   const OrientationMap<2> aligned_orientation{};
 
