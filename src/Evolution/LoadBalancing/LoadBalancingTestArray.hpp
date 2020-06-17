@@ -21,8 +21,6 @@
 #include "ParallelAlgorithms/Initialization/Actions/RemoveOptionsAndTerminatePhase.hpp"
 #include "Utilities/Gsl.hpp"
 
-#include "Parallel/Printf.hpp"
-
 namespace Lb {
 
 template <typename Metavariables>
