@@ -55,12 +55,24 @@ struct SendDataToNeighbors {
         const auto& orientation = direction_and_neighbors.second.orientation();
         const auto direction_from_neighbor = orientation(direction.opposite());
 
-        Parallel::receive_data<ReceiveTags::LoadBalancingCommunication<Dim>>(
-            receiver_proxy[neighbor], db::get<Tags::StepNumber>(box),
-            std::make_pair(
-                dg::MortarId<volume_dim>{direction_from_neighbor, element.id()},
-                std::move(bundled_data)),
-            true);
+        // if this isn't enforced, sometimes when running on few cores, the
+        // element will mistakenly start back up the algorithm on an element
+        // that's still in Initialization, which will cause incomrehensible
+        // errors
+        if (db::get<Tags::StepNumber>(box) > 1) {
+          Parallel::receive_data<ReceiveTags::LoadBalancingCommunication<Dim>>(
+              receiver_proxy[neighbor], db::get<Tags::StepNumber>(box),
+              std::make_pair(dg::MortarId<volume_dim>{direction_from_neighbor,
+                                                      element.id()},
+                             std::move(bundled_data)),
+              true);
+        } else {
+          Parallel::receive_data<ReceiveTags::LoadBalancingCommunication<Dim>>(
+              receiver_proxy[neighbor], db::get<Tags::StepNumber>(box),
+              std::make_pair(dg::MortarId<volume_dim>{direction_from_neighbor,
+                                                      element.id()},
+                             std::move(bundled_data)));
+        }
       }
     }
     return std::forward_as_tuple(std::move(box));
