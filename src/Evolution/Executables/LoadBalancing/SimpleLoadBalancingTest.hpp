@@ -10,14 +10,12 @@
 #include "Evolution/LoadBalancing/LoadBalancingTestArray.hpp"
 #include "Evolution/LoadBalancing/Tags.hpp"
 #include "Parallel/InitializationFunctions.hpp"
+#include "Parallel/RegisterDerivedClassesWithCharm.hpp"
 
 template <size_t Dim>
 struct EvolutionMetavars {
   static constexpr size_t volume_dim = Dim;
   using temporal_id = Lb::Tags::StepNumber;
-
-  // TODO make this a runtime option in future
-  using distribution_strategy = Lb::Distribution::RoundRobin<volume_dim>;
 
   enum class Phase {
     Initialization,
@@ -57,7 +55,9 @@ static const std::vector<void (*)()> charm_init_node_funcs{
     &setup_error_handling,
     &domain::creators::time_dependence::register_derived_with_charm,
     &domain::FunctionsOfTime::register_derived_with_charm,
-    &domain::creators::register_derived_with_charm};
+    &domain::creators::register_derived_with_charm,
+    &Parallel::register_derived_classes_with_charm<
+        Lb::Distribution::DistributionStrategy>};
 
 static const std::vector<void (*)()> charm_init_proc_funcs{
   &enable_floating_point_exceptions};

@@ -23,6 +23,8 @@
 
 namespace Lb {
 
+// TODO PUP
+
 template <typename Metavariables>
 struct LoadBalancingTestArray {
   static constexpr size_t volume_dim = Metavariables::volume_dim;
@@ -56,9 +58,10 @@ struct LoadBalancingTestArray {
     Parallel::get_initialization_actions_list<phase_dependent_action_list>,
     array_allocation_tags>;
 
-  using const_global_cache_tag_list =
-      Parallel::get_const_global_cache_tags_from_actions<
-          phase_dependent_action_list>;
+  using const_global_cache_tags =
+      tmpl::push_back<Parallel::get_const_global_cache_tags_from_actions<
+                          phase_dependent_action_list>,
+                      Tags::DistributionStrategy>;
 
   static void execute_next_phase(
       const typename Metavariables::Phase next_phase,
@@ -89,17 +92,22 @@ void LoadBalancingTestArray<Metavariables>::allocate_array(
   const auto& initial_refinement_levels =
       get<domain::Tags::InitialRefinementLevels<volume_dim>>(
           initialization_items);
-  typename Metavariables::distribution_strategy distribution{
-      domain, initial_refinement_levels,
-      static_cast<size_t>(Parallel::number_of_procs())};
+  auto distribution =
+      Parallel::get<Tags::DistributionStrategy>(local_cache).get_clone();
   for (const auto& block : domain.blocks()) {
     const std::vector<ElementId<volume_dim>> element_ids =
         initial_element_ids(block.id(), initial_refinement_levels[block.id()]);
     for (size_t i = 0; i < element_ids.size(); ++i) {
       lb_element_array(ElementId<volume_dim>{element_ids[i]})
           .insert(global_cache, initialization_items,
-                  distribution.which_proc(
-                      local_cache, ElementId<volume_dim>{element_ids[i]}));
+                  distribution->which_proc(
+                      domain, initial_refinement_levels,
+                      static_cast<size_t>(Parallel::number_of_procs()),
+                      domain::Initialization::create_initial_element(
+                          element_ids[i], block, initial_refinement_levels),
+                      ElementId<volume_dim>{element_ids[i]},
+                      ElementMap<volume_dim, Frame::Inertial>{
+                          element_ids[i], block.stationary_map().get_clone()}));
     }
   }
 }

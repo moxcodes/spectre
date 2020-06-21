@@ -46,6 +46,13 @@ struct NumberOfSteps {
   static constexpr OptionString help{"number of steps to run"};
   using group = TestLoadBalancing;
 };
+
+struct DistributionStrategy {
+  using type = std::unique_ptr<Distribution::DistributionStrategy>;
+  static constexpr OptionString help{
+      "Strategy for initial element distribution"};
+  using group = TestLoadBalancing;
+};
 }  // namespace OptionTags
 
 namespace Tags {
@@ -106,6 +113,19 @@ struct NeighborData : db::SimpleTag {
 struct InternalStorage : db::SimpleTag {
   using type = std::vector<DataVector>;
 };
+
+struct DistributionStrategy : db::SimpleTag {
+  using type =
+      std::unique_ptr<Distribution::DistributionStrategy>;
+  using option_tags = tmpl::list<OptionTags::DistributionStrategy>;
+
+  static constexpr bool pass_metavariables = false;
+  static std::unique_ptr<Distribution::DistributionStrategy>
+  create_from_options(const std::unique_ptr<Distribution::DistributionStrategy>&
+                          distribution_strategy) {
+    return distribution_strategy->get_clone();
+  }
+};
 }  // namespace Tags
 
 namespace ReceiveTags {
@@ -119,5 +139,6 @@ struct LoadBalancingCommunication
       FixedHashMap<maximum_number_of_neighbors(Dim), dg::MortarId<Dim>,
                    std::vector<DataVector>, boost::hash<dg::MortarId<Dim>>>>;
 };
+
 }  // namespace ReceiveTags
 }  // namespace Lb
