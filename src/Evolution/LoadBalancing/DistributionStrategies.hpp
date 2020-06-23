@@ -10,6 +10,8 @@
 #include "Parallel/CharmPupable.hpp"
 #include "Parallel/ConstGlobalCache.hpp"
 
+#include "Parallel/Printf.hpp"
+
 namespace Lb {
 namespace Distribution {
 
@@ -143,6 +145,8 @@ struct KnownEvenOptimal : public DistributionStrategy {
     }
     double x_coord =
         element_map(tnsr::I<double, 1, Frame::Logical>{{{0.0}}})[0];
+    Parallel::printf("sending %f to %d\n", x_coord,
+                     static_cast<int>(0.5 * (x_coord + 1.0) * number_of_procs));
     return static_cast<int>(0.5 * (x_coord + 1.0) * number_of_procs);
   }
 
@@ -196,6 +200,11 @@ struct KnownMaxFragmented : public DistributionStrategy {
           "block");
     }
     double x_coord = element_map(tnsr::I<double, 1, Frame::Logical>{{0.0}})[0];
+    Parallel::printf(
+        "sending %f to %d\n", x_coord,
+        static_cast<int>(0.5 * (x_coord + 1.0) *
+                         pow(2.0, initial_refinement_levels[0][0])) %
+            static_cast<int>(number_of_procs));
     return static_cast<int>(0.5 * (x_coord + 1.0) *
                             pow(2.0, initial_refinement_levels[0][0])) %
            static_cast<int>(number_of_procs);

@@ -12,6 +12,7 @@
 #include "Domain/InitialElementIds.hpp"
 #include "Evolution/LoadBalancing/Actions/EmulateLoad.hpp"
 #include "Evolution/LoadBalancing/Actions/InitializeLoadBalancingTestArray.hpp"
+#include "Evolution/LoadBalancing/Actions/InitializeGraphDumpLabel.hpp"
 #include "Evolution/LoadBalancing/Actions/StepManagement.hpp"
 #include "Evolution/LoadBalancing/Actions/LoadBalancingTestCommunication.hpp"
 #include "Evolution/LoadBalancing/Tags.hpp"
@@ -35,6 +36,7 @@ struct LoadBalancingTestArray {
 
   using initialization_action_list =
       tmpl::list<Actions::InitializeLoadBalancingTestArray<volume_dim>,
+                 Actions::InitializeGraphDumpLabel,
                  Initialization::Actions::RemoveOptionsAndTerminatePhase>;
   using evolution_action_list =
       tmpl::list<Actions::ExitIfComplete,

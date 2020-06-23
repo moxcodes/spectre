@@ -12,6 +12,8 @@
 #include "NumericalAlgorithms/DiscontinuousGalerkin/MortarHelpers.hpp"
 #include "Options/Options.hpp"
 #include "Parallel/InboxInserters.hpp"
+#include "Parallel/Serialize.hpp"
+#include "ParallelAlgorithms/EventsAndTriggers/Trigger.hpp"
 
 namespace Lb {
 namespace OptionTags {
@@ -52,6 +54,13 @@ struct DistributionStrategy {
   static constexpr OptionString help{
       "Strategy for initial element distribution"};
   using group = TestLoadBalancing;
+};
+
+template <typename TriggerRegistrars>
+struct GraphDumpTrigger {
+  using type = std::unique_ptr<Trigger<TriggerRegistrars>>;
+  static constexpr OptionString help =
+      "condition for which to dump graph to projections";
 };
 }  // namespace OptionTags
 
@@ -103,6 +112,10 @@ struct StepNumber :db::SimpleTag {
   using type = size_t;
 };
 
+struct GraphDumpLabel : db::SimpleTag {
+  using type = size_t;
+};
+
 template <size_t Dim>
 struct NeighborData : db::SimpleTag {
   using type =
@@ -126,6 +139,23 @@ struct DistributionStrategy : db::SimpleTag {
     return distribution_strategy->get_clone();
   }
 };
+
+struct GraphDumpTriggerBase : db::BaseTag {};
+
+template <typename TriggerRegistrars>
+struct GraphDumpTrigger : GraphDumpTriggerBase, db::SimpleTag {
+  using type = std::unique_ptr<Trigger<TriggerRegistrars>>;
+  using option_tags =
+      tmpl::list<OptionTags::GraphDumpTrigger<TriggerRegistrars>>;
+
+  static constexpr bool pass_metavariables = false;
+  static std::unique_ptr<Trigger<TriggerRegistrars>> create_from_options(
+      const std::unique_ptr<Trigger<TriggerRegistrars>>& trigger) noexcept {
+    // :(
+    return deserialize<type>(serialize<type>(trigger).data());
+  }
+};
+
 }  // namespace Tags
 
 namespace ReceiveTags {

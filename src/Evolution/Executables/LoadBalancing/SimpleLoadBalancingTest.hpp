@@ -8,6 +8,7 @@
 #include "Domain/FunctionsOfTime/RegisterDerivedWithCharm.hpp"
 #include "Evolution/LoadBalancing/DistributionStrategies.hpp"
 #include "Evolution/LoadBalancing/LoadBalancingTestArray.hpp"
+#include "Evolution/LoadBalancing/StepTriggers.hpp"
 #include "Evolution/LoadBalancing/Tags.hpp"
 #include "Parallel/InitializationFunctions.hpp"
 #include "Parallel/RegisterDerivedClassesWithCharm.hpp"
@@ -16,6 +17,8 @@ template <size_t Dim>
 struct EvolutionMetavars {
   static constexpr size_t volume_dim = Dim;
   using temporal_id = Lb::Tags::StepNumber;
+
+  using triggers = tmpl::list<Triggers::Registrars::SpecifiedStepTrigger>;
 
   enum class Phase {
     Initialization,
@@ -43,10 +46,20 @@ struct EvolutionMetavars {
     }
   }
 
+  using const_global_cache_tags =
+      tmpl::list<Lb::Tags::GraphDumpTrigger<triggers>>;
+
   static constexpr OptionString help{
       "Run a fast strawman version of a domain evolution for testing "
       "load-balancing strategies according to parameters of the elements"};
 
+
+  // Probably want a triggers interface to specify when/where to graph
+  // dump. That will be the desired interface for the main code I think.
+
+  // the idea is that the diagnostic dump will occur only when a trigger is
+  // satisfied (so the trigger will be retrieved from the const global cache and
+  // evaluated, but there will be no associated event.)
   using component_list =
       tmpl::list<Lb::LoadBalancingTestArray<EvolutionMetavars>>;
 };
