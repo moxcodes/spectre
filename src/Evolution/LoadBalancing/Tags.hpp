@@ -140,10 +140,8 @@ struct DistributionStrategy : db::SimpleTag {
   }
 };
 
-struct GraphDumpTriggerBase : db::BaseTag {};
-
 template <typename TriggerRegistrars>
-struct GraphDumpTrigger : GraphDumpTriggerBase, db::SimpleTag {
+struct GraphDumpTrigger : db::SimpleTag {
   using type = std::unique_ptr<Trigger<TriggerRegistrars>>;
   using option_tags =
       tmpl::list<OptionTags::GraphDumpTrigger<TriggerRegistrars>>;

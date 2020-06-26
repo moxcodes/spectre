@@ -16,8 +16,14 @@
 namespace Lb {
 namespace Actions {
 
+template <typename Metavariables>
 struct InitializeGraphDumpLabel {
-  template <typename DataBox, typename... InboxTags, typename Metavariables,
+  using initialization_tags =
+      tmpl::list<Tags::GraphDumpTrigger<typename Metavariables::triggers>>;
+  using initialization_tags_to_keep =
+      tmpl::list<Tags::GraphDumpTrigger<typename Metavariables::triggers>>;
+
+  template <typename DataBox, typename... InboxTags,
             typename ActionList, typename ParallelComponent,
             typename ArrayIndex>
   static auto apply(DataBox& box,

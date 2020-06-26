@@ -18,7 +18,8 @@ struct EvolutionMetavars {
   static constexpr size_t volume_dim = Dim;
   using temporal_id = Lb::Tags::StepNumber;
 
-  using triggers = tmpl::list<Triggers::Registrars::SpecifiedStepTrigger>;
+  using triggers = tmpl::list<Triggers::Registrars::SpecifiedStepTrigger,
+                              Triggers::Registrars::SpecifiedWallTimeTrigger>;
 
   enum class Phase {
     Initialization,
@@ -46,9 +47,6 @@ struct EvolutionMetavars {
     }
   }
 
-  using const_global_cache_tags =
-      tmpl::list<Lb::Tags::GraphDumpTrigger<triggers>>;
-
   static constexpr OptionString help{
       "Run a fast strawman version of a domain evolution for testing "
       "load-balancing strategies according to parameters of the elements"};
@@ -70,7 +68,9 @@ static const std::vector<void (*)()> charm_init_node_funcs{
     &domain::FunctionsOfTime::register_derived_with_charm,
     &domain::creators::register_derived_with_charm,
     &Parallel::register_derived_classes_with_charm<
-        Lb::Distribution::DistributionStrategy>};
+        Lb::Distribution::DistributionStrategy>,
+    &Parallel::register_derived_classes_with_charm<
+        Trigger<metavariables::triggers>>};
 
 static const std::vector<void (*)()> charm_init_proc_funcs{
   &enable_floating_point_exceptions};

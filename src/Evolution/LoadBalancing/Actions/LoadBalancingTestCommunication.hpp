@@ -29,7 +29,7 @@ template <typename Metavariables, typename FromComponent, typename ToComponent,
 void record_communication_event_projections_stream(
     const std::array<int, Dim>* from_array_index,
     const std::array<int, Dim>* to_array_index,
-    db::DataBox<DbTagList>& box) noexcept {
+    const db::DataBox<DbTagList>& box) noexcept {
   // if we're tracing with projections, insert into the event stream the user
   // note of the origin and destination
 
@@ -66,6 +66,12 @@ void record_communication_event_projections_stream(
     traceUserSuppliedData((*to_array_index)[i]);
   }
   traceUserSuppliedData(-2);
+#endif
+}
+
+template <typename DbTagList>
+void increment_graph_label(db::DataBox<DbTagList>& box) noexcept {
+#ifdef SPECTRE_CHARM_PROJECTIONS
   db::mutate<Tags::GraphDumpLabel>(
       make_not_null(&box),
       [](const gsl::not_null<size_t*> label) noexcept { ++(*label); });
@@ -95,6 +101,9 @@ struct SendDataToNeighbors {
     if (db::get<Tags::StepNumber>(box) >= db::get<Tags::NumberOfSteps>(box)) {
       return std::forward_as_tuple(std::move(box));
     }
+    bool is_triggered =
+        db::get<Tags::GraphDumpTrigger<typename Metavariables::triggers>>(box)
+            .is_triggered(box);
     const auto& element = db::get<domain::Tags::Element<volume_dim>>(box);
     auto& receiver_proxy =
         Parallel::get_parallel_component<LoadBalancingTestArray<Metavariables>>(
@@ -118,11 +127,13 @@ struct SendDataToNeighbors {
         // element will mistakenly start back up the algorithm on an element
         // that's still in Initialization, which will cause incomprehensible
         // errors
-        record_communication_event_projections_stream<
-            Metavariables, LoadBalancingTestArray<Metavariables>,
-            LoadBalancingTestArray<Metavariables>>(
-            reinterpret_cast<const std::array<int, Dim>*>(&array_index),
-            reinterpret_cast<const std::array<int, Dim>*>(&neighbor), box);
+        if (is_triggered) {
+          record_communication_event_projections_stream<
+              Metavariables, LoadBalancingTestArray<Metavariables>,
+              LoadBalancingTestArray<Metavariables>>(
+              reinterpret_cast<const std::array<int, Dim>*>(&array_index),
+              reinterpret_cast<const std::array<int, Dim>*>(&neighbor), box);
+        }
         if (db::get<Tags::StepNumber>(box) > 1) {
           Parallel::receive_data<ReceiveTags::LoadBalancingCommunication<Dim>>(
               receiver_proxy[neighbor], db::get<Tags::StepNumber>(box),
@@ -137,8 +148,13 @@ struct SendDataToNeighbors {
                                                       element.id()},
                              std::move(bundled_data)));
         }
-        record_communication_event_projections_done_messages();
+        if (is_triggered) {
+          record_communication_event_projections_done_messages();
+        }
       }
+    }
+    if (is_triggered) {
+      increment_graph_label(box);
     }
     return std::forward_as_tuple(std::move(box));
   }

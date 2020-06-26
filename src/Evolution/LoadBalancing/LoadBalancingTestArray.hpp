@@ -36,7 +36,7 @@ struct LoadBalancingTestArray {
 
   using initialization_action_list =
       tmpl::list<Actions::InitializeLoadBalancingTestArray<volume_dim>,
-                 Actions::InitializeGraphDumpLabel,
+                 Actions::InitializeGraphDumpLabel<Metavariables>,
                  Initialization::Actions::RemoveOptionsAndTerminatePhase>;
   using evolution_action_list =
       tmpl::list<Actions::ExitIfComplete,

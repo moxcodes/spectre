@@ -96,7 +96,8 @@ class SpecifiedWallTimeTrigger : public Trigger<TriggerRegistrars> {
   // dump the graph either just before or just after the load-balancing takes
   // place
   bool operator()(const size_t current_graph_index) const noexcept {
-    return Parallel::wall_time() > times_[current_graph_index];
+    return current_graph_index < times_.size() and
+           Parallel::wall_time() > times_[current_graph_index];
   }
 
   void pup(PUP::er& p) noexcept override { p | times_; }
