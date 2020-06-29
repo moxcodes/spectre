@@ -3,10 +3,12 @@
 
 #pragma once
 
+#include <charm++.h>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
+#include "AlgorithmArray.hpp"
 #include "DataStructures/DataBox/DataBox.hpp"
 #include "DataStructures/DataBox/Tag.hpp"
 #include "DataStructures/DataVector.hpp"
@@ -16,6 +18,7 @@
 #include "Domain/ElementMap.hpp"
 #include "Domain/MaxNumberOfNeighbors.hpp"
 #include "Domain/Tags.hpp"
+#include "Evolution/LoadBalancing/LoadBalancingTestArray.hpp"
 #include "Evolution/LoadBalancing/Tags.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/MortarHelpers.hpp"
 #include "Parallel/ConstGlobalCache.hpp"
@@ -47,10 +50,12 @@ struct InitializeLoadBalancingTestArray {
             typename ActionList, typename ParallelComponent>
   static auto apply(DataBox& box,
                     const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
-                    const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
+                    Parallel::ConstGlobalCache<Metavariables>& cache,
                     const ElementId<Dim>& array_index,
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
+    LBTurnInstrumentOn();
+
     using simple_tags =
         db::AddSimpleTags<domain::Tags::Element<Dim>,
                           domain::Tags::ElementMap<Dim>, Tags::InternalStorage,

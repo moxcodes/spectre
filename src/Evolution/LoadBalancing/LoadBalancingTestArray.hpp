@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <charm++.h>
 #include <unordered_map>
 #include <vector>
 
@@ -81,6 +82,20 @@ struct LoadBalancingTestArray {
           initialization_items) noexcept;
 };
 
+
+struct SetMigratable {
+  template <typename ParallelComponent, typename... DbTags,
+            typename Metavariables, typename ArrayIndex>
+  static void apply(db::DataBox<tmpl::list<DbTags...>>& box,
+                    Parallel::ConstGlobalCache<Metavariables>& cache,
+                    const ArrayIndex& array_index) noexcept {
+    auto& lb_element_array =
+        Parallel::get_parallel_component<LoadBalancingTestArray<Metavariables>>(
+            cache);
+    lb_element_array(array_index).ckLocal()->setMigratable(true);
+  }
+};
+
 template <class Metavariables>
 void LoadBalancingTestArray<Metavariables>::allocate_array(
     Parallel::CProxy_ConstGlobalCache<Metavariables>& global_cache,
@@ -110,6 +125,8 @@ void LoadBalancingTestArray<Metavariables>::allocate_array(
                       ElementId<volume_dim>{element_ids[i]},
                       ElementMap<volume_dim, Frame::Inertial>{
                           element_ids[i], block.stationary_map().get_clone()}));
+      Parallel::simple_action<SetMigratable>(
+          lb_element_array(ElementId<volume_dim>{element_ids[i]}));
     }
   }
 }

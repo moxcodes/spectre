@@ -23,6 +23,11 @@
 
 namespace Lb {
 
+/// \cond
+template <typename Metavariables>
+struct LoadBalancingTestArray;
+/// \endcond
+
 // TODO this should probably get moved to parallel somewhere.
 template <typename Metavariables, typename FromComponent, typename ToComponent,
           typename DbTagList, size_t Dim>

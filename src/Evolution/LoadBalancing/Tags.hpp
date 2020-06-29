@@ -9,6 +9,7 @@
 
 #include "DataStructures/DataBox/Tag.hpp"
 #include "Domain/MaxNumberOfNeighbors.hpp"
+#include "Evolution/LoadBalancing/DistributionStrategies.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/MortarHelpers.hpp"
 #include "Options/Options.hpp"
 #include "Parallel/InboxInserters.hpp"
