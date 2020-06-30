@@ -37,8 +37,9 @@ struct type_for_get_helper<std::unique_ptr<T, D>> {
 // an unknown tag is requested from the ConstGlobalCache.
 template <typename ConstGlobalCacheTag, typename ListOfPossibleTags>
 struct list_of_matching_tags_helper {
-  using type = tmpl::filter<ListOfPossibleTags,
-               std::is_base_of<tmpl::pin<ConstGlobalCacheTag>, tmpl::_1>>;
+  using type =
+      tmpl::filter<ListOfPossibleTags,
+                   std::is_base_of<tmpl::pin<ConstGlobalCacheTag>, tmpl::_1>>;
   static_assert(not std::is_same_v<type, tmpl::list<>>,
                 "Trying to get a nonexistent tag from the ConstGlobalCache. "
                 "To diagnose the problem, search for "
@@ -264,14 +265,11 @@ auto get(const ConstGlobalCache<Metavariables>& cache) noexcept -> const
       [](std::true_type /*is_unique_ptr*/, auto&& local_cache)
           -> decltype(
               *(tuples::get<tag>(local_cache.const_global_cache_).get())) {
-        return *(
-            tuples::get<tag>(local_cache.const_global_cache_)
-                .get());
+        return *(tuples::get<tag>(local_cache.const_global_cache_).get());
       },
       [](std::false_type /*is_unique_ptr*/, auto&& local_cache)
           -> decltype(tuples::get<tag>(local_cache.const_global_cache_)) {
-        return tuples::get<tag>(
-            local_cache.const_global_cache_);
+        return tuples::get<tag>(local_cache.const_global_cache_);
       })(typename tt::is_a<std::unique_ptr, typename tag::type>::type{}, cache);
 }
 
@@ -283,7 +281,7 @@ struct ConstGlobalCache : db::BaseTag {};
 
 template <class Metavariables>
 struct ConstGlobalCacheImpl : ConstGlobalCache, db::SimpleTag {
-  using type = const Parallel::ConstGlobalCache<Metavariables>*;
+  using type = Parallel::CProxy_ConstGlobalCache<Metavariables>;
   static std::string name() noexcept { return "ConstGlobalCache"; }
 };
 
@@ -298,8 +296,9 @@ struct FromConstGlobalCache : CacheTag, db::ComputeTag {
   }
   template <class Metavariables>
   static const ConstGlobalCache_detail::type_for_get<CacheTag, Metavariables>&
-  function(const Parallel::ConstGlobalCache<Metavariables>* const& cache) {
-    return Parallel::get<CacheTag>(*cache);
+  function(
+      const Parallel::CProxy_ConstGlobalCache<Metavariables>& cache) noexcept {
+    return Parallel::get<CacheTag>(*cache.ckLocalBranch());
   }
   using argument_tags = tmpl::list<ConstGlobalCache>;
 };

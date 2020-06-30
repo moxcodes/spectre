@@ -23,6 +23,8 @@
 #include "ParallelAlgorithms/Initialization/Actions/RemoveOptionsAndTerminatePhase.hpp"
 #include "Utilities/Gsl.hpp"
 
+#include "Utilities/TmplDebugging.hpp"
+
 namespace Lb {
 
 // TODO PUP
@@ -93,6 +95,10 @@ struct SetMigratable {
         Parallel::get_parallel_component<LoadBalancingTestArray<Metavariables>>(
             cache);
     lb_element_array(array_index).ckLocal()->setMigratable(true);
+    TurnManualLBOn();
+    TurnManualLBOff();
+    lb_element_array(array_index).ckLocal()->AtSync();
+    // lb_element_array(array_index).ckLocal()->ckMigrate(0);
   }
 };
 
@@ -125,9 +131,17 @@ void LoadBalancingTestArray<Metavariables>::allocate_array(
                       ElementId<volume_dim>{element_ids[i]},
                       ElementMap<volume_dim, Frame::Inertial>{
                           element_ids[i], block.stationary_map().get_clone()}));
+    }
+  }
+  lb_element_array.doneInserting();
+  for (const auto& block : domain.blocks()) {
+    const std::vector<ElementId<volume_dim>> element_ids =
+        initial_element_ids(block.id(), initial_refinement_levels[block.id()]);
+    for (size_t i = 0; i < element_ids.size(); ++i) {
       Parallel::simple_action<SetMigratable>(
           lb_element_array(ElementId<volume_dim>{element_ids[i]}));
     }
   }
+  // CkStartLB();
 }
 }  // namespace Lb

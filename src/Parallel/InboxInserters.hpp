@@ -45,7 +45,7 @@ struct Map {
     auto& current_inbox = (*inbox)[temporal_id];
     ASSERT(0 == current_inbox.count(data.first),
            "Receiving data from the 'same' source twice. The message id is: "
-               << data.first);
+               << data.first << " : " << temporal_id);
     if (not current_inbox.insert(std::forward<ReceiveDataType>(data)).second) {
       ERROR("Failed to insert data to receive at instance '"
             << temporal_id << "' with tag '"

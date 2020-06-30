@@ -32,8 +32,15 @@
 #include "Utilities/TypeTraits/IsA.hpp"
 #include "Utilities/TypeTraits/IsCallable.hpp"
 
+#include "Parallel/Printf.hpp"
+
 // IWYU pragma: no_forward_declare brigand::get_destination
 // IWYU pragma: no_forward_declare brigand::get_source
+
+namespace Parallel::Tags {
+template <class Metavariables>
+struct ConstGlobalCacheImpl;
+}
 
 /*!
  * \ingroup DataBoxGroup
@@ -911,7 +918,7 @@ template <typename... NonSubitemsTags, typename... ComputeTags>
 void DataBox<tmpl::list<Tags...>>::pup_impl(
     PUP::er& p, tmpl::list<NonSubitemsTags...> /*meta*/,
     tmpl::list<ComputeTags...> /*meta*/) noexcept {
-  const auto pup_simple_item = [&p, this ](auto current_tag) noexcept {
+  const auto pup_simple_item = [&p, this](auto current_tag) noexcept {
     (void)this;  // Compiler bug warning this capture is not used
     using tag = decltype(current_tag);
     if (p.isUnpacking()) {
@@ -929,7 +936,7 @@ void DataBox<tmpl::list<Tags...>>::pup_impl(
   (void)pup_simple_item;  // Silence GCC warning about unused variable
   EXPAND_PACK_LEFT_TO_RIGHT(pup_simple_item(NonSubitemsTags{}));
 
-  const auto pup_compute_item = [&p, this ](auto current_tag) noexcept {
+  const auto pup_compute_item = [&p, this](auto current_tag) noexcept {
     (void)this;  // Compiler bug warns this isn't used
     using tag = decltype(current_tag);
     if (p.isUnpacking()) {

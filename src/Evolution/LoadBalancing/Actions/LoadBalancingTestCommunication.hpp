@@ -106,9 +106,12 @@ struct SendDataToNeighbors {
     if (db::get<Tags::StepNumber>(box) >= db::get<Tags::NumberOfSteps>(box)) {
       return std::forward_as_tuple(std::move(box));
     }
-    bool is_triggered =
+    bool is_triggered = false;
+#ifdef SPECTRE_CHARM_PROJECTIONS
+    is_triggered =
         db::get<Tags::GraphDumpTrigger<typename Metavariables::triggers>>(box)
             .is_triggered(box);
+#endif
     const auto& element = db::get<domain::Tags::Element<volume_dim>>(box);
     auto& receiver_proxy =
         Parallel::get_parallel_component<LoadBalancingTestArray<Metavariables>>(
