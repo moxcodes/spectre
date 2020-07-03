@@ -22,6 +22,7 @@
 #include "Parallel/Exit.hpp"
 #include "Parallel/ParallelComponentHelpers.hpp"
 #include "Parallel/Printf.hpp"
+#include "Parallel/Tags.hpp"
 #include "Parallel/TypeTraits.hpp"
 #include "Utilities/Formaline.hpp"
 #include "Utilities/Overloader.hpp"
@@ -69,6 +70,21 @@ class Main : public CBase_Main<Metavariables> {
   /// Determine the next phase of the simulation and execute it.
   void execute_next_phase() noexcept;
 
+  void register_element_to_checkpoint() noexcept;
+
+  void sync_run_checkpoint() noexcept;
+
+  void restart_from_checkpoint() noexcept;
+
+  void pup(PUP::er& p) noexcept override {
+    p | const_global_cache_proxy_;
+    p | input_file_;
+    p | number_of_elements_to_checkpoint_;
+    if (p.isUnpacking()) {
+      options_.parse_file(input_file_);
+    }
+  }
+
  private:
   template <typename ParallelComponent>
   using parallel_component_options =
@@ -88,6 +104,9 @@ class Main : public CBase_Main<Metavariables> {
 
   CProxy_ConstGlobalCache<Metavariables> const_global_cache_proxy_;
   Options<option_list> options_;
+  std::string input_file_;
+  size_t number_of_elements_to_checkpoint_ = 0;
+  size_t number_of_elements_ready_to_checkpoint_ = 0;
 };
 
 // ================================================================
@@ -132,17 +151,17 @@ Main<Metavariables>::Main(CkArgMsg* msg) noexcept
             -> std::void_t<decltype(
                 tmpl::type_from<decltype(mv)>::input_file)> {
           // Metavariables has options and default input file name
-          command_line_options.add_options()
-              ("input-file",
-               bpo::value<std::string>()->default_value(
-                   tmpl::type_from<decltype(mv)>::input_file),
-               "Input file name");
+          command_line_options.add_options()(
+              "input-file",
+              bpo::value<std::string>()->default_value(
+                  tmpl::type_from<decltype(mv)>::input_file),
+              "Input file name");
         },
         [&command_line_options](std::true_type /*meta*/, auto /*mv*/,
                                 auto... /*unused*/) {
           // Metavariables has options and no default input file name
-          command_line_options.add_options()
-              ("input-file", bpo::value<std::string>(), "Input file name");
+          command_line_options.add_options()(
+              "input-file", bpo::value<std::string>(), "Input file name");
         },
         [](std::false_type /*meta*/, auto mv, int /*gcc_bug*/)
             -> std::void_t<decltype(
@@ -215,6 +234,7 @@ Main<Metavariables>::Main(CkArgMsg* msg) noexcept
         ERROR("No default input file name.  Pass --input-file.");
       }
       input_file = parsed_command_line_options["input-file"].as<std::string>();
+      input_file_ = input_file;
       options_.parse_file(input_file);
     } else {
       options_.parse("");
@@ -247,7 +267,8 @@ Main<Metavariables>::Main(CkArgMsg* msg) noexcept
 
   const_global_cache_proxy_ = CProxy_ConstGlobalCache<Metavariables>::ckNew(
       Parallel::create_from_options<Metavariables>(items_from_options,
-                                                   const_global_cache_tags{}));
+                                                   const_global_cache_tags{}),
+      this->thisProxy);
 
   tuples::tagged_tuple_from_typelist<parallel_component_tag_list>
       the_parallel_components;
@@ -263,10 +284,10 @@ Main<Metavariables>::Main(CkArgMsg* msg) noexcept
   const_global_cache_dependency.setGroupDepID(
       const_global_cache_proxy_.ckGetGroupID());
 
-  tmpl::for_each<group_component_list>([
-    this, &the_parallel_components, &items_from_options, &
-    const_global_cache_dependency
-  ](auto parallel_component_v) noexcept {
+  tmpl::for_each<group_component_list>([this, &the_parallel_components,
+                                        &items_from_options,
+                                        &const_global_cache_dependency](
+                                           auto parallel_component_v) noexcept {
     using parallel_component = tmpl::type_from<decltype(parallel_component_v)>;
     using ParallelComponentProxy =
         Parallel::proxy_from_parallel_component<parallel_component>;
@@ -284,19 +305,21 @@ Main<Metavariables>::Main(CkArgMsg* msg) noexcept
       tmpl::filter<component_list,
                    Parallel::is_chare_proxy<tmpl::bind<
                        Parallel::proxy_from_parallel_component, tmpl::_1>>>;
-  tmpl::for_each<singleton_component_list>([
-    this, &the_parallel_components, &items_from_options
-  ](auto parallel_component_v) noexcept {
-    using parallel_component = tmpl::type_from<decltype(parallel_component_v)>;
-    using ParallelComponentProxy =
-        Parallel::proxy_from_parallel_component<parallel_component>;
-    tuples::get<tmpl::type_<ParallelComponentProxy>>(the_parallel_components) =
-        ParallelComponentProxy::ckNew(
-            const_global_cache_proxy_,
-            Parallel::create_from_options<Metavariables>(
-                items_from_options,
-                typename parallel_component::initialization_tags{}));
-  });
+  tmpl::for_each<singleton_component_list>(
+      [this, &the_parallel_components,
+       &items_from_options](auto parallel_component_v) noexcept {
+        using parallel_component =
+            tmpl::type_from<decltype(parallel_component_v)>;
+        using ParallelComponentProxy =
+            Parallel::proxy_from_parallel_component<parallel_component>;
+        tuples::get<tmpl::type_<ParallelComponentProxy>>(
+            the_parallel_components) =
+            ParallelComponentProxy::ckNew(
+                const_global_cache_proxy_,
+                Parallel::create_from_options<Metavariables>(
+                    items_from_options,
+                    typename parallel_component::initialization_tags{}));
+      });
 
   // Create proxies for empty array chares (whose elements will be created by
   // the allocate functions of the array components during
@@ -307,7 +330,7 @@ Main<Metavariables>::Main(CkArgMsg* msg) noexcept
                      Parallel::proxy_from_parallel_component, tmpl::_1>>,
                  tmpl::not_<Parallel::is_bound_array<tmpl::_1>>>>;
   tmpl::for_each<array_component_list>([&the_parallel_components](
-      auto parallel_component) noexcept {
+                                           auto parallel_component) noexcept {
     using ParallelComponentProxy = Parallel::proxy_from_parallel_component<
         tmpl::type_from<decltype(parallel_component)>>;
     tuples::get<tmpl::type_<ParallelComponentProxy>>(the_parallel_components) =
@@ -320,8 +343,9 @@ Main<Metavariables>::Main(CkArgMsg* msg) noexcept
       tmpl::and_<Parallel::is_array_proxy<tmpl::bind<
                      Parallel::proxy_from_parallel_component, tmpl::_1>>,
                  Parallel::is_bound_array<tmpl::_1>>>;
-  tmpl::for_each<bound_array_component_list>([&the_parallel_components](
-      auto parallel_component) noexcept {
+  tmpl::for_each<
+      bound_array_component_list>([&the_parallel_components](
+                                      auto parallel_component) noexcept {
     using ParallelComponentProxy = Parallel::proxy_from_parallel_component<
         tmpl::type_from<decltype(parallel_component)>>;
     CkArrayOptions opts;
@@ -361,8 +385,8 @@ void Main<Metavariables>::
       tmpl::filter<component_list,
                    Parallel::is_array_proxy<tmpl::bind<
                        Parallel::proxy_from_parallel_component, tmpl::_1>>>;
-  tmpl::for_each<array_component_list>([ this, &items_from_options ](
-      auto parallel_component_v) noexcept {
+  tmpl::for_each<array_component_list>([this, &items_from_options](
+                                           auto parallel_component_v) noexcept {
     using parallel_component = tmpl::type_from<decltype(parallel_component_v)>;
     parallel_component::allocate_array(
         const_global_cache_proxy_,
@@ -378,6 +402,49 @@ void Main<Metavariables>::
   });
   CkStartQD(CkCallback(CkIndex_Main<Metavariables>::execute_next_phase(),
                        this->thisProxy));
+}
+
+// primitive version
+template <typename Metavariables>
+void Main<Metavariables>::register_element_to_checkpoint() noexcept {
+  ++number_of_elements_to_checkpoint_;
+}
+
+template <typename Metavariables>
+void Main<Metavariables>::sync_run_checkpoint() noexcept {
+  ++number_of_elements_ready_to_checkpoint_;
+  if (number_of_elements_to_checkpoint_ ==
+      number_of_elements_ready_to_checkpoint_) {
+    CkStartCheckpoint(
+        "checkpoint_directory",
+        CkCallback(CkIndex_Main<Metavariables>::restart_from_checkpoint(),
+                   this->thisProxy));
+  }
+}
+
+template <typename Metavariables>
+void Main<Metavariables>::restart_from_checkpoint() noexcept {
+  Parallel::printf("Restarting from checkpoint\n");
+  using array_component_list =
+      tmpl::filter<component_list,
+                   Parallel::is_array_proxy<tmpl::bind<
+                       Parallel::proxy_from_parallel_component, tmpl::_1>>>;
+  tmpl::for_each<array_component_list>([this](
+                                           auto parallel_component_v) noexcept {
+    using parallel_component = tmpl::type_from<decltype(parallel_component_v)>;
+    Parallel::get_parallel_component<parallel_component>(
+        *(const_global_cache_proxy_.ckLocalBranch()))
+        .doneInserting();
+  });
+  number_of_elements_ready_to_checkpoint_ = 0;
+  tmpl::for_each<component_list>([this](auto parallel_component_v) noexcept {
+    using parallel_component = tmpl::type_from<decltype(parallel_component_v)>;
+    Parallel::receive_data<
+        Parallel::ReceiveTags::IsRestartingFromCheckpointSync>(
+        Parallel::get_parallel_component<parallel_component>(
+            *(const_global_cache_proxy_.ckLocalBranch())),
+        0_st, true, true);
+  });
 }
 
 template <typename Metavariables>

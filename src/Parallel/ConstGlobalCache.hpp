@@ -19,6 +19,7 @@
 #include "Utilities/TypeTraits/IsA.hpp"
 
 #include "Parallel/ConstGlobalCache.decl.h"
+#include "Parallel/Main.decl.h"
 
 namespace Parallel {
 
@@ -147,10 +148,12 @@ class ConstGlobalCache : public CBase_ConstGlobalCache<Metavariables> {
   /// Typelist of the ParallelComponents stored in the ConstGlobalCache
   using component_list = typename Metavariables::component_list;
 
-  explicit ConstGlobalCache(tuples::tagged_tuple_from_typelist<
-                            get_const_global_cache_tags<Metavariables>>
-                                const_global_cache) noexcept
-      : const_global_cache_(std::move(const_global_cache)) {}
+  ConstGlobalCache(tuples::tagged_tuple_from_typelist<
+                       get_const_global_cache_tags<Metavariables>>
+                       const_global_cache,
+                   const CProxy_Main<Metavariables>& main_proxy) noexcept
+      : const_global_cache_(std::move(const_global_cache)),
+        main_proxy_{main_proxy} {}
   explicit ConstGlobalCache(CkMigrateMessage* /*msg*/) {}
   ~ConstGlobalCache() noexcept override {
     (void)Parallel::charmxx::RegisterChare<
@@ -169,6 +172,17 @@ class ConstGlobalCache : public CBase_ConstGlobalCache<Metavariables> {
       tuples::tagged_tuple_from_typelist<parallel_component_tag_list>&&
           parallel_components,
       const CkCallback& callback) noexcept;
+
+  CProxy_Main<Metavariables> get_main_proxy() const noexcept {
+    return main_proxy_;
+  }
+
+  void pup(PUP::er& p) noexcept override {
+    p | const_global_cache_;
+    p | parallel_components_;
+    p | main_proxy_;
+    p | parallel_components_have_been_set_;
+  }
 
  private:
   // clang-tidy: false positive, redundant declaration
@@ -197,6 +211,7 @@ class ConstGlobalCache : public CBase_ConstGlobalCache<Metavariables> {
       const_global_cache_{};
   tuples::tagged_tuple_from_typelist<parallel_component_tag_list>
       parallel_components_{};
+  CProxy_Main<Metavariables> main_proxy_;
   bool parallel_components_have_been_set_{false};
 };
 

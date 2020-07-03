@@ -22,6 +22,7 @@
 #include "Evolution/LoadBalancing/Tags.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/MortarHelpers.hpp"
 #include "Parallel/ConstGlobalCache.hpp"
+#include "Parallel/Tags.hpp"
 #include "ParallelAlgorithms/Initialization/MergeIntoDataBox.hpp"
 #include "Utilities/TaggedTuple.hpp"
 
@@ -55,11 +56,15 @@ struct InitializeLoadBalancingTestArray {
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
     LBTurnInstrumentOn();
+    // we don't have a registration phase for this component yet, once we do,
+    // this should be moved there
+    cache.get_main_proxy().register_element_to_checkpoint();
 
     using simple_tags =
         db::AddSimpleTags<domain::Tags::Element<Dim>,
                           domain::Tags::ElementMap<Dim>, Tags::InternalStorage,
-                          Tags::NeighborData<Dim>, Tags::StepNumber>;
+                          Tags::NeighborData<Dim>, Tags::StepNumber,
+                          Parallel::Tags::IsSyncingForCheckpoint>;
     std::mt19937 gen{std::random_device{}()};
     std::uniform_real_distribution<double> dist{0.1, 1.0};
     std::vector<DataVector> internal_storage(
@@ -100,7 +105,8 @@ struct InitializeLoadBalancingTestArray {
             InitializeLoadBalancingTestArray, simple_tags, db::AddComputeTags<>,
             Initialization::MergePolicy::Overwrite>(
             std::move(box), std::move(element), std::move(element_map),
-            std::move(internal_storage), std::move(neighbor_data), 0_st));
+            std::move(internal_storage), std::move(neighbor_data), 0_st,
+            false));
   }
 };
 }  // namespace Actions

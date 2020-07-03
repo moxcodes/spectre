@@ -108,9 +108,9 @@ struct SendDataToNeighbors {
     }
     bool is_triggered = false;
 #ifdef SPECTRE_CHARM_PROJECTIONS
-    is_triggered =
-        db::get<Tags::GraphDumpTrigger<typename Metavariables::triggers>>(box)
-            .is_triggered(box);
+    is_triggered = db::get<Tags::GraphDumpTrigger<
+        typename Metavariables::graph_dump_triggers>>(box)
+                       .is_triggered(box);
 #endif
     const auto& element = db::get<domain::Tags::Element<volume_dim>>(box);
     auto& receiver_proxy =

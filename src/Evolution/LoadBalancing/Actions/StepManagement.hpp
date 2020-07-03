@@ -26,6 +26,8 @@ struct ExitIfComplete {
       const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
       const ArrayIndex& /*array_index*/, const ActionList /*meta*/,
       const ParallelComponent* const /*meta*/) noexcept {
+    Parallel::printf("time: %zu of %zu\n", db::get<Tags::StepNumber>(box),
+                     db::get<Tags::NumberOfSteps>(box));
     return {std::move(box), db::get<Tags::StepNumber>(box) >=
                                 db::get<Tags::NumberOfSteps>(box)};
   }

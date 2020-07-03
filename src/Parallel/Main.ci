@@ -10,6 +10,11 @@ module Main {
     entry Main(CkArgMsg* msg);
     entry void allocate_array_components_and_execute_initialization_phase();
     entry void execute_next_phase();
+    entry void register_element_to_checkpoint();
+
+    entry void sync_run_checkpoint();
+
+    entry void restart_from_checkpoint();
   }
 
   }

@@ -5,13 +5,14 @@
 module ConstGlobalCache {
   include "Parallel/ParallelComponentHelpers.hpp";
   include "Utilities/TaggedTuple.hpp";
-  namespace Parallel {
+  include "Parallel/Main.decl.h";
 
+  namespace Parallel {
   template <typename Metavariables>
   nodegroup[migratable] ConstGlobalCache {
-    entry ConstGlobalCache(
-        tuples::tagged_tuple_from_typelist<
-            get_const_global_cache_tags<Metavariables>>&);
+    entry ConstGlobalCache(tuples::tagged_tuple_from_typelist<
+                               get_const_global_cache_tags<Metavariables>>&,
+                           CProxy_Main<Metavariables> & main_proxy);
     entry void set_parallel_components(
         tuples::tagged_tuple_from_typelist<tmpl::transform<
             typename Metavariables::component_list,
@@ -19,6 +20,6 @@ module ConstGlobalCache {
                        tmpl::bind<Parallel::proxy_from_parallel_component,
                                   tmpl::_1>>>>,
         const CkCallback&);
-  }
+    }
   }
 }

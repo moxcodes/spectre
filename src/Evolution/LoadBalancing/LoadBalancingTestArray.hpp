@@ -12,18 +12,17 @@
 #include "DataStructures/DataVector.hpp"
 #include "Domain/InitialElementIds.hpp"
 #include "Evolution/LoadBalancing/Actions/EmulateLoad.hpp"
-#include "Evolution/LoadBalancing/Actions/InitializeLoadBalancingTestArray.hpp"
 #include "Evolution/LoadBalancing/Actions/InitializeGraphDumpLabel.hpp"
-#include "Evolution/LoadBalancing/Actions/StepManagement.hpp"
+#include "Evolution/LoadBalancing/Actions/InitializeLoadBalancingTestArray.hpp"
 #include "Evolution/LoadBalancing/Actions/LoadBalancingTestCommunication.hpp"
+#include "Evolution/LoadBalancing/Actions/StepManagement.hpp"
+#include "Evolution/LoadBalancing/Actions/SyncForCheckpoint.hpp"
 #include "Evolution/LoadBalancing/Tags.hpp"
 #include "Parallel/ConstGlobalCache.hpp"
 #include "Parallel/Info.hpp"
 #include "Parallel/ParallelComponentHelpers.hpp"
 #include "ParallelAlgorithms/Initialization/Actions/RemoveOptionsAndTerminatePhase.hpp"
 #include "Utilities/Gsl.hpp"
-
-#include "Utilities/TmplDebugging.hpp"
 
 namespace Lb {
 
@@ -43,10 +42,10 @@ struct LoadBalancingTestArray {
                  Initialization::Actions::RemoveOptionsAndTerminatePhase>;
   using evolution_action_list =
       tmpl::list<Actions::ExitIfComplete,
+                 Actions::CheckpointSyncAndRestart<Metavariables>,
                  Actions::SendDataToNeighbors<volume_dim>,
                  Actions::ReceiveDataFromNeighbors<volume_dim>,
-                 Actions::EmulateLoad<>,
-                 Actions::IncrementTime>;
+                 Actions::EmulateLoad<>, Actions::IncrementTime>;
 
   using phase_dependent_action_list =
       tmpl::list<Parallel::PhaseActions<typename Metavariables::Phase,
@@ -67,6 +66,57 @@ struct LoadBalancingTestArray {
       tmpl::push_back<Parallel::get_const_global_cache_tags_from_actions<
                           phase_dependent_action_list>,
                       Tags::DistributionStrategy>;
+
+  static void pup(const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
+                  const ElementId<volume_dim>& array_index,
+                  PUP::er& p) noexcept {
+    if (p.isMigration() and not p.isUnpacking()) {
+      int current_proc = Parallel::my_proc();
+      p | current_proc;
+      Parallel::printf("element : ");
+      for (const auto id :
+           *reinterpret_cast<const std::array<int, volume_dim>*>(
+               &array_index)) {
+        Parallel::printf("%d ", id);
+      }
+      Parallel::printf("migrating from %d\n", Parallel::my_proc());
+    }
+    if (p.isMigration() and p.isUnpacking()) {
+      int old_proc;
+      p | old_proc;
+      Parallel::printf("element : ");
+      for (const auto& id :
+           *reinterpret_cast<const std::array<int, volume_dim>*>(
+               &array_index)) {
+        Parallel::printf("%d ", id);
+      }
+      Parallel::printf("successfully migrated from %d to %d\n", old_proc,
+                       Parallel::my_proc());
+    }
+    if (p.isCheckpoint() and not p.isUnpacking()) {
+      double current_time = Parallel::wall_time();
+      p | current_time;
+      Parallel::printf("element : ");
+      for (const auto id :
+           *reinterpret_cast<const std::array<int, volume_dim>*>(
+               &array_index)) {
+        Parallel::printf("%d ", id);
+      }
+      Parallel::printf("checkpointing at %f\n", current_time);
+    }
+    if (p.isCheckpoint() and p.isUnpacking()) {
+      double old_wall_time;
+      p | old_wall_time;
+      Parallel::printf("element : ");
+      for (const auto id :
+           *reinterpret_cast<const std::array<int, volume_dim>*>(
+               &array_index)) {
+        Parallel::printf("%d ", id);
+      }
+      Parallel::printf("successfully restarted at %f (saving run time %f)\n",
+                       Parallel::wall_time(), old_wall_time);
+    }
+  }
 
   static void execute_next_phase(
       const typename Metavariables::Phase next_phase,
@@ -97,7 +147,7 @@ struct SetMigratable {
     lb_element_array(array_index).ckLocal()->setMigratable(true);
     TurnManualLBOn();
     TurnManualLBOff();
-    lb_element_array(array_index).ckLocal()->AtSync();
+    // lb_element_array(array_index).ckLocal()->AtSync();
     // lb_element_array(array_index).ckLocal()->ckMigrate(0);
   }
 };

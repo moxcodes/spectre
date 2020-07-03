@@ -12,20 +12,18 @@
 #include "ParallelAlgorithms/Initialization/MergeIntoDataBox.hpp"
 #include "Utilities/TaggedTuple.hpp"
 
-
 namespace Lb {
 namespace Actions {
 
 template <typename Metavariables>
 struct InitializeGraphDumpLabel {
-  using initialization_tags =
-      tmpl::list<Tags::GraphDumpTrigger<typename Metavariables::triggers>>;
-  using initialization_tags_to_keep =
-      tmpl::list<Tags::GraphDumpTrigger<typename Metavariables::triggers>>;
+  using initialization_tags = tmpl::list<
+      Tags::GraphDumpTrigger<typename Metavariables::graph_dump_triggers>>;
+  using initialization_tags_to_keep = tmpl::list<
+      Tags::GraphDumpTrigger<typename Metavariables::graph_dump_triggers>>;
 
-  template <typename DataBox, typename... InboxTags,
-            typename ActionList, typename ParallelComponent,
-            typename ArrayIndex>
+  template <typename DataBox, typename... InboxTags, typename ActionList,
+            typename ParallelComponent, typename ArrayIndex>
   static auto apply(DataBox& box,
                     const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
                     const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,

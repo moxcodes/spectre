@@ -18,8 +18,11 @@ struct EvolutionMetavars {
   static constexpr size_t volume_dim = Dim;
   using temporal_id = Lb::Tags::StepNumber;
 
-  using triggers = tmpl::list<Triggers::Registrars::SpecifiedStepTrigger,
-                              Triggers::Registrars::SpecifiedWallTimeTrigger>;
+  using triggers = tmpl::list<Triggers::Registrars::SpecifiedStepTrigger>;
+
+  using graph_dump_triggers =
+      tmpl::list<Triggers::Registrars::SpecifiedStepTrigger,
+                 Triggers::Registrars::SpecifiedWallTimeTrigger>;
 
   enum class Phase {
     Initialization,
@@ -70,7 +73,9 @@ static const std::vector<void (*)()> charm_init_node_funcs{
     &Parallel::register_derived_classes_with_charm<
         Lb::Distribution::DistributionStrategy>,
     &Parallel::register_derived_classes_with_charm<
-        Trigger<metavariables::triggers>>};
+        Trigger<metavariables::triggers>>,
+    &Parallel::register_derived_classes_with_charm<
+        Trigger<metavariables::graph_dump_triggers>>};
 
 static const std::vector<void (*)()> charm_init_proc_funcs{
   &enable_floating_point_exceptions};

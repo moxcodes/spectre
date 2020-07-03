@@ -228,8 +228,13 @@ class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
     p | terminate_;
     p | const_global_cache_proxy_;
 
-    // this will probably fail :(
+    p | inboxes_;
+    p | array_index_;
     p | box_;
+    // TODO in future, we should consider only pupping parts of the box to save
+    // transmission space
+    ParallelComponent::pup((*const_global_cache_proxy_.ckLocalBranch()),
+                           array_index_, p);
     if (p.isUnpacking()) {
       mutate_with_current_box_if_available<Tags::ConstGlobalCache>(
           box_,
@@ -238,8 +243,6 @@ class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
             *const_global_cache = const_global_cache_proxy_.ckLocalBranch();
           });
     }
-    p | inboxes_;
-    p | array_index_;
   }
   /// \cond
   ~AlgorithmImpl();
@@ -456,7 +459,7 @@ AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>::
   make_overloader([](CmiNodeLock& node_lock) { node_lock = create_lock(); },
                   [](NoSuchType /*unused*/) {})(node_lock_);
   set_array_index();
-  this->usesAtSync = true;
+  // this->usesAtSync = true;
 }
 
 template <typename ParallelComponent, typename... PhaseDepActionListsPack>

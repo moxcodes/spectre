@@ -63,6 +63,13 @@ struct GraphDumpTrigger {
   static constexpr OptionString help =
       "condition for which to dump graph to projections";
 };
+
+template <typename TriggerRegistrars>
+struct CheckpointTrigger {
+  using type = std::unique_ptr<Trigger<TriggerRegistrars>>;
+  static constexpr OptionString help =
+      "condition for which to checkpoint the array";
+};
 }  // namespace OptionTags
 
 namespace Tags {
@@ -146,6 +153,20 @@ struct GraphDumpTrigger : db::SimpleTag {
   using type = std::unique_ptr<Trigger<TriggerRegistrars>>;
   using option_tags =
       tmpl::list<OptionTags::GraphDumpTrigger<TriggerRegistrars>>;
+
+  static constexpr bool pass_metavariables = false;
+  static std::unique_ptr<Trigger<TriggerRegistrars>> create_from_options(
+      const std::unique_ptr<Trigger<TriggerRegistrars>>& trigger) noexcept {
+    // :(
+    return deserialize<type>(serialize<type>(trigger).data());
+  }
+};
+
+template <typename TriggerRegistrars>
+struct CheckpointTrigger : db::SimpleTag {
+  using type = std::unique_ptr<Trigger<TriggerRegistrars>>;
+  using option_tags =
+      tmpl::list<OptionTags::CheckpointTrigger<TriggerRegistrars>>;
 
   static constexpr bool pass_metavariables = false;
   static std::unique_ptr<Trigger<TriggerRegistrars>> create_from_options(
