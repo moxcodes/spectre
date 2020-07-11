@@ -283,7 +283,7 @@ struct ConstGlobalCache : db::BaseTag {};
 
 template <class Metavariables>
 struct ConstGlobalCacheImpl : ConstGlobalCache, db::SimpleTag {
-  using type = const Parallel::ConstGlobalCache<Metavariables>*;
+  using type = Parallel::CProxy_ConstGlobalCache<Metavariables>;
   static std::string name() noexcept { return "ConstGlobalCache"; }
 };
 
@@ -298,8 +298,9 @@ struct FromConstGlobalCache : CacheTag, db::ComputeTag {
   }
   template <class Metavariables>
   static const ConstGlobalCache_detail::type_for_get<CacheTag, Metavariables>&
-  function(const Parallel::ConstGlobalCache<Metavariables>* const& cache) {
-    return Parallel::get<CacheTag>(*cache);
+  function(
+      const Parallel::CProxy_ConstGlobalCache<Metavariables>& cache) noexcept {
+    return Parallel::get<CacheTag>(*cache.ckLocalBranch());
   }
   using argument_tags = tmpl::list<ConstGlobalCache>;
 };

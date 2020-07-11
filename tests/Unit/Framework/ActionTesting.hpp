@@ -699,7 +699,8 @@ class MockDistributedObject {
   template <typename... Options>
   MockDistributedObject(
       const array_index& index,
-      Parallel::ConstGlobalCache<typename Component::metavariables>* cache,
+      Parallel::CProxy_ConstGlobalCache<typename Component::metavariables>
+          cache,
       tuples::tagged_tuple_from_typelist<inbox_tags_list>* inboxes,
       Options&&... opts)
       : array_index_(index), const_global_cache_(cache), inboxes_(inboxes) {
@@ -708,8 +709,7 @@ class MockDistributedObject {
                        Parallel::Tags::ConstGlobalCacheImpl<metavariables>>,
                    db::AddComputeTags<db::wrap_tags_in<
                        Parallel::Tags::FromConstGlobalCache, all_cache_tags>>>(
-            static_cast<const Parallel::ConstGlobalCache<metavariables>*>(
-                const_global_cache_)),
+            const_global_cache_),
         std::forward<Options>(opts)...);
   }
 
@@ -817,8 +817,8 @@ class MockDistributedObject {
     } else {                                                                  \
       NAME##_queue_.push_back(                                                \
           std::make_unique<BOOST_PP_IF(USE_SIMPLE_ACTION, InvokeSimpleAction, \
-                                       InvokeThreadedAction) < Action,        \
-                           Args...>> (this, std::move(args)));                \
+                                       InvokeThreadedAction)<Action,          \
+                           Args...>>(this, std::move(args)));                 \
     }                                                                         \
   }                                                                           \
   template <typename Action, typename... Args,                                \
@@ -839,8 +839,8 @@ class MockDistributedObject {
     } else {                                                                  \
       NAME##_queue_.push_back(                                                \
           std::make_unique<BOOST_PP_IF(USE_SIMPLE_ACTION, InvokeSimpleAction, \
-                                       InvokeThreadedAction) < new_action,    \
-                           Args...>> (this, std::move(args)));                \
+                                       InvokeThreadedAction)<new_action,      \
+                           Args...>>(this, std::move(args)));                 \
     }                                                                         \
   }                                                                           \
   template <typename Action,                                                  \
@@ -851,7 +851,7 @@ class MockDistributedObject {
     if (direct_from_action_runner) {                                          \
       performing_action_ = true;                                              \
       Parallel::Algorithm_detail::simple_action_visitor<Action, Component>(   \
-          box_, *const_global_cache_,                                         \
+          box_, *const_global_cache_.ckLocalBranch(),                         \
           std::as_const(array_index_)                                         \
               BOOST_PP_COMMA_IF(BOOST_PP_NOT(USE_SIMPLE_ACTION)) BOOST_PP_IF( \
                   USE_SIMPLE_ACTION, , make_not_null(&node_lock_)));          \
@@ -859,7 +859,7 @@ class MockDistributedObject {
     } else {                                                                  \
       NAME##_queue_.push_back(                                                \
           std::make_unique<BOOST_PP_IF(USE_SIMPLE_ACTION, InvokeSimpleAction, \
-                                       InvokeThreadedAction) < Action>>       \
+                                       InvokeThreadedAction)<Action>>         \
           (this));                                                            \
     }                                                                         \
   }                                                                           \
@@ -876,7 +876,7 @@ class MockDistributedObject {
       performing_action_ = true;                                              \
       Parallel::Algorithm_detail::simple_action_visitor<new_action,           \
                                                         Component>(           \
-          box_, *const_global_cache_,                                         \
+          box_, *const_global_cache_.ckLocalBranch(),                         \
           std::as_const(array_index_)                                         \
               BOOST_PP_COMMA_IF(BOOST_PP_NOT(USE_SIMPLE_ACTION)) BOOST_PP_IF( \
                   USE_SIMPLE_ACTION, , make_not_null(&node_lock_)));          \
@@ -884,7 +884,7 @@ class MockDistributedObject {
     } else {                                                                  \
       simple_action_queue_.push_back(                                         \
           std::make_unique<BOOST_PP_IF(USE_SIMPLE_ACTION, InvokeSimpleAction, \
-                                       InvokeThreadedAction) < new_action>>   \
+                                       InvokeThreadedAction)<new_action>>     \
           (this));                                                            \
     }                                                                         \
   }
@@ -939,7 +939,7 @@ class MockDistributedObject {
       std::tuple<Args...>&& args,
       std::index_sequence<Is...> /*meta*/) noexcept {
     Parallel::Algorithm_detail::simple_action_visitor<Action, Component>(
-        box_, *const_global_cache_, std::as_const(array_index_),
+        box_, *const_global_cache_.ckLocalBranch(), std::as_const(array_index_),
         std::forward<Args>(std::get<Is>(args))...);
   }
 
@@ -948,7 +948,7 @@ class MockDistributedObject {
       std::tuple<Args...>&& args,
       std::index_sequence<Is...> /*meta*/) noexcept {
     Parallel::Algorithm_detail::simple_action_visitor<Action, Component>(
-        box_, *const_global_cache_, std::as_const(array_index_),
+        box_, *const_global_cache_.ckLocalBranch(), std::as_const(array_index_),
         make_not_null(&node_lock_), std::forward<Args>(std::get<Is>(args))...);
   }
 
@@ -1077,7 +1077,7 @@ class MockDistributedObject {
   PhaseType phase_{};
 
   typename Component::array_index array_index_{};
-  Parallel::ConstGlobalCache<typename Component::metavariables>*
+  Parallel::CProxy_ConstGlobalCache<typename Component::metavariables>
       const_global_cache_{nullptr};
   tuples::tagged_tuple_from_typelist<inbox_tags_list>* inboxes_{nullptr};
   std::deque<std::unique_ptr<InvokeActionBase>> simple_action_queue_;
@@ -1146,24 +1146,24 @@ void MockDistributedObject<Component>::next_action_impl(
     const auto invoke_this_action = make_overloader(
         [this](auto& my_box,
                std::integral_constant<size_t, 1> /*meta*/) noexcept {
-          std::tie(box_) =
-              this_action::apply(my_box, *inboxes_, *const_global_cache_,
-                                 std::as_const(array_index_), actions_list{},
-                                 std::add_pointer_t<Component>{});
+          std::tie(box_) = this_action::apply(
+              my_box, *inboxes_, *const_global_cache_.ckLocalBranch(),
+              std::as_const(array_index_), actions_list{},
+              std::add_pointer_t<Component>{});
         },
         [this](auto& my_box,
                std::integral_constant<size_t, 2> /*meta*/) noexcept {
-          std::tie(box_, terminate_) =
-              this_action::apply(my_box, *inboxes_, *const_global_cache_,
-                                 std::as_const(array_index_), actions_list{},
-                                 std::add_pointer_t<Component>{});
+          std::tie(box_, terminate_) = this_action::apply(
+              my_box, *inboxes_, *const_global_cache_.ckLocalBranch(),
+              std::as_const(array_index_), actions_list{},
+              std::add_pointer_t<Component>{});
         },
         [this](auto& my_box,
                std::integral_constant<size_t, 3> /*meta*/) noexcept {
-          std::tie(box_, terminate_, algorithm_step_) =
-              this_action::apply(my_box, *inboxes_, *const_global_cache_,
-                                 std::as_const(array_index_), actions_list{},
-                                 std::add_pointer_t<Component>{});
+          std::tie(box_, terminate_, algorithm_step_) = this_action::apply(
+              my_box, *inboxes_, *const_global_cache_.ckLocalBranch(),
+              std::as_const(array_index_), actions_list{},
+              std::add_pointer_t<Component>{});
         });
 
     // `check_if_ready` calls the `is_ready` static method on the action
@@ -1177,7 +1177,8 @@ void MockDistributedObject<Component>::next_action_impl(
         [this](std::true_type /*has_is_ready*/, auto action,
                const auto& check_local_box) noexcept {
           return decltype(action)::is_ready(
-              check_local_box, std::as_const(*inboxes_), *const_global_cache_,
+              check_local_box, std::as_const(*inboxes_),
+              *const_global_cache_.ckLocalBranch(),
               std::as_const(array_index_));
         },
         [](std::false_type /*has_is_ready*/, auto /*action*/,
@@ -1242,7 +1243,7 @@ void MockDistributedObject<Component>::next_action_impl(
                 invoke_this_action(
                     box,
                     typename std::tuple_size<decltype(local_this_action::apply(
-                        box, *inboxes_, *const_global_cache_,
+                        box, *inboxes_, *const_global_cache_.ckLocalBranch(),
                         std::as_const(array_index_), actions_list{},
                         std::add_pointer_t<Component>{}))>::type{});
               } else if (box_.which() ==
@@ -1268,7 +1269,7 @@ void MockDistributedObject<Component>::next_action_impl(
                 invoke_this_action(
                     box,
                     typename std::tuple_size<decltype(local_this_action::apply(
-                        box, *inboxes_, *const_global_cache_,
+                        box, *inboxes_, *const_global_cache_.ckLocalBranch(),
                         std::as_const(array_index_), actions_list{},
                         std::add_pointer_t<Component>{}))>::type{});
               } else {
@@ -1308,7 +1309,7 @@ void MockDistributedObject<Component>::next_action_impl(
                 invoke_this_action(
                     box,
                     typename std::tuple_size<decltype(local_this_action::apply(
-                        box, *inboxes_, *const_global_cache_,
+                        box, *inboxes_, *const_global_cache_.ckLocalBranch(),
                         std::as_const(array_index_), actions_list{},
                         std::add_pointer_t<Component>{}))>::type{});
               } else {
@@ -1405,8 +1406,8 @@ bool MockDistributedObject<Component>::is_ready_impl(
         [&box, &array_index, &const_global_cache, &inboxes](
             std::true_type /*has_is_ready*/, auto t) {
           return decltype(t)::is_ready(
-              std::as_const(box), std::as_const(inboxes), *const_global_cache,
-              std::as_const(array_index));
+              std::as_const(box), std::as_const(inboxes),
+              *const_global_cache.ckLocalBranch(), std::as_const(array_index));
         },
         [](std::false_type /*has_is_ready*/, auto /*meta*/) { return true; });
 
@@ -1633,13 +1634,14 @@ class MockRuntimeSystem {
 
   /// Construct from the tuple of ConstGlobalCache objects.
   explicit MockRuntimeSystem(CacheTuple cache_contents)
-      : cache_(std::move(cache_contents)) {
+      : cache_(Parallel::CProxy_ConstGlobalCache<Metavariables>::ckNew(
+            std::move(cache_contents))) {
     tmpl::for_each<typename Metavariables::component_list>([this](
                                                                auto component) {
       using Component = tmpl::type_from<decltype(component)>;
-      Parallel::get_parallel_component<Component>(cache_).set_data(
-          &tuples::get<MockDistributedObjectsTag<Component>>(local_algorithms_),
-          &tuples::get<InboxesTag<Component>>(inboxes_));
+      Parallel::get_parallel_component<Component>(*cache_.ckLocalBranch())
+          .set_data(&tuples::get<MockDistributedObjectsTag<Component>>(
+              local_algorithms_));
     });
   }
 
@@ -1657,7 +1659,7 @@ class MockRuntimeSystem {
     algorithms<Component>().emplace(
         array_index,
         MockDistributedObject<Component>(
-            array_index, &cache_,
+            array_index, cache_,
             &(tuples::get<InboxesTag<Component>>(inboxes_)[array_index]),
             std::forward<Options>(opts)...));
   }
@@ -1676,7 +1678,7 @@ class MockRuntimeSystem {
     auto iterator_bool = algorithms<Component>().emplace(
         array_index,
         MockDistributedObject<Component>(
-            array_index, &cache_,
+            array_index, cache_,
             &(tuples::get<InboxesTag<Component>>(inboxes_)[array_index]),
             std::forward<Options>(opts)...));
     if (not iterator_bool.second) {
@@ -1881,7 +1883,9 @@ class MockRuntimeSystem {
     return tuples::get<MockDistributedObjectsTag<Component>>(local_algorithms_);
   }
 
-  GlobalCache& cache() noexcept { return cache_; }
+  Parallel::ConstGlobalCache<Metavariables>& cache() noexcept {
+    return *cache_.ckLocalBranch();
+  }
 
   /// Set the phase of all parallel components to `next_phase`
   void set_phase(const typename Metavariables::Phase next_phase) noexcept {
@@ -1895,7 +1899,7 @@ class MockRuntimeSystem {
   }
 
  private:
-  GlobalCache cache_;
+  Parallel::CProxy_ConstGlobalCache<Metavariables> cache_;
   Inboxes inboxes_;
   TupleOfMockDistributedObjects local_algorithms_;
 };
