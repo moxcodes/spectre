@@ -1427,14 +1427,11 @@ bool MockDistributedObject<Component>::is_ready_impl(
 namespace ActionTesting_detail {
 // A mock class for the Charm++ generated CProxyElement_AlgorithmArray (we use
 // an array for everything, so no need to mock groups, nodegroups, singletons).
-template <typename Component, typename InboxTagList>
+template <typename Component>
 class MockArrayElementProxy {
  public:
-  using Inbox = tuples::tagged_tuple_from_typelist<InboxTagList>;
-
-  MockArrayElementProxy(MockDistributedObject<Component>& local_algorithm,
-                        Inbox& inbox)
-      : local_algorithm_(local_algorithm), inbox_(inbox) {}
+  MockArrayElementProxy(MockDistributedObject<Component>& local_algorithm)
+      : local_algorithm_(local_algorithm) {}
 
   template <typename InboxTag, typename Data>
   void receive_data(const typename InboxTag::temporal_id& id, Data&& data,
@@ -1443,8 +1440,8 @@ class MockArrayElementProxy {
     // not needed now. However, it is required by the interface to be compliant
     // with the Algorithm invocations.
     (void)enable_if_disabled;
-    InboxTag::insert_into_inbox(make_not_null(&tuples::get<InboxTag>(inbox_)),
-                                id, std::forward<Data>(data));
+    local_algorithm_.template receive_data<InboxTag>(
+        id, std::forward<Data>(data), enable_if_disabled);
   }
 
   template <typename Action, typename... Args>
@@ -1478,49 +1475,40 @@ class MockArrayElementProxy {
 
  private:
   MockDistributedObject<Component>& local_algorithm_;
-  Inbox& inbox_;
 };
 
 // A mock class for the Charm++ generated CProxy_AlgorithmArray (we use an array
 // for everything, so no need to mock groups, nodegroups, singletons).
-template <typename Component, typename Index, typename InboxTagList>
+template <typename Component, typename Index>
 class MockProxy {
  public:
-  using Inboxes =
-      std::unordered_map<Index,
-                         tuples::tagged_tuple_from_typelist<InboxTagList>>;
   using TupleOfMockDistributedObjects =
       std::unordered_map<Index, MockDistributedObject<Component>>;
 
-  MockProxy() : inboxes_(nullptr) {}
+  MockProxy() = default;
 
   template <typename InboxTag, typename Data>
   void receive_data(const typename InboxTag::temporal_id& id, const Data& data,
                     const bool enable_if_disabled = false) {
     for (const auto& key_value_pair : *local_algorithms_) {
-      MockArrayElementProxy<Component, InboxTagList>(
-          local_algorithms_->at(key_value_pair.first),
-          inboxes_->operator[](key_value_pair.first))
+      MockArrayElementProxy<Component>(
+          local_algorithms_->at(key_value_pair.first))
           .template receive_data<InboxTag>(id, data, enable_if_disabled);
     }
   }
 
-  void set_data(TupleOfMockDistributedObjects* local_algorithms,
-                Inboxes* inboxes) {
+  void set_data(TupleOfMockDistributedObjects* local_algorithms) {
     local_algorithms_ = local_algorithms;
-    inboxes_ = inboxes;
   }
 
-  MockArrayElementProxy<Component, InboxTagList> operator[](
-      const Index& index) {
+  MockArrayElementProxy<Component> operator[](const Index& index) {
     ASSERT(local_algorithms_->count(index) == 1,
            "Should have exactly one local algorithm with key '"
                << index << "' but found " << local_algorithms_->count(index)
                << ". The known keys are " << keys_of(*local_algorithms_)
                << ". Did you forget to add a local algorithm when constructing "
                   "the MockRuntimeSystem?");
-    return MockArrayElementProxy<Component, InboxTagList>(
-        local_algorithms_->at(index), inboxes_->operator[](index));
+    return MockArrayElementProxy<Component>(local_algorithms_->at(index));
   }
 
   MockDistributedObject<Component>* ckLocalBranch() noexcept {
@@ -1580,16 +1568,13 @@ class MockProxy {
 
  private:
   TupleOfMockDistributedObjects* local_algorithms_;
-  Inboxes* inboxes_;
 };
 }  // namespace ActionTesting_detail
 
 /// A mock class for the CMake-generated `Parallel::Algorithms::Array`
 struct MockArrayChare {
   template <typename Component, typename Index>
-  using cproxy = ActionTesting_detail::MockProxy<
-      Component, Index,
-      typename MockDistributedObject<Component>::inbox_tags_list>;
+  using cproxy = ActionTesting_detail::MockProxy<Component, Index>;
 };
 }  // namespace ActionTesting
 
