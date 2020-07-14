@@ -18,6 +18,8 @@ module ConstGlobalCache {
                        tmpl::bind<Parallel::proxy_from_parallel_component,
                                   tmpl::_1>>>>,
         const CkCallback&);
+    entry void set_self_proxy(
+        const CProxy_ConstGlobalCache<Metavariables>& self_proxy);
   }
   }
 }

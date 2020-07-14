@@ -5,8 +5,12 @@
 #include <memory>
 #include <pup.h>
 
+#include "Domain/CoordinateMaps/CoordinateMap.hpp"
+#include "Domain/CoordinateMaps/CoordinateMap.tpp"
+#include "Domain/CoordinateMaps/Identity.hpp"
 #include "Domain/CoordinateMaps/TimeDependent/CubicScale.hpp"
 #include "Domain/CoordinateMaps/TimeDependent/ProductMaps.hpp"
+#include "Domain/CoordinateMaps/TimeDependent/ProductMaps.tpp"
 #include "Domain/CoordinateMaps/TimeDependent/Translation.hpp"
 #include "Domain/Creators/TimeDependence/CubicScale.hpp"
 #include "Domain/Creators/TimeDependence/None.hpp"
@@ -15,9 +19,7 @@
 #include "Parallel/RegisterDerivedClassesWithCharm.hpp"
 #include "Utilities/TMPL.hpp"
 
-namespace domain {
-namespace creators {
-namespace time_dependence {
+namespace domain::creators::time_dependence {
 namespace {
 template <typename TimeDep>
 struct get_maps {
@@ -26,9 +28,12 @@ struct get_maps {
 
 template <size_t Dim>
 void register_maps_with_charm() noexcept {
-  using maps_to_register = tmpl::remove_duplicates<tmpl::flatten<
-      tmpl::transform<typename TimeDependence<Dim>::creatable_classes,
-                      get_maps<tmpl::_1>>>>;
+  using maps_to_register =
+      tmpl::remove_duplicates<tmpl::flatten<tmpl::push_back<
+          tmpl::transform<typename TimeDependence<Dim>::creatable_classes,
+                          get_maps<tmpl::_1>>,
+          domain::CoordinateMap<Frame::Grid, Frame::Inertial,
+                                CoordinateMaps::Identity<Dim>>>>>;
 
   Parallel::register_classes_in_list<maps_to_register>();
 }
@@ -39,6 +44,4 @@ void register_derived_with_charm() noexcept {
   register_maps_with_charm<2>();
   register_maps_with_charm<3>();
 }
-}  // namespace time_dependence
-}  // namespace creators
-}  // namespace domain
+}  // namespace domain::creators::time_dependence

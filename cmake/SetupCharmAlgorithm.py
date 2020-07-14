@@ -132,15 +132,23 @@ def create_header_file(args):
         "template <typename ParallelComponent,\n" \
         "          typename SpectreArrayIndex>\n" \
         "class Algorithm%s\n" \
-        "    : public CBase_Algorithm%s<ParallelComponent, \n" \
-        "                      SpectreArrayIndex>,\n" \
-        "      public Parallel::AlgorithmImpl<ParallelComponent,\n" \
+        "    : public Parallel::AlgorithmImpl<ParallelComponent,\n" \
         "        typename ParallelComponent::phase_dependent_action_list> {\n" \
         "  using algorithm = Parallel::Algorithms::%s;\n" \
         " public:\n" \
         "  using Parallel::AlgorithmImpl<ParallelComponent,\n" \
         "    typename ParallelComponent::phase_dependent_action_list\n" \
         "                  >::AlgorithmImpl;\n" \
+        "\n" \
+        "  Algorithm%s(CkMigrateMessage* /*message*/) noexcept : \n"\
+        "    Parallel::AlgorithmImpl<ParallelComponent,\n"\
+        "    typename ParallelComponent::phase_dependent_action_list>{} {}\n"\
+        "\n" \
+        "  void pup(PUP::er& p) noexcept {\n"\
+        "Parallel::AlgorithmImpl<ParallelComponent,\n"\
+        "    typename ParallelComponent::phase_dependent_action_list>"\
+        "::pup(p);\n"\
+        "  }\n"\
         "};\n\n" % (args['algorithm_name'],
                     args['algorithm_name'], args['algorithm_name'])
     # Write include of the def file, but including only the template definitions

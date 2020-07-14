@@ -231,6 +231,16 @@ class CoordinateMapBase : public PUP::able {
  * that is equal to the dimensionality of the map. The Coordinatemap class
  * contains a member `static constexpr size_t dim`, a type alias `source_frame`,
  * a type alias `target_frame` and `typelist of the `Maps...`.
+ *
+ * \warning Charm requires the registration of template instantiations of this
+ * class for serialization of the `CoordinateMapBase` pointers. This is
+ * typically accomplished by the function
+ * `domain::creators::register_derived_with_charm()` for those maps used in
+ * domain creators, but if additional instantiations are used outside of a
+ * domain creator, they must be either added to the existing registration
+ * functions, or new registration functions must be constructed. The
+ * registration functions are then used in the `charm_init_node_funcs()` in the
+ * parallel executable headers.
  */
 template <typename SourceFrame, typename TargetFrame, typename... Maps>
 class CoordinateMap
