@@ -4,6 +4,7 @@
 #pragma once
 
 #include <boost/variant/variant.hpp>
+#include <charm++.h>
 #include <converse.h>
 #include <cstddef>
 #include <exception>
@@ -14,6 +15,13 @@
 #include <unordered_set>
 #include <utility>
 
+// this include must precede the decl.h
+#include "Parallel/ArrayIndex.hpp"
+
+#include "Algorithms/AlgorithmArray.decl.h"
+#include "Algorithms/AlgorithmGroup.decl.h"
+#include "Algorithms/AlgorithmNodegroup.decl.h"
+#include "Algorithms/AlgorithmSingleton.decl.h"
 #include "DataStructures/DataBox/DataBox.hpp"  // IWYU pragma: keep
 #include "DataStructures/DataBox/PrefixHelpers.hpp"
 #include "ErrorHandling/Assert.hpp"
@@ -21,9 +29,11 @@
 #include "Parallel/AlgorithmMetafunctions.hpp"
 #include "Parallel/CharmRegistration.hpp"
 #include "Parallel/GlobalCache.hpp"
+#include "Parallel/Info.hpp"
 #include "Parallel/NodeLock.hpp"
 #include "Parallel/ParallelComponentHelpers.hpp"
 #include "Parallel/PhaseDependentActionList.hpp"
+#include "Parallel/PupStlCpp11.hpp"
 #include "Parallel/SimpleActionVisitation.hpp"
 #include "Parallel/TypeTraits.hpp"
 #include "Utilities/BoostHelpers.hpp"
@@ -46,6 +56,8 @@ namespace Parallel {
 namespace Algorithms {
 struct Nodegroup;
 struct Singleton;
+struct Group;
+struct Array;
 }  // namespace Algorithms
 }  // namespace Parallel
 // IWYU pragma: no_forward_declare db::DataBox
@@ -57,6 +69,44 @@ template <typename ParallelComponent, typename PhaseDepActionList>
 class AlgorithmImpl;
 /// \endcond
 
+namespace detail {
+
+template <typename Component, typename ChareType>
+struct get_charm_base_class;
+
+template <typename Component>
+struct get_charm_base_class<Component, Parallel::Algorithms::Array> {
+  using type = CBase_AlgorithmArray<
+      Component, typename get_array_index<
+                     Parallel::Algorithms::Array>::template f<Component>>;
+};
+
+template <typename Component>
+struct get_charm_base_class<Component, Parallel::Algorithms::Group> {
+  using type = CBase_AlgorithmGroup<
+      Component, typename get_array_index<
+                     Parallel::Algorithms::Group>::template f<Component>>;
+};
+
+template <typename Component>
+struct get_charm_base_class<Component, Parallel::Algorithms::Nodegroup> {
+  using type = CBase_AlgorithmNodegroup<
+      Component, typename get_array_index<
+                     Parallel::Algorithms::Nodegroup>::template f<Component>>;
+};
+
+template <typename Component>
+struct get_charm_base_class<Component, Parallel::Algorithms::Singleton> {
+  using type = CBase_AlgorithmSingleton<
+      Component, typename get_array_index<
+                     Parallel::Algorithms::Singleton>::template f<Component>>;
+};
+
+template <typename Component>
+using get_charm_base_class_t =
+    typename get_charm_base_class<Component,
+                                  typename Component::chare_type>::type;
+}  // namespace detail
 /*!
  * \ingroup ParallelGroup
  * \brief A distributed object (Charm++ Chare) that executes a series of Actions
@@ -123,7 +173,8 @@ class AlgorithmImpl;
  * necessary to reproduce the issue.
  */
 template <typename ParallelComponent, typename... PhaseDepActionListsPack>
-class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>> {
+class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
+    : public detail::get_charm_base_class_t<ParallelComponent> {
   static_assert(
       sizeof...(PhaseDepActionListsPack) > 0,
       "Must have at least one phase dependent action list "
@@ -174,6 +225,28 @@ class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>> {
   /// Charm++ migration constructor, used after a chare is migrated
   constexpr explicit AlgorithmImpl(CkMigrateMessage* /*msg*/) noexcept;
 
+  void pup(PUP::er& p) noexcept {
+#ifdef SPECTRE_CHARM_PROJECTIONS
+    p | non_action_time_start_;
+#endif
+    if (performing_action_) {
+      ERROR("cannot serialize while performing action!");
+    }
+    p | performing_action_;
+    p | phase_;
+    p | algorithm_step_;
+    if constexpr (Parallel::is_node_group_proxy<cproxy_type>::value) {
+      p | node_lock_;
+    }
+    p | terminate_;
+    p | box_;
+    p | inboxes_;
+    if constexpr (not std::is_same_v<typename ParallelComponent::chare_type,
+                  Algorithms::Singleton>) {
+      p | array_index_;
+    }
+    p | const_global_cache_;
+  }
   /// \cond
   ~AlgorithmImpl();
 
@@ -400,15 +473,14 @@ AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>::
     : AlgorithmImpl() {
   (void)initialization_items;  // avoid potential compiler warnings if unused
   global_cache_ = global_cache_proxy.ckLocalBranch();
-  box_ = db::create<
-      db::AddSimpleTags<tmpl::flatten<
-          tmpl::list<Tags::GlobalCacheImpl<metavariables>,
+  box_ =
+      db::create<db::AddSimpleTags<tmpl::flatten<tmpl::list<
+                     Tags::GlobalCacheImpl<metavariables>,
                      typename ParallelComponent::initialization_tags>>>,
-      db::AddComputeTags<
-          db::wrap_tags_in<Tags::FromGlobalCache, all_cache_tags>>>(
-      static_cast<const Parallel::GlobalCache<metavariables>*>(
-          global_cache_),
-      std::move(get<InitializationTags>(initialization_items))...);
+                 db::AddComputeTags<
+                     db::wrap_tags_in<Tags::FromGlobalCache, all_cache_tags>>>(
+          global_cache_,
+          std::move(get<InitializationTags>(initialization_items))...);
 }
 
 template <typename ParallelComponent, typename... PhaseDepActionListsPack>

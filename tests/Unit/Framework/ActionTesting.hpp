@@ -704,12 +704,11 @@ class MockDistributedObject {
       Options&&... opts)
       : array_index_(index), global_cache_(cache), inboxes_(inboxes) {
     box_ = detail::ForwardAllOptionsToDataBox<initialization_tags>::apply(
-        db::create<db::AddSimpleTags<
-                       Parallel::Tags::GlobalCacheImpl<metavariables>>,
-                   db::AddComputeTags<db::wrap_tags_in<
-                       Parallel::Tags::FromGlobalCache, all_cache_tags>>>(
-            static_cast<const Parallel::GlobalCache<metavariables>*>(
-                global_cache_)),
+        db::create<
+            db::AddSimpleTags<Parallel::Tags::GlobalCacheImpl<metavariables>>,
+            db::AddComputeTags<db::wrap_tags_in<Parallel::Tags::FromGlobalCache,
+                                                all_cache_tags>>>(
+            global_cache_),
         std::forward<Options>(opts)...);
   }
 

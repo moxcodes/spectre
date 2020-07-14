@@ -248,6 +248,7 @@ Main<Metavariables>::Main(CkArgMsg* msg) noexcept
   global_cache_proxy_ = CProxy_GlobalCache<Metavariables>::ckNew(
       Parallel::create_from_options<Metavariables>(items_from_options,
                                                    const_global_cache_tags{}));
+  const_global_cache_proxy_.set_self_proxy(const_global_cache_proxy_);
 
   tuples::tagged_tuple_from_typelist<parallel_component_tag_list>
       the_parallel_components;
