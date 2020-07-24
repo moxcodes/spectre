@@ -38,6 +38,7 @@
 #include "NumericalAlgorithms/DiscontinuousGalerkin/NumericalFluxes/LocalLaxFriedrichs.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/Tags.hpp"
 #include "Options/Options.hpp"
+#include "Parallel/Actions/CheckForGlobalSync.hpp"
 #include "Parallel/Actions/TerminatePhase.hpp"
 #include "Parallel/InitializationFunctions.hpp"
 #include "Parallel/PhaseDependentActionList.hpp"
@@ -50,6 +51,7 @@
 #include "ParallelAlgorithms/DiscontinuousGalerkin/InitializeMortars.hpp"
 #include "ParallelAlgorithms/Events/ObserveErrorNorms.hpp"
 #include "ParallelAlgorithms/Events/ObserveFields.hpp"
+#include "ParallelAlgorithms/Events/RequestPhase.hpp"
 #include "ParallelAlgorithms/EventsAndTriggers/Actions/RunEventsAndTriggers.hpp"  // IWYU pragma: keep
 #include "ParallelAlgorithms/EventsAndTriggers/Event.hpp"
 #include "ParallelAlgorithms/EventsAndTriggers/EventsAndTriggers.hpp"  // IWYU pragma: keep
@@ -99,6 +101,30 @@ struct EvolutionMetavars {
       dg::Formulation::StrongInertial;
   using temporal_id = Tags::TimeStepId;
   static constexpr bool local_time_stepping = false;
+
+  enum class Phase {
+    Initialization,
+    RegisterWithObserver,
+    LoadBalancing,
+    InitializeTimeStepperHistory,
+    Evolve,
+    Exit
+  };
+
+  static std::string phase_name(const Phase phase) noexcept {
+    switch (phase) {
+      case Phase::LoadBalancing:
+        return "LoadBalancing";
+      case Phase::Evolve:
+        return "Evolve";
+      default:
+        ERROR("No name for given phase");
+    }
+  }
+
+  static void global_startup_routines() noexcept {
+    TurnManualLBOn();
+  }
 
   using initial_data = InitialData;
   static_assert(
@@ -158,8 +184,15 @@ struct EvolutionMetavars {
                           tmpl::list<>>,
       dg::Events::Registrars::ObserveFields<1, Tags::Time, observe_fields,
                                             analytic_solution_fields>,
-      Events::Registrars::ChangeSlabSize<slab_choosers>>>;
+      Events::Registrars::ChangeSlabSize<slab_choosers>,
+      Events::Registrars::RequestPhase<
+          EvolutionMetavars,
+          std::integral_constant<Phase, Phase::LoadBalancing>>,
+      Events::Registrars::RequestPhase<
+          EvolutionMetavars, std::integral_constant<Phase, Phase::Evolve>>>>;
   using triggers = Triggers::time_triggers;
+  using global_sync_triggers = tmpl::list<Triggers::Registrars::EveryNSlabs,
+                                          Triggers::Registrars::SpecifiedSlabs>;
 
   using const_global_cache_tags =
       tmpl::list<initial_data_tag, normal_dot_numerical_flux, time_stepper_tag,
@@ -195,14 +228,6 @@ struct EvolutionMetavars {
       Actions::UpdateU<>, Limiters::Actions::SendData<EvolutionMetavars>,
       Limiters::Actions::Limit<EvolutionMetavars>>>;
 
-  enum class Phase {
-    Initialization,
-    RegisterWithObserver,
-    InitializeTimeStepperHistory,
-    Evolve,
-    Exit
-  };
-
   using initialization_actions = tmpl::list<
       Initialization::Actions::TimeAndTimeStep<EvolutionMetavars>,
       evolution::dg::Initialization::Domain<1>,
@@ -228,35 +253,48 @@ struct EvolutionMetavars {
       Initialization::Actions::Minmod<1>,
       Initialization::Actions::RemoveOptionsAndTerminatePhase>;
 
-  using component_list = tmpl::list<
-      observers::Observer<EvolutionMetavars>,
-      observers::ObserverWriter<EvolutionMetavars>,
-      DgElementArray<
-          EvolutionMetavars,
-          tmpl::list<
-              Parallel::PhaseActions<Phase, Phase::Initialization,
-                                     initialization_actions>,
+  using dg_registration_list =
+      tmpl::list<observers::Actions::RegisterWithObservers<
+          observers::RegisterObservers<Tags::Time, element_observation_type>>>;
 
-              Parallel::PhaseActions<
-                  Phase, Phase::RegisterWithObserver,
-                  tmpl::list<observers::Actions::RegisterWithObservers<
-                                 observers::RegisterObservers<
-                                     Tags::Time, element_observation_type>>,
-                             Parallel::Actions::TerminatePhase>>,
+  using dg_element_array_component = DgElementArray<
+      EvolutionMetavars,
+      tmpl::list<
+          Parallel::PhaseActions<Phase, Phase::Initialization,
+                                 initialization_actions>,
 
-              Parallel::PhaseActions<
-                  Phase, Phase::InitializeTimeStepperHistory,
-                  SelfStart::self_start_procedure<step_actions>>,
+          Parallel::PhaseActions<Phase, Phase::RegisterWithObserver,
+                                 tmpl::list<dg_registration_list,
+                                            Parallel::Actions::TerminatePhase>>,
 
-              Parallel::PhaseActions<
-                  Phase, Phase::Evolve,
-                  tmpl::list<
-                      Actions::RunEventsAndTriggers,
-                      Actions::ChangeSlabSize,
-                      tmpl::conditional_t<
-                          local_time_stepping,
-                          Actions::ChangeStepSize<step_choosers>, tmpl::list<>>,
-                      step_actions, Actions::AdvanceTime>>>>>;
+          Parallel::PhaseActions<Phase, Phase::InitializeTimeStepperHistory,
+                                 SelfStart::self_start_procedure<step_actions>>,
+
+          Parallel::PhaseActions<
+              Phase, Phase::Evolve,
+              tmpl::list<
+                  Actions::RunEventsAndTriggers, Actions::ChangeSlabSize,
+                  tmpl::conditional_t<local_time_stepping,
+                                      Actions::ChangeStepSize<step_choosers>,
+                                      tmpl::list<>>,
+                  step_actions,
+                  Parallel::Actions::CheckForGlobalSync<EvolutionMetavars>,
+                  Actions::AdvanceTime>>>>;
+
+  template <typename component>
+  struct registration_list {
+    using type = tmpl::list<>;
+  };
+
+  template <>
+  struct registration_list<dg_element_array_component> {
+    using type = dg_registration_list;
+  };
+
+  using component_list =
+      tmpl::list<observers::Observer<EvolutionMetavars>,
+                 observers::ObserverWriter<EvolutionMetavars>,
+                 dg_element_array_component>;
 
   static constexpr OptionString help{
       "Evolve the Burgers equation.\n\n"
@@ -302,6 +340,8 @@ static const std::vector<void (*)()> charm_init_node_funcs{
     &Parallel::register_derived_classes_with_charm<StepController>,
     &Parallel::register_derived_classes_with_charm<TimeStepper>,
     &Parallel::register_derived_classes_with_charm<
-        Trigger<metavariables::triggers>>};
+        Trigger<metavariables::triggers>>,
+    &Parallel::register_derived_classes_with_charm<
+        Trigger<metavariables::global_sync_triggers>>};
 static const std::vector<void (*)()> charm_init_proc_funcs{
     &enable_floating_point_exceptions};

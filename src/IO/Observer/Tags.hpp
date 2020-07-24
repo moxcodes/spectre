@@ -78,7 +78,7 @@ struct ReductionDataNames : db::SimpleTag {
 /// The key of the map is the `observation_type_hash` of the `ObservationId`.
 /// The set contains all the processing elements it has registered on.
 struct VolumeObserversRegistered : db::SimpleTag {
-  using type = std::unordered_map<size_t, std::set<size_t>>;
+  using type = std::unordered_map<size_t, std::unordered_map<size_t, size_t>>;
 };
 
 /// The number of observer components that have contributed data at the
@@ -97,14 +97,14 @@ struct VolumeObserversContributed : db::SimpleTag {
 /// Observer group will call the local ObserverWriter nodegroup during
 /// a reduction.
 struct ReductionObserversRegistered : db::SimpleTag {
-  using type = std::unordered_map<size_t, std::set<size_t>>;
+  using type = std::unordered_map<size_t, std::unordered_map<size_t, size_t>>;
 };
 
 /// The number of ObserverWriter nodegroups that have registered.
 /// The key of the map is the `observation_type_hash` of the `ObservationId`.
 /// The set contains all the nodes that have been registered.
 struct ReductionObserversRegisteredNodes : db::SimpleTag {
-  using type = std::unordered_map<size_t, std::set<size_t>>;
+  using type = std::unordered_map<size_t, std::unordered_map<size_t, size_t>>;
 };
 
 /// The number of observer components that have contributed data at the

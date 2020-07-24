@@ -33,6 +33,11 @@ struct Observer {
   using initialization_tags = Parallel::get_initialization_tags<
       Parallel::get_initialization_actions_list<phase_dependent_action_list>>;
 
+  template <typename DbTagList, typename ArrayIndex>
+  static void pup(PUP::er& /*p*/, db::DataBox<DbTagList>& /*box*/,
+                  Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
+                  const ArrayIndex& /*array_index*/) noexcept {}
+
   static void execute_next_phase(
       const typename Metavariables::Phase /*next_phase*/,
       Parallel::CProxy_ConstGlobalCache<
@@ -55,6 +60,11 @@ struct ObserverWriter {
       tmpl::list<Actions::InitializeWriter<Metavariables>>>>;
   using initialization_tags = Parallel::get_initialization_tags<
       Parallel::get_initialization_actions_list<phase_dependent_action_list>>;
+
+  template <typename DbTagList, typename ArrayIndex>
+  static void pup(PUP::er& /*p*/, db::DataBox<DbTagList>& /*box*/,
+                  Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
+                  const ArrayIndex& /*array_index*/) noexcept {}
 
   static void execute_next_phase(
       const typename Metavariables::Phase /*next_phase*/,

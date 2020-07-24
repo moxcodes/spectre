@@ -53,7 +53,7 @@ class Not : public Trigger<TriggerRegistrars> {
   using argument_tags = tmpl::list<Tags::DataBox>;
 
   template <typename DbTags>
-  bool operator()(const db::DataBox<DbTags>& box) noexcept {
+  bool operator()(const db::DataBox<DbTags>& box) const noexcept {
     return not negated_trigger_->is_triggered(box);
   }
 
@@ -89,7 +89,7 @@ class And : public Trigger<TriggerRegistrars> {
   using argument_tags = tmpl::list<Tags::DataBox>;
 
   template <typename DbTags>
-  bool operator()(const db::DataBox<DbTags>& box) noexcept {
+  bool operator()(const db::DataBox<DbTags>& box) const noexcept {
     for (auto& trigger : combined_triggers_) {
       if (not trigger->is_triggered(box)) {
         return false;
@@ -130,7 +130,7 @@ class Or : public Trigger<TriggerRegistrars> {
   using argument_tags = tmpl::list<Tags::DataBox>;
 
   template <typename DbTags>
-  bool operator()(const db::DataBox<DbTags>& box) noexcept {
+  bool operator()(const db::DataBox<DbTags>& box) const noexcept {
     for (auto& trigger : combined_triggers_) {
       if (trigger->is_triggered(box)) {
         return true;

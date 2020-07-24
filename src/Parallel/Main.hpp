@@ -391,6 +391,22 @@ void Main<Metavariables>::
                        this->thisProxy));
 }
 
+namespace detail {
+template <typename Metavariables, typename phase_constant = std::void_t<>>
+struct has_load_balancing_phase_impl : std::false_type {};
+
+template <typename Metavariables>
+struct has_load_balancing_phase_impl<
+    Metavariables,
+    std::void_t<std::integral_constant<typename Metavariables::Phase,
+                                       Metavariables::Phase::LoadBalancing>>>
+    : std::true_type {};
+
+template <typename Metavariables>
+constexpr bool has_load_balancing_phase =
+    has_load_balancing_phase_impl<Metavariables>::value;
+}  // namespace detail
+
 template <typename Metavariables>
 void Main<Metavariables>::execute_next_phase() noexcept {
   if (not static_cast<bool>(phase_to_resume_after_sync_phases_)) {
@@ -411,6 +427,14 @@ void Main<Metavariables>::execute_next_phase() noexcept {
   if (Metavariables::Phase::Exit == current_phase_) {
     Informer::print_exit_info();
     Parallel::exit();
+  }
+  if constexpr (detail::has_load_balancing_phase<Metavariables>) {
+    if (Metavariables::Phase::LoadBalancing == current_phase_) {
+      CkStartLB();
+      CkStartQD(CkCallback(CkIndex_Main<Metavariables>::execute_next_phase(),
+                           this->thisProxy));
+      return;
+    }
   }
   tmpl::for_each<component_list>([this](auto parallel_component) noexcept {
     tmpl::type_from<decltype(parallel_component)>::execute_next_phase(

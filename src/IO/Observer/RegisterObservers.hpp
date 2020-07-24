@@ -14,7 +14,9 @@ namespace observers {
 template <typename ObservationValueTag, typename ObsType>
 struct RegisterObservers {
   template <typename ParallelComponent, typename DbTagsList,
-            typename ArrayIndex>
+            typename ArrayIndex,
+            Requires<tmpl::list_contains_v<DbTagsList, ObservationValueTag>> =
+                nullptr>
   static std::pair<observers::TypeOfObservation, observers::ObservationId>
   register_info(const db::DataBox<DbTagsList>& box,
                 const ArrayIndex& /*array_index*/) noexcept {
@@ -22,6 +24,16 @@ struct RegisterObservers {
         observers::TypeOfObservation::ReductionAndVolume,
         observers::ObservationId{
             static_cast<double>(db::get<ObservationValueTag>(box)), ObsType{}}};
+  }
+
+  template <
+      typename ParallelComponent, typename DbTagsList, typename ArrayIndex,
+      Requires<not tmpl::list_contains_v<DbTagsList, ObservationValueTag>> =
+          nullptr>
+  static std::pair<observers::TypeOfObservation, observers::ObservationId>
+  register_info(const db::DataBox<DbTagsList>& /*box*/,
+                const ArrayIndex& /*array_index*/) noexcept {
+    ERROR("Observation id not found in box");
   }
 };
 }  // namespace observers

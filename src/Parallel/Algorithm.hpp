@@ -169,6 +169,35 @@ template <typename Metavariables>
 constexpr bool has_required_phase_sync_function =
     has_required_phase_sync_function_impl<Metavariables>::value;
 
+// for checking whether a class defines a pup function
+template <typename ParallelComponent, typename check = std::void_t<>>
+struct has_pup_function_impl : std::false_type {};
+
+template <typename ParallelComponent>
+struct has_pup_function_impl<ParallelComponent,
+                             std::void_t<decltype(&ParallelComponent::pup)>>
+    : std::true_type {};
+
+template <typename ParallelComponent>
+constexpr bool has_pup_function =
+    has_pup_function_impl<ParallelComponent>::value;
+
+// for checking that iterable action has the correct return type
+template <typename ParallelComponentType, typename ActionType,
+          typename GeneralType>
+struct check_iterable_action_return_type : std::false_type {};
+
+
+template <typename Metavariables>
+struct has_required_phase_sync_function_impl<
+    Metavariables,
+    std::void_t<decltype(&Metavariables::is_required_sync_phase)>>
+    : std::true_type {};
+
+template <typename Metavariables>
+constexpr bool has_required_phase_sync_function =
+    has_required_phase_sync_function_impl<Metavariables>::value;
+
 // for checking the DataBox return of an iterable action
 template <typename FirstIterableActionType>
 struct check_iterable_action_first_return_type : std::false_type {};
@@ -359,6 +388,7 @@ class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
       p | array_index_;
     }
     p | const_global_cache_;
+    invoke_component_pup_with_current_box(p, box_);
   }
   /// \cond
   ~AlgorithmImpl() override;
@@ -525,6 +555,29 @@ class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
   }
 
  private:
+  template <typename ThisVariant, typename... Variants, typename... Args>
+  void invoke_component_pup_with_current_box_impl(
+      PUP::er& p, boost::variant<Variants...>& box,
+      const gsl::not_null<int*> iter,
+      const gsl::not_null<bool*> already_visited) noexcept {
+    if (box.which() == *iter and not *already_visited) {
+      ParallelComponent::pup(p, boost::get<ThisVariant>(box),
+                             *const_global_cache_, array_index_);
+      *already_visited = true;
+    }
+    ++(*iter);
+  }
+
+  template <typename... Variants, typename... Args>
+  void invoke_component_pup_with_current_box(
+      PUP::er& p, boost::variant<Variants...>& box) noexcept {
+    int iter = 0;
+    bool already_visited = false;
+    EXPAND_PACK_LEFT_TO_RIGHT(
+        invoke_component_pup_with_current_box_impl<Variants>(p, box, &iter,
+                                                             &already_visited));
+  }
+
   static constexpr bool is_singleton =
       std::is_same_v<chare_type, Parallel::Algorithms::Singleton>;
 
@@ -716,6 +769,7 @@ AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>::
                       initialization_items) noexcept
     : AlgorithmImpl() {
   (void)initialization_items;  // avoid potential compiler warnings if unused
+  metavariables::global_startup_routines();
   const_global_cache_ = global_cache_proxy.ckLocalBranch();
   box_ = db::create<
       db::AddSimpleTags<tmpl::flatten<

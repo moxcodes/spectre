@@ -254,13 +254,14 @@ struct IncrementInt0 {
 struct RemoveInt0 {
   template <typename DbTags, typename... InboxTags, typename Metavariables,
             typename ArrayIndex, typename ActionList,
-            typename ParallelComponent>
-  static auto apply(db::DataBox<DbTags>& box,
-                    tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
-                    const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
-                    const ArrayIndex& /*array_index*/,
-                    const ActionList /*meta*/,
-                    const ParallelComponent* const /*meta*/) noexcept {
+            typename ParallelComponent,
+            Requires<tmpl::list_contains_v<DbTags, Tags::Int0>> = nullptr>
+      > static auto apply(
+            db::DataBox<DbTags>& box,
+            tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
+            const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
+            const ArrayIndex& /*array_index*/, const ActionList /*meta*/,
+            const ParallelComponent* const /*meta*/) noexcept {
     static_assert(std::is_same_v<ParallelComponent,
                                  ArrayParallelComponent<TestMetavariables>>,
                   "The ParallelComponent is not deduced to be the right type");

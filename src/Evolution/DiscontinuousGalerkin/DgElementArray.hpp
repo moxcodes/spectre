@@ -111,6 +111,32 @@ struct DgElementArray {
       Parallel::get_initialization_actions_list<phase_dependent_action_list>,
       array_allocation_tags>;
 
+  template <typename DbTagList, typename ArrayIndex>
+  static void pup(PUP::er& p, db::DataBox<DbTagList>& box,
+                  Parallel::ConstGlobalCache<Metavariables>& cache,
+                  const ArrayIndex& array_index) noexcept {
+    // this does not actually insert anything into the PUP::er stream, so
+    // nothing is done on a sizing pup.
+    if(p.isPacking()) {
+      tmpl::for_each<typename Metavariables::template registration_list<
+          DgElementArray>::type>(
+          [&box, &cache, &array_index](auto registration_v) noexcept {
+            using registration = typename decltype(registration_v)::type;
+            registration::template perform_deregistration<DgElementArray>(
+                box, cache, array_index);
+          });
+    }
+    if(p.isUnpacking()) {
+      tmpl::for_each<typename Metavariables::template registration_list<
+          DgElementArray>::type>(
+          [&box, &cache, &array_index](auto registration_v) noexcept {
+            using registration = typename decltype(registration_v)::type;
+            registration::template perform_registration<DgElementArray>(
+                box, cache, array_index);
+          });
+    }
+  }
+
   static void allocate_array(
       Parallel::CProxy_ConstGlobalCache<Metavariables>& global_cache,
       const tuples::tagged_tuple_from_typelist<initialization_tags>&
