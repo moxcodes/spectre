@@ -3,8 +3,6 @@
 
 #pragma once
 
-#include "Evolution/Systems/Cce/Initialize/GeneratePsi0.hpp"
-
 #include <cstddef>
 #include <memory>
 #include <string>

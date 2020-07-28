@@ -87,7 +87,7 @@ struct NoIncomingRadiation : InitializeJ {
       const Scalar<SpinWeighted<ComplexDataVector, 0>>& r, size_t l_max,
       size_t number_of_radial_points) const noexcept override;
 
-  void pup(PUP::er& p) noexcept override;
+  void pup(PUP::er& /*p*/) noexcept override;
 
  private:
   bool require_convergence_ = false;
