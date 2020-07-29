@@ -6,6 +6,8 @@
 #include <charm++.h>
 #include <type_traits>
 
+#include "ErrorHandling/Assert.hpp"
+
 namespace Parallel {
 /*!
  * \ingroup ParallelGroup

@@ -36,6 +36,7 @@ add_algorithm_test(Test_AlgorithmBadBoxApply)
 add_algorithm_test(Test_AlgorithmNestedApply1)
 add_algorithm_test(Test_AlgorithmNestedApply2)
 add_algorithm_test(Test_AlgorithmParallel)
+add_algorithm_test(Test_AlgorithmPhaseControl)
 add_algorithm_test(Test_AlgorithmNodelock)
 add_algorithm_test(Test_AlgorithmReduction)
 
