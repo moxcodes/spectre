@@ -51,6 +51,9 @@ def create_interface_file(args):
                             "\n" \
               "    entry void start_phase(\n" \
               "         typename ParallelComponent::metavariables::Phase);\n" \
+                            "\n" \
+              "    entry void request_sync_phase(\n" \
+              "         typename ParallelComponent::metavariables::Phase);\n" \
               "\n" % (args['algorithm_name'], args['algorithm_name'])
 
     if args['algorithm_type'] == "nodegroup":
@@ -141,6 +144,16 @@ def create_header_file(args):
         "  using Parallel::AlgorithmImpl<ParallelComponent,\n" \
         "    typename ParallelComponent::phase_dependent_action_list\n" \
         "                  >::AlgorithmImpl;\n" \
+        "\n" \
+        "  explicit Algorithm%s(CkMigrateMessage* /*message*/) noexcept : \n"\
+        "    Parallel::AlgorithmImpl<ParallelComponent,\n"\
+        "    typename ParallelComponent::phase_dependent_action_list>{} {}\n"\
+        "\n" \
+        "  void pup(PUP::er& p) noexcept override {  // NOLINT \n"\
+        "Parallel::AlgorithmImpl<ParallelComponent,\n"\
+        "    typename ParallelComponent::phase_dependent_action_list>"\
+        "::pup(p);\n"\
+        "  }\n"\
         "};\n\n" % (args['algorithm_name'],
                     args['algorithm_name'], args['algorithm_name'])
     # Write include of the def file, but including only the template definitions

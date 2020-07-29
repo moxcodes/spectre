@@ -4,6 +4,7 @@
 module GlobalCache {
   include "Parallel/ParallelComponentHelpers.hpp";
   include "Utilities/TaggedTuple.hpp";
+  include "Parallel/Main.decl.h";
   namespace Parallel {
 
   template <typename Metavariables>
@@ -18,6 +19,9 @@ module GlobalCache {
                        tmpl::bind<Parallel::proxy_from_parallel_component,
                                   tmpl::_1>>>>,
         const CkCallback&);
+    entry void set_self_proxy(
+        const CProxy_ConstGlobalCache<Metavariables>& self_proxy);
+    entry void set_main_proxy(const CProxy_Main<Metavariables>& main_proxy);
   }
   }
 }

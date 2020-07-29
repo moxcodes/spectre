@@ -19,6 +19,7 @@
 #include "Utilities/TypeTraits/IsA.hpp"
 
 #include "Parallel/GlobalCache.decl.h"
+#include "Parallel/Main.decl.h"
 
 namespace Parallel {
 
@@ -141,6 +142,8 @@ class GlobalCache : public CBase_GlobalCache<Metavariables> {
           tmpl::bind<Parallel::proxy_from_parallel_component, tmpl::_1>>>;
 
  public:
+  using self_proxy_type = CProxy_ConstGlobalCache<Metavariables>;
+  using main_proxy_type = CProxy_Main<Metavariables>;
   /// Access to the Metavariables template parameter
   using metavariables = Metavariables;
   /// Typelist of the ParallelComponents stored in the GlobalCache
@@ -168,6 +171,24 @@ class GlobalCache : public CBase_GlobalCache<Metavariables> {
       tuples::tagged_tuple_from_typelist<parallel_component_tag_list>&&
           parallel_components,
       const CkCallback& callback) noexcept;
+
+  /// Entry method to set the proxy to the const global cache itself (needed to
+  /// serialize the pointers to the const global cache kept in the \ref
+  /// DataBoxGroup and `Parallel::AlgorithmImpl`). This should be only called
+  /// once.
+  void set_self_proxy(const self_proxy_type& self_proxy) noexcept;
+
+  /// Retrieve the proxy to the const global cache or errors if not using charm
+  /// proxies.
+  boost::optional<self_proxy_type> get_self_proxy() noexcept;
+
+  /// Entry method to set the proxy to the Main chare. This should be only
+  /// called once.
+  void set_main_proxy(const main_proxy_type& main_proxy) noexcept;
+
+  /// Retrieve the proxy to the Main chare (or boost::none if the proxy has not
+  /// been set).
+  boost::optional<main_proxy_type> get_main_proxy() noexcept;
 
  private:
   // clang-tidy: false positive, redundant declaration
@@ -197,6 +218,8 @@ class GlobalCache : public CBase_GlobalCache<Metavariables> {
   tuples::tagged_tuple_from_typelist<parallel_component_tag_list>
       parallel_components_{};
   bool parallel_components_have_been_set_{false};
+  boost::optional<self_proxy_type> self_proxy_;
+  boost::optional<main_proxy_type> main_proxy_;
 };
 
 template <typename Metavariables>
@@ -209,6 +232,40 @@ void GlobalCache<Metavariables>::set_parallel_components(
   parallel_components_ = std::move(parallel_components);
   parallel_components_have_been_set_ = true;
   this->contribute(callback);
+}
+
+template <typename Metavariables>
+void ConstGlobalCache<Metavariables>::set_self_proxy(
+    const self_proxy_type& self_proxy) noexcept {
+  if (not static_cast<bool>(self_proxy_)) {
+    self_proxy_ = self_proxy;
+  } else {
+    ERROR("The self proxy has already been set, and cannot be set twice.");
+  }
+}
+
+template <typename Metavariables>
+boost::optional<
+    typename Parallel::ConstGlobalCache<Metavariables>::self_proxy_type>
+ConstGlobalCache<Metavariables>::get_self_proxy() noexcept {
+  return self_proxy_;
+}
+
+template <typename Metavariables>
+void ConstGlobalCache<Metavariables>::set_main_proxy(
+    const main_proxy_type& main_proxy) noexcept {
+  if (not static_cast<bool>(main_proxy_)) {
+    main_proxy_ = main_proxy;
+  } else {
+    ERROR("The main proxy has already been set, and cannot be set twice.");
+  }
+}
+
+template <typename Metavariables>
+boost::optional<
+    typename Parallel::ConstGlobalCache<Metavariables>::main_proxy_type>
+ConstGlobalCache<Metavariables>::get_main_proxy() noexcept {
+  return main_proxy_;
 }
 
 // @{

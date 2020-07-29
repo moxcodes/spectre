@@ -7,6 +7,7 @@
 #include <type_traits>
 
 #include "Utilities/TypeTraits/IsA.hpp"
+#include "ErrorHandling/Assert.hpp"
 
 namespace Parallel {
 /*!
