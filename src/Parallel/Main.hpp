@@ -66,8 +66,14 @@ class Main : public CBase_Main<Metavariables> {
   /// initialization phase on each component
   void allocate_array_components_and_execute_initialization_phase() noexcept;
 
-  /// Determine the next phase of the simulation and execute it.
+  /// Determine the next phase of the simulation and execute it. The earliest
+  /// next requested phase will be run.
   void execute_next_phase() noexcept;
+
+  /// Request a phase for future execution during global syncs.
+  void request_next_phase(
+      const std::unordered_set<typename Metavariables::Phase>&
+          phase_request) noexcept;
 
  private:
   template <typename ParallelComponent>
@@ -87,6 +93,8 @@ class Main : public CBase_Main<Metavariables> {
       Metavariables::Phase::Initialization};
 
   CProxy_ConstGlobalCache<Metavariables> const_global_cache_proxy_;
+  std::set<typename Metavariables::Phase> requested_phases_;
+  boost::optional<typename Metavariables::Phase> return_phase_;
   Options<option_list> options_;
 };
 
@@ -384,8 +392,18 @@ void Main<Metavariables>::
 
 template <typename Metavariables>
 void Main<Metavariables>::execute_next_phase() noexcept {
-  current_phase_ = Metavariables::determine_next_phase(
-      current_phase_, const_global_cache_proxy_);
+  if (requested_phases_.empty() and not static_cast<bool>(return_phase_)) {
+    current_phase_ = Metavariables::determine_next_phase(
+        current_phase_, const_global_cache_proxy_);
+  } else if (not requested_phases_.empty()) {
+    // when selecting a next phase, we prioritize those that appear earlier in
+    // the enum specification (lower values when treated as integers).
+    current_phase_ = *(requested_phases_.begin());
+    requested_phases_.erase(requested_phases_.begin());
+  } else {
+    current_phase_ = *return_phase_;
+    return_phase_ = boost::none;
+  }
   if (Metavariables::Phase::Exit == current_phase_) {
     Informer::print_exit_info();
     Parallel::exit();
@@ -396,6 +414,14 @@ void Main<Metavariables>::execute_next_phase() noexcept {
   });
   CkStartQD(CkCallback(CkIndex_Main<Metavariables>::execute_next_phase(),
                        this->thisProxy));
+}
+
+template <typename Metavariables>
+void Main<Metavariables>::request_next_phase(
+    const std::unordered_set<typename Metavariables::Phase>&
+        phase_request) noexcept {
+  requested_phases_.insert(phase_request.begin(), phase_request.end());
+  return_phase_ = current_phase_;
 }
 
 }  // namespace Parallel
