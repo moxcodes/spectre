@@ -32,8 +32,16 @@ namespace Cce {
 namespace InitializeJ {
 
 void read_in_worldtube_data(
+    const gsl::not_null<
+    std::vector<SpinWeighted<ComplexDataVector, 2>>*> j_container,
+    const gsl::not_null<
+    std::vector<SpinWeighted<ComplexDataVector, 2>>*> dr_j_container,
+    const gsl::not_null<
+    std::vector<SpinWeighted<ComplexDataVector, 0>>*> r_container,
+    const gsl::not_null<size_t*> l_max,
     const string files,
-    const double t0) noexcept {
+    const int target_idx,
+    const double target_time) noexcept {
 
   //read in j, dr_j, and r from worldtubes
   Variables<tmpl::list<
@@ -58,69 +66,114 @@ void read_in_worldtube_data(
   auto& r =
     get(get<::Tags::SpinWeighted<::Tags::TempScalar<2, ComplexModalVector>,
         std::integral_constant<int, 0>>>(computation_buffers));
+
+  ReducedSpecWorldtubeH5BuggerUpdater target_buffer_updater{files[target_idx]};
+  const double target_radius = target_buffer_updater.get_extraction_radius();
   for(filename in files) {
     ReducedSpecWorldtubeH5BufferUpdater buffer_updater{filename};
-    size_t l_max = buffer_updater.get_extraction_radius();
-    //get(*j).data() = buffer_updater
+    l_max = buffer_updater.get_l_max();
+    const size_t number_of_angular_points =
+        Spectral::Swsh::number_of_swsh_collocation_points(l_max);
+
+    ReducedWorldtubeDataManager DataManager{
+        buffer_updater, l_max, 100,
+        intrp::BarycentricRationalSpanInterpolator interpolator{10_st, 10_st}};
+    Variables<Tags::characteristic_worldtube_boundary_tags<Tags::BoundaryValue>>
+        variables{number_of_angular_points};
+    const double ext_radius = buffer_updater.get_extraction_radius()
+    const double corrected_time = (ext_radius - target_radius) + target_time;
+    DataManager.populate_hypersurface_boundary_data(
+        make_not_null(&variables), corrected_time);
+
+    get(*j).data() = get<Tags::BondiJ>(variables);
+    get(*dr_j).data() = get<Tags::BondiDrJ>(variables);
+    get(*r).data() = get<Tags::BondiR>(variables);
+
+    //convert the j to libsharp convention
+    SpinWeighted<ComplexModalVector, 2> target_j_transform{
+        Spectral::Swsh::size_of_libsharp_coefficient_vector(l_max)};
+    Spectral::Swsh::goldberg_to_libsharp_modes(
+        make_not_null(&target_j_transform), get(j), l_max);
+    SpinWeighted<ComplexDataVector, 2> target_j =
+        Spectral::Swsh::inverse_swsh_transform(
+            l_max, 1, target_j_transform);
+    //convert the dr_j to libsharp convention
+    SpinWeighted<ComplexModalVector, 2> target_dr_j_transform{
+        Spectral::Swsh::size_of_libsharp_coefficient_vector(l_max)};
+    Spectral::Swsh::goldberg_to_libsharp_modes(
+        make_not_null(&target_dr_j_transform), get(dr_bondi_j), l_max);
+    SpinWeighted<ComplexDataVector, 2> target_dr_j =
+        Spectral::Swsh::inverse_swsh_transform(
+            l_max, 1, target_dr_j_transform);
+    //convert r to libsharp convention
+    SpinWeighted<ComplexModalVector, 0> target_r_transform{
+        Spectral::Swsh::size_of_libsharp_coefficient_vector(l_max)};
+    Spectral::Swsh::goldberg_to_libsharp_modes(
+        make_not_null(&target_r_transform),get(bondi_r), l_max);
+    SpinWeighted<ComplexDataVector, 0> target_r =
+        Spectral::Swsh::inverse_swsh_transform(
+            l_max, number_of_radial_points, target_r_transform);
+
+    //fill the containers of the complex data vectors
+    j_container.push_back(target_j);
+    dr_j_container.push_back(target_dr_j);
+    r_container.push_back(target_r);
   }
 }
 
 void second_derivative_of_j_from_worldtubes(
     const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> dr_dr_j,
-    const Scalar<SpinWeighted<ComplexModalVector, 2>>& bondi_j,
-    const Scalar<SpinWeighted<ComplexModalVector, 2>>& dr_bondi_j,
-    const Scalar<SpinWeighted<ComplexModalVector, 0>>& bondi_r,
+    std::vector<SpinWeighted<ComplexDataVector, 2>>& j,
+    std::vector<SpinWeighted<ComplexDataVector, 2>>& dr_j,
+    std::vector<SpinWeighted<ComplexDataVector, 0>>& r,
     const size_t l_max) noexcept {
 
-  const size_t number_of_angular_points =
-    Spectral::Swsh::number_of_swsh_collocation_points(l_max);
-
-  //convert the dr_j to libsharp convention
-  SpinWeighted<ComplexModalVector, 2> target_dr_j_transform{
-      Spectral::Swsh::size_of_libsharp_coefficient_vector(l_max)};
-  Spectral::Swsh::goldberg_to_libsharp_modes(
-      make_not_null(&target_dr_j_transform), get(dr_bondi_j), l_max);
-  SpinWeighted<ComplexDataVector, 2> target_dr_j =
-    Spectral::Swsh::inverse_swsh_transform(
-      l_max, 1, target_dr_j_transform);
-  //convert r to libsharp convention
-  SpinWeighted<ComplexModalVector, 0> target_r_transform{
-      Spectral::Swsh::size_of_libsharp_coefficient_vector(l_max)};
-  Spectral::Swsh::goldberg_to_libsharp_modes(
-      make_not_null(&target_r_transform),get(bondi_r), l_max);
-  SpinWeighted<ComplexDataVector, 0> target_r =
-    Spectral::Swsh::inverse_swsh_transform(
-      l_max, number_of_radial_points, target_r_transform);
-  //transpose inputs
-  ComplexDataVector dr_bondi_j_transpose = trans(dr_bondi_j.data());
-  ComplexDataVector bondi_r_tranpose = trans(bondi_r.data());
-
-  for (const auto& libsharp_mode :
+  get(*dr_dr_j).data() = trans(get(*dr_dr_j).data());
+  for (const auto& mode :
          Spectral::Swsh::cached_coefficients_metadata(l_max)) {
-    //???
+    std::vector<double> dr_j_values_re;
+    std::vector<double> r_values_re;
+    std::vector<double> dr_j_values_im;
+    std::vector<double> r_values_im;
+
+    //tranpose the variables to cluster radii together
+    //and evaluate at the relevant libsharp mode (real part and imag part)
+    //this can't be the right way to do this...
+    for (int i=0; i<j.size(); i++) {
+      dr_j_values_re.push_back(
+         trans(dr_j[i].data()).data()[mode.transform_of_real_part_offset]);
+      r_values_re.push_back(
+         trans(r[i].data()).data()[mode.transform_of_real_part_offset]);
+      dr_j_values_im.push_back(
+         trans(dr_j[i].data()).data()[mode.transform_of_imag_part_offset]);
+      r_values_im.push_back(
+         trans(r[i].data()).data()[mode.transform_of_imag_part_offset]);
+    }
+    gsl::span<const std::complex<double>> span_dr_j_re(
+       dr_j_values_re, dr_j.size());
+    gsl::span<const std::complex<double>> span_dr_j_im(
+       dr_j_values_im, dr_j.size());
+    gsl::span<const double> span_r_re(r_values_re, r.size());
+    gsl::span<const double> span_r_im(r_values_im, r.size());
+
+    intrp::BarycentricRationalSpanInterpolator interpolator{10_st, 10_st};
+    //what should the target_points be? just the same points?
+    auto derivative(double function) {
+      return [=](double r) {return boost::math::differentiation::
+          finite_difference_derivative(function, r); };
+    }
+    //i guess we still need to evaluate at the target radius?
+    //worried i'm just making a mess of things...
+    auto dr_dr_j_value_re = derivative(
+      interpolator.interpolate(span_dr_j_re, span_r_re, span_re.data()));
+    auto dr_dr_j_value_im = derivative(
+      interpolator.interpolate(span_dr_j_im, span_r_im, span_im.data()));
+    get(*dr_dr_j).data()[mode.transform_of_real_part_offset] = dr_dr_j_value_re;
+    get(*dr_dr_j).data()[mode.transform_of_imag_part_offset] = dr_dr_j_value_im;
   }
-  //use BarycentricRationalSpanInterpolator to do interpolation
-  intrp::BarycentricRationalSpanInterpolator interpolator{10_st, 10_st};
-  const auto dr_j_interpolated = interpolator.interpolate(
-      gsl::span<const double>(bondi_r.data(), bondi_r.size()),
-      gsl::span<const std::complex<double>>(
-      dr_bondi_j.data(), dr_bondi_j.size()),
-      *bondi_r.data());
-  dr_dr_j = boost::math::differentiation::
-      finite_difference_derivative(dr_j_interpolated, bondi_r.data());
+  //transpose back
+  get(*dr_dr_j).data() = trans(get(*dr_dr_j).data());
 }
-
-void first_derivative_of_beta(
-    const ComplexDataVector& bondi_j,
-    const ComplexDataVector& dr_bondi_j,
-    const DataVector& bondi_r) noexcept {}
-
-void compute_psi0(
-    const ComplexDataVector& bondi_j,
-    const ComplexDataVector& dr_bondi_j,
-    const ComplexDataVector& dr_dr_bondi_j,
-    const ComplexDataVector& dr_beta,
-    const DataVector& bondi_r) noexcept {}
 
 std::unique_ptr<InitializeJ> GeneratePsi0::get_clone() const noexcept {
   return std::make_unique<GeneratePsi0>();
@@ -128,17 +181,20 @@ std::unique_ptr<InitializeJ> GeneratePsi0::get_clone() const noexcept {
 
 void GeneratePsi0::operator()(
     const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> j,
-    const gsl::not_null<tnsr::i<DataVector, 3>*> cartesian_cauchy_coordinates,
-    const gsl::not_null<
-        tnsr::i<DataVector, 2, ::Frame::Spherical<::Frame::Inertial>>*>
-        angular_cauchy_coordinates,
-    const size_t l_max,
-    const size_t number_of_concentric_worldtubes) const noexcept {
+    const string files,
+    const int target_idx,
+    const double target_time) const noexcept {
 
-  read_in_worldtube_data()
+  std::vector<SpinWeighted<ComplexDataVector, 2>>& j_container;
+  std::vector<SpinWeighted<ComplexDataVector, 2>>& dr_j_container;
+  std::vector<SpinWeighted<ComplexDataVector, 0>>& r_container;
+  read_in_worldtube_data(j_container, dr_j_container, r_container, l_max,
+                         files, target_idx, target_time);
 
-    second_derivative_of_j_from_worldtubes()
-  }
+  const Scalar<SpinWeighted<ComplexDataVector, 2>>*> dr_dr_j;
+  second_derivative_of_j_from_worldtubes(
+      dr_dr_j, dr_j_container, r_container, l_max);
+}
 
 void GeneratePsi0::pup(PUP::er& /*p*/) noexcept {}
 
