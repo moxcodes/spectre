@@ -182,23 +182,10 @@ template <typename ParallelComponent>
 constexpr bool has_pup_function =
     has_pup_function_impl<ParallelComponent>::value;
 
-// for checking that iterable action has the correct return type
-template <typename ParallelComponentType, typename ActionType,
-          typename GeneralType>
-struct check_iterable_action_return_type : std::false_type {};
-
-
-template <typename Metavariables>
-struct has_required_phase_sync_function_impl<
-    Metavariables,
-    std::void_t<decltype(&Metavariables::is_required_sync_phase)>>
-    : std::true_type {};
-
-template <typename Metavariables>
-constexpr bool has_required_phase_sync_function =
-    has_required_phase_sync_function_impl<Metavariables>::value;
-
-// for checking the DataBox return of an iterable action
+// for checking that iterable action has the correct return type. The second
+// template parameter is unused, but required to be passed so that the generated
+// template error from a failing static_assert displays the action for which the
+// return type is invalid.
 template <typename FirstIterableActionType>
 struct check_iterable_action_first_return_type : std::false_type {};
 
@@ -210,10 +197,7 @@ template <typename TypeList>
 struct check_iterable_action_first_return_type<db::DataBox<TypeList>&&>
     : std::true_type {};
 
-// for checking that iterable action has the correct return type. The second
-// template parameter is unused, but required to be passed so that the generated
-// template error from a failing static_assert displays the action for which the
-// return type is invalid.
+// for checking that iterable action has the correct return type
 template <typename ParallelComponentType, typename ActionType,
           typename GeneralType>
 struct check_iterable_action_return_type : std::false_type {};
@@ -505,7 +489,6 @@ class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
             << static_cast<int>(previous_phase)
             << " and the next phase is: " << static_cast<int>(next_phase));
       }
-
       if (static_cast<bool>(phase_to_resume_after_sync_phases_) and
           phase_ == *phase_to_resume_after_sync_phases_) {
         phase_to_resume_after_sync_phases_ = boost::none;
@@ -536,9 +519,7 @@ class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
   }
 
   /// Check if an algorithm should continue being evaluated
-  constexpr bool get_terminate() const noexcept {
-    return terminate_;
-  }
+  constexpr bool get_terminate() const noexcept { return terminate_; }
 
   /// Tell the algorithm that on the next designated 'global sync', it should
   /// include `phase` in the collection of phases it requests from the Main

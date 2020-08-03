@@ -141,17 +141,17 @@ Main<Metavariables>::Main(CkArgMsg* msg) noexcept
             -> std::void_t<decltype(
                 tmpl::type_from<decltype(mv)>::input_file)> {
           // Metavariables has options and default input file name
-          command_line_options.add_options()
-              ("input-file",
-               bpo::value<std::string>()->default_value(
-                   tmpl::type_from<decltype(mv)>::input_file),
-               "Input file name");
+          command_line_options.add_options()(
+              "input-file",
+              bpo::value<std::string>()->default_value(
+                  tmpl::type_from<decltype(mv)>::input_file),
+              "Input file name");
         },
         [&command_line_options](std::true_type /*meta*/, auto /*mv*/,
                                 auto... /*unused*/) {
           // Metavariables has options and no default input file name
-          command_line_options.add_options()
-              ("input-file", bpo::value<std::string>(), "Input file name");
+          command_line_options.add_options()(
+              "input-file", bpo::value<std::string>(), "Input file name");
         },
         [](std::false_type /*meta*/, auto mv, int /*gcc_bug*/)
             -> std::void_t<decltype(
@@ -274,10 +274,10 @@ Main<Metavariables>::Main(CkArgMsg* msg) noexcept
   const_global_cache_dependency.setGroupDepID(
       const_global_cache_proxy_.ckGetGroupID());
 
-  tmpl::for_each<group_component_list>([
-    this, &the_parallel_components, &items_from_options, &
-    const_global_cache_dependency
-  ](auto parallel_component_v) noexcept {
+  tmpl::for_each<group_component_list>([this, &the_parallel_components,
+                                        &items_from_options,
+                                        &const_global_cache_dependency](
+                                           auto parallel_component_v) noexcept {
     using parallel_component = tmpl::type_from<decltype(parallel_component_v)>;
     using ParallelComponentProxy =
         Parallel::proxy_from_parallel_component<parallel_component>;
@@ -295,19 +295,21 @@ Main<Metavariables>::Main(CkArgMsg* msg) noexcept
       tmpl::filter<component_list,
                    Parallel::is_chare_proxy<tmpl::bind<
                        Parallel::proxy_from_parallel_component, tmpl::_1>>>;
-  tmpl::for_each<singleton_component_list>([
-    this, &the_parallel_components, &items_from_options
-  ](auto parallel_component_v) noexcept {
-    using parallel_component = tmpl::type_from<decltype(parallel_component_v)>;
-    using ParallelComponentProxy =
-        Parallel::proxy_from_parallel_component<parallel_component>;
-    tuples::get<tmpl::type_<ParallelComponentProxy>>(the_parallel_components) =
-        ParallelComponentProxy::ckNew(
-            const_global_cache_proxy_,
-            Parallel::create_from_options<Metavariables>(
-                items_from_options,
-                typename parallel_component::initialization_tags{}));
-  });
+  tmpl::for_each<singleton_component_list>(
+      [this, &the_parallel_components,
+       &items_from_options](auto parallel_component_v) noexcept {
+        using parallel_component =
+            tmpl::type_from<decltype(parallel_component_v)>;
+        using ParallelComponentProxy =
+            Parallel::proxy_from_parallel_component<parallel_component>;
+        tuples::get<tmpl::type_<ParallelComponentProxy>>(
+            the_parallel_components) =
+            ParallelComponentProxy::ckNew(
+                const_global_cache_proxy_,
+                Parallel::create_from_options<Metavariables>(
+                    items_from_options,
+                    typename parallel_component::initialization_tags{}));
+      });
 
   // Create proxies for empty array chares (whose elements will be created by
   // the allocate functions of the array components during
@@ -318,7 +320,7 @@ Main<Metavariables>::Main(CkArgMsg* msg) noexcept
                      Parallel::proxy_from_parallel_component, tmpl::_1>>,
                  tmpl::not_<Parallel::is_bound_array<tmpl::_1>>>>;
   tmpl::for_each<array_component_list>([&the_parallel_components](
-      auto parallel_component) noexcept {
+                                           auto parallel_component) noexcept {
     using ParallelComponentProxy = Parallel::proxy_from_parallel_component<
         tmpl::type_from<decltype(parallel_component)>>;
     tuples::get<tmpl::type_<ParallelComponentProxy>>(the_parallel_components) =
@@ -331,8 +333,9 @@ Main<Metavariables>::Main(CkArgMsg* msg) noexcept
       tmpl::and_<Parallel::is_array_proxy<tmpl::bind<
                      Parallel::proxy_from_parallel_component, tmpl::_1>>,
                  Parallel::is_bound_array<tmpl::_1>>>;
-  tmpl::for_each<bound_array_component_list>([&the_parallel_components](
-      auto parallel_component) noexcept {
+  tmpl::for_each<
+      bound_array_component_list>([&the_parallel_components](
+                                      auto parallel_component) noexcept {
     using ParallelComponentProxy = Parallel::proxy_from_parallel_component<
         tmpl::type_from<decltype(parallel_component)>>;
     CkArrayOptions opts;
@@ -372,8 +375,8 @@ void Main<Metavariables>::
       tmpl::filter<component_list,
                    Parallel::is_array_proxy<tmpl::bind<
                        Parallel::proxy_from_parallel_component, tmpl::_1>>>;
-  tmpl::for_each<array_component_list>([ this, &items_from_options ](
-      auto parallel_component_v) noexcept {
+  tmpl::for_each<array_component_list>([this, &items_from_options](
+                                           auto parallel_component_v) noexcept {
     using parallel_component = tmpl::type_from<decltype(parallel_component_v)>;
     parallel_component::allocate_array(
         const_global_cache_proxy_,
@@ -430,12 +433,16 @@ void Main<Metavariables>::execute_next_phase() noexcept {
   }
   if constexpr (detail::has_load_balancing_phase<Metavariables>) {
     if (Metavariables::Phase::LoadBalancing == current_phase_) {
+      Parallel::printf("Starting phase: LoadBalancing at: %f\n",
+                       Parallel::wall_time());
       CkStartLB();
       CkStartQD(CkCallback(CkIndex_Main<Metavariables>::execute_next_phase(),
                            this->thisProxy));
       return;
     }
   }
+  Parallel::printf("Starting phase: %zu at: %f\n",
+                   static_cast<size_t>(current_phase_), Parallel::wall_time());
   tmpl::for_each<component_list>([this](auto parallel_component) noexcept {
     tmpl::type_from<decltype(parallel_component)>::execute_next_phase(
         current_phase_, const_global_cache_proxy_);

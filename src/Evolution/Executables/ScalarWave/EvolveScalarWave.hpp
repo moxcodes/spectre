@@ -142,6 +142,9 @@ struct EvolutionMetavars {
     }
   }
 
+  using global_sync_phases =
+      tmpl::list<std::integral_constant<Phase, Phase::LoadBalancing>>;
+
   static void global_startup_routines() noexcept { TurnManualLBOn(); }
 
   using step_choosers_common =
