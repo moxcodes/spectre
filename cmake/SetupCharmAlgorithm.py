@@ -72,7 +72,7 @@ def create_interface_file(args):
         "                            ReceiveData_t&,\n" \
         "                            bool enable_if_disabled = false);\n"
 
-    ci_str += "\n" "    entry void set_terminate(bool);\n" "  }\n" "}\n"
+    ci_str += "\n" "    entry void set_pause(bool);\n" "  }\n" "}\n"
 
     file_name = "%s/Algorithm%s.ci" % (args['build_dir'],
                                        args['algorithm_name'])

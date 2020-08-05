@@ -39,7 +39,7 @@
 #include "NumericalAlgorithms/LinearOperators/ExponentialFilter.hpp"
 #include "NumericalAlgorithms/LinearOperators/FilterAction.hpp"  // IWYU pragma: keep
 #include "Options/Options.hpp"
-#include "Parallel/Actions/CheckForGlobalSync.hpp"
+#include "Parallel/Actions/ManagePhaseControl.hpp"
 #include "Parallel/Actions/TerminatePhase.hpp"
 #include "Parallel/InitializationFunctions.hpp"
 #include "Parallel/PhaseDependentActionList.hpp"
@@ -281,7 +281,7 @@ struct EvolutionMetavars {
                                       Actions::ChangeStepSize<step_choosers>,
                                       tmpl::list<>>,
                   step_actions,
-                  Parallel::Actions::CheckForGlobalSync<EvolutionMetavars>,
+                  Parallel::Actions::ManagePhaseControl<EvolutionMetavars>,
                   Actions::AdvanceTime>>>>;
 
   template <typename component>
