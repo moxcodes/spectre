@@ -70,10 +70,10 @@ class Main : public CBase_Main<Metavariables> {
   /// next requested phase will be run.
   void execute_next_phase() noexcept;
 
-  /// Request a phase for future execution during global syncs.
-  void request_next_phase(
+  /// Request a collection of phases to execute after the next global sync
+  void request_global_sync_phases(
       const std::unordered_set<typename Metavariables::Phase>&
-          phase_request) noexcept;
+          phase_requests) noexcept;
 
  private:
   template <typename ParallelComponent>
@@ -93,8 +93,9 @@ class Main : public CBase_Main<Metavariables> {
       Metavariables::Phase::Initialization};
 
   CProxy_ConstGlobalCache<Metavariables> const_global_cache_proxy_;
-  std::set<typename Metavariables::Phase> requested_phases_;
-  boost::optional<typename Metavariables::Phase> return_phase_;
+  std::set<typename Metavariables::Phase> requested_global_sync_phases_;
+  boost::optional<typename Metavariables::Phase>
+      phase_to_resume_after_sync_phases_;
   Options<option_list> options_;
 };
 
@@ -392,17 +393,20 @@ void Main<Metavariables>::
 
 template <typename Metavariables>
 void Main<Metavariables>::execute_next_phase() noexcept {
-  if (requested_phases_.empty() and not static_cast<bool>(return_phase_)) {
-    current_phase_ = Metavariables::determine_next_phase(
-        current_phase_, const_global_cache_proxy_);
-  } else if (not requested_phases_.empty()) {
-    // when selecting a next phase, we prioritize those that appear earlier in
-    // the enum specification (lower values when treated as integers).
-    current_phase_ = *(requested_phases_.begin());
-    requested_phases_.erase(requested_phases_.begin());
+  if (not static_cast<bool>(phase_to_resume_after_sync_phases_)) {
+    if (requested_global_sync_phases_.size() == 0) {
+      current_phase_ = Metavariables::determine_next_phase(
+          current_phase_, const_global_cache_proxy_);
+    } else {
+      // when selecting a next phase, we prioritize those that appear earlier in
+      // the enum specification (lower values when treated as integers).
+      current_phase_ = *(requested_global_sync_phases_.begin());
+      requested_global_sync_phases_.erase(
+          requested_global_sync_phases_.begin());
+    }
   } else {
-    current_phase_ = *return_phase_;
-    return_phase_ = boost::none;
+    current_phase_ = *phase_to_resume_after_sync_phases_;
+    phase_to_resume_after_sync_phases_ = boost::none;
   }
   if (Metavariables::Phase::Exit == current_phase_) {
     Informer::print_exit_info();
@@ -417,11 +421,12 @@ void Main<Metavariables>::execute_next_phase() noexcept {
 }
 
 template <typename Metavariables>
-void Main<Metavariables>::request_next_phase(
+void Main<Metavariables>::request_global_sync_phases(
     const std::unordered_set<typename Metavariables::Phase>&
-        phase_request) noexcept {
-  requested_phases_.insert(phase_request.begin(), phase_request.end());
-  return_phase_ = current_phase_;
+        phase_requests) noexcept {
+  requested_global_sync_phases_.insert(phase_requests.begin(),
+                                       phase_requests.end());
+  phase_to_resume_after_sync_phases_ = current_phase_;
 }
 
 }  // namespace Parallel
