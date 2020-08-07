@@ -7,6 +7,8 @@
 #include "Framework/TestHelpers.hpp"
 #include "Helpers/DataStructures/MakeWithRandomValues.hpp"
 #include "NumericalAlgorithms/Interpolation/BarycentricRationalSpanInterpolator.hpp"
+#include "NumericalAlgorithms/Interpolation/CubicSpanInterpolator.hpp"
+#include "NumericalAlgorithms/Interpolation/LinearSpanInterpolator.hpp"
 #include "NumericalAlgorithms/Interpolation/SpanInterpolator.hpp"
 #include "Utilities/VectorAlgebra.hpp"
 
@@ -212,6 +214,7 @@ void test_interpolate_quadratic() {
 
 SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.ScriPlusInterpolationManager",
                   "[Unit][Evolution]") {
+  Parallel::register_derived_classes_with_charm<intrp::SpanInterpolator>();
   test_interpolate_quadratic<DataVector, false>();
   test_interpolate_quadratic<ComplexDataVector, false>();
   test_interpolate_quadratic<DataVector, true>();
