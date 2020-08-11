@@ -634,7 +634,7 @@ struct RegisterSingletonWithObserverWriter {
   template <typename DbTagList, typename... InboxTags, typename Metavariables,
             typename ArrayIndex, typename ActionList,
             typename ParallelComponent>
-  static std::tuple<db::DataBox<DbTagList>&&> apply(
+  static std::tuple<db::DataBox<DbTagList>&&, bool> apply(
       db::DataBox<DbTagList>& box,
       const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
       Parallel::ConstGlobalCache<Metavariables>& cache,

@@ -38,7 +38,7 @@
 #include "NumericalAlgorithms/DiscontinuousGalerkin/NumericalFluxes/LocalLaxFriedrichs.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/Tags.hpp"
 #include "Options/Options.hpp"
-#include "Parallel/Actions/CheckForGlobalSync.hpp"
+#include "Parallel/Actions/ManagePhaseControl.hpp"
 #include "Parallel/Actions/TerminatePhase.hpp"
 #include "Parallel/InitializationFunctions.hpp"
 #include "Parallel/PhaseDependentActionList.hpp"
@@ -277,9 +277,7 @@ struct EvolutionMetavars {
                   tmpl::conditional_t<local_time_stepping,
                                       Actions::ChangeStepSize<step_choosers>,
                                       tmpl::list<>>,
-                  step_actions,
-                  Parallel::Actions::CheckForGlobalSync<EvolutionMetavars>,
-                  Actions::AdvanceTime>>>>;
+                  step_actions, Actions::AdvanceTime>>>>;
 
   template <typename component>
   struct registration_list {

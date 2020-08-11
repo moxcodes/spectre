@@ -75,6 +75,20 @@ struct import_numeric_data_cache_tags<
                                         InitialData>::const_global_cache_tags;
 };
 
+template <typename Metavariables, typename Component,
+          typename check = std::void_t<>>
+struct has_registration_list_impl : std::false_type {};
+
+template <typename Metavariables, typename Component>
+struct has_registration_list_impl<
+    Metavariables, Component,
+    std::void_t<
+        typename Metavariables::template registration_list<Component>::type>>
+    : std::true_type {};
+
+template <typename Metavariables, typename Component>
+constexpr bool has_registration_list =
+    has_registration_list_impl<Metavariables, Component>::value;
 }  // namespace DgElementArray_detail
 
 /*!
@@ -117,23 +131,27 @@ struct DgElementArray {
                   const ArrayIndex& array_index) noexcept {
     // this does not actually insert anything into the PUP::er stream, so
     // nothing is done on a sizing pup.
-    if(p.isPacking()) {
-      tmpl::for_each<typename Metavariables::template registration_list<
-          DgElementArray>::type>(
-          [&box, &cache, &array_index](auto registration_v) noexcept {
-            using registration = typename decltype(registration_v)::type;
-            registration::template perform_deregistration<DgElementArray>(
-                box, cache, array_index);
-          });
-    }
-    if(p.isUnpacking()) {
-      tmpl::for_each<typename Metavariables::template registration_list<
-          DgElementArray>::type>(
-          [&box, &cache, &array_index](auto registration_v) noexcept {
-            using registration = typename decltype(registration_v)::type;
-            registration::template perform_registration<DgElementArray>(
-                box, cache, array_index);
-          });
+    if constexpr (DgElementArray_detail::has_registration_list<
+                      Metavariables, DgElementArray>) {
+      using registration_list =
+          typename Metavariables::template registration_list<
+              DgElementArray>::type;
+      if (p.isPacking()) {
+        tmpl::for_each<registration_list>(
+            [&box, &cache, &array_index](auto registration_v) noexcept {
+              using registration = typename decltype(registration_v)::type;
+              registration::template perform_deregistration<DgElementArray>(
+                  box, cache, array_index);
+            });
+      }
+      if (p.isUnpacking()) {
+        tmpl::for_each<registration_list>(
+            [&box, &cache, &array_index](auto registration_v) noexcept {
+              using registration = typename decltype(registration_v)::type;
+              registration::template perform_registration<DgElementArray>(
+                  box, cache, array_index);
+            });
+      }
     }
   }
 

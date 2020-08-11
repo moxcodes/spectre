@@ -38,7 +38,7 @@ class Completion : public Event<EventRegistrars> {
     auto al_gore =
         Parallel::get_parallel_component<Component>(cache)[array_index]
             .ckLocal();
-    al_gore->set_pause(true);
+    al_gore->set_terminate(true);
   }
 };
 

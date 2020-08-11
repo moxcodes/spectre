@@ -351,8 +351,6 @@ struct finalize {
   static void apply(db::DataBox<tmpl::list<DbTags...>>& box,
                     const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
                     const ArrayIndex& /*array_index*/) {
-    Parallel::printf("count actions called: %d\n",
-                     db::get<CountActionsCalled>(box));
     SPECTRE_PARALLEL_REQUIRE(db::get<CountActionsCalled>(box) == 13);
   }
 };
@@ -634,28 +632,6 @@ struct finalize {
 };
 }  // namespace any_order
 
-namespace phase_control_test {
-struct branch_on_action_count {
-  template <typename... DbTags, typename... InboxTags, typename Metavariables,
-            typename ArrayIndex, typename ActionList,
-            typename ParallelComponent>
-  static std::tuple<db::DataBox<tmpl::list<DbTags...>>,
-                    typename Metavariables::Phase>
-  apply(db::DataBox<tmpl::list<DbTags...>>& box,
-        tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
-        const Parallel::ConstGlobalCache<Metavariables>&
-        /*cache*/,
-        const ArrayIndex& /*array_index*/, ActionList /*meta*/,
-        const ParallelComponent* const  // NOLINT const
-        /*meta*/) noexcept {
-    Parallel::printf("actions called: %d\n", db::get<CountActionsCalled>(box));
-    return {std::move(box), db::get<CountActionsCalled>(box) < 32
-                                ? Metavariables::Phase::AnyOrderStart
-                                : Metavariables::Phase::Exit};
-  }
-};
-}  // namespace phase_control_test
-
 template <class Metavariables>
 struct AnyOrderComponent {
   using chare_type = Parallel::Algorithms::Singleton;
@@ -672,10 +648,7 @@ struct AnyOrderComponent {
                                         add_remove_test::increment_int0,
                                         any_order::iterate_increment_int0,
                                         add_remove_test::remove_int0,
-                                        receive_data_test::update_instance>>,
-      Parallel::PhaseActions<
-          typename Metavariables::Phase, Metavariables::Phase::PhaseControl,
-          tmpl::list<phase_control_test::branch_on_action_count>>>;
+                                        receive_data_test::update_instance>>>;
   using initialization_tags = Parallel::get_initialization_tags<
       Parallel::get_initialization_actions_list<phase_dependent_action_list>>;
 
@@ -722,7 +695,6 @@ struct TestMetavariables {
     ReceiveFinish,
     AnyOrderStart,
     AnyOrderFinish,
-    PhaseControl,
     Exit
   };
 
@@ -748,8 +720,6 @@ struct TestMetavariables {
       case Phase::AnyOrderStart:
         return Phase::AnyOrderFinish;
       case Phase::AnyOrderFinish:
-        return Phase::PhaseControl;
-      case Phase::PhaseControl:
         return Phase::Exit;
       case Phase::Exit:
         return Phase::Exit;

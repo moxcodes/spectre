@@ -40,7 +40,7 @@ struct ManagePhaseControl {
     if (tuples::get<Tags::GlobalSyncTrigger<Metavariables>>(
             algorithm_control_triggers)
             ->is_triggered(box)) {
-      algorithm_control.execution_flag = AlgorithmExecution::WaitForSyncPhases;
+      algorithm_control.execution_flag = AlgorithmExecution::SleepForSyncPhases;
     }
 
     if (tuples::get<Tags::HaltTrigger<Metavariables>>(

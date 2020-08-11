@@ -170,17 +170,34 @@ constexpr bool has_required_phase_sync_function =
     has_required_phase_sync_function_impl<Metavariables>::value;
 
 // for checking whether a class defines a pup function
-template <typename ParallelComponent, typename check = std::void_t<>>
+template <typename ParallelComponent, typename BoxTagList,
+          typename ArrayIndex, typename check = std::void_t<>>
 struct has_pup_function_impl : std::false_type {};
 
-template <typename ParallelComponent>
-struct has_pup_function_impl<ParallelComponent,
-                             std::void_t<decltype(&ParallelComponent::pup)>>
+template <typename ParallelComponent, typename BoxTagList, typename ArrayIndex>
+struct has_pup_function_impl<
+    ParallelComponent, BoxTagList, ArrayIndex,
+    std::void_t<decltype(
+        &ParallelComponent::template pup<BoxTagList, ArrayIndex>)>>
     : std::true_type {};
 
-template <typename ParallelComponent>
+template <typename ParallelComponent, typename BoxTagList, typename ArrayIndex>
 constexpr bool has_pup_function =
-    has_pup_function_impl<ParallelComponent>::value;
+    has_pup_function_impl<ParallelComponent, BoxTagList, ArrayIndex>::value;
+
+//
+template <typename Metavariables, typename check = std::void_t<>>
+struct has_global_startup_routines_impl : std::false_type {};
+
+template <typename Metavariables>
+struct has_global_startup_routines_impl<
+    Metavariables,
+    std::void_t<decltype(&Metavariables::global_startup_routines)>>
+    : std::true_type {};
+
+template <typename Metavariables>
+constexpr bool has_global_startup_routines =
+    has_global_startup_routines_impl<Metavariables>::value;
 
 // for checking the DataBox return of an iterable action
 template <typename FirstIterableActionType>
@@ -436,7 +453,7 @@ class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
   /// \brief Receive data and store it in the Inbox, and try to continue
   /// executing the algorithm
   ///
-  /// When an algorithm has paused it can be restarted by passing
+  /// When an algorithm has terminated it can be restarted by passing
   /// `enable_if_disabled = true`. This allows long-term disabling and
   /// re-enabling of algorithms
   template <typename ReceiveTag, typename ReceiveDataType>
@@ -452,9 +469,9 @@ class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
   /// `AlgorithmExecution::Halt`.
   constexpr void perform_algorithm() noexcept;
 
-  constexpr void perform_algorithm(const bool restart_if_paused) noexcept {
-    if (restart_if_paused) {
-      set_pause(false);
+  constexpr void perform_algorithm(const bool restart_if_terminated) noexcept {
+    if (restart_if_terminated) {
+      set_terminate(false);
     }
     perform_algorithm();
   }
@@ -482,7 +499,7 @@ class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
     if (should_start_phase) {
       if (not get_terminate() and not sleep_algorithm_until_next_phase_) {
         ERROR(
-            "An algorithm must always be set to pause at the beginning "
+            "An algorithm must always be set to terminate at the beginning "
             "of a phase. Since this is not the case the previous phase did "
             "not end correctly. The integer corresponding to the previous "
             "phase is: "
@@ -510,16 +527,16 @@ class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
   }
 
   /// Tell the Algorithm it should no longer execute the algorithm. This does
-  /// not mean that the execution of the program is paused, but only that
-  /// the algorithm has paused. An algorithm can be restarted by passing
+  /// not mean that the execution of the program is terminated, but only that
+  /// the algorithm has terminated. An algorithm can be restarted by passing
   /// `true` as the second argument to the `receive_data` method or by calling
   /// perform_algorithm(true).
-  constexpr void set_pause(const bool pause) noexcept {
-    pause_ = pause;
+  constexpr void set_terminate(const bool terminate) noexcept {
+    terminate_ = terminate;
   }
 
   /// Check if an algorithm should continue being evaluated
-  constexpr bool get_pause() const noexcept { return pause_; }
+  constexpr bool get_terminate() const noexcept { return terminate_; }
 
   /// Tell the algorithm that on the next designated 'global sync', it should
   /// include `phase` in the collection of phases it requests from the Main
@@ -541,10 +558,14 @@ class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
       PUP::er& p, boost::variant<Variants...>& box,
       const gsl::not_null<int*> iter,
       const gsl::not_null<bool*> already_visited) noexcept {
-    if (box.which() == *iter and not *already_visited) {
-      ParallelComponent::pup(p, boost::get<ThisVariant>(box),
-                             *const_global_cache_, array_index_);
-      *already_visited = true;
+    if constexpr (detail::has_pup_function<ParallelComponent,
+                                           typename ThisVariant::tags_list,
+                                           array_index>) {
+      if (box.which() == *iter and not *already_visited) {
+        ParallelComponent::pup(p, boost::get<ThisVariant>(box),
+                               *const_global_cache_, array_index_);
+        *already_visited = true;
+      }
     }
     ++(*iter);
   }
@@ -623,7 +644,7 @@ class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
   //    algorithm to execute next.
   template <typename ThisAction, typename ActionList, typename DbTags>
   void invoke_iterable_action(db::DataBox<DbTags>& my_box) noexcept {
-    const auto action_return = ThisAction::apply(
+    auto action_return = ThisAction::apply(
         my_box, inboxes_, *const_global_cache_, std::as_const(array_index_),
         ActionList{}, std::add_pointer_t<ParallelComponent>{});
 
@@ -750,7 +771,9 @@ AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>::
                       initialization_items) noexcept
     : AlgorithmImpl() {
   (void)initialization_items;  // avoid potential compiler warnings if unused
-  metavariables::global_startup_routines();
+  if constexpr (detail::has_global_startup_routines<metavariables>) {
+    metavariables::global_startup_routines();
+  }
   const_global_cache_ = global_cache_proxy.ckLocalBranch();
   box_ = db::create<
       db::AddSimpleTags<tmpl::flatten<
@@ -870,7 +893,7 @@ void AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>::
       node_lock_.lock();
     }
     if (enable_if_disabled) {
-      set_pause(false);
+      set_terminate(false);
     }
     ReceiveTag::insert_into_inbox(
         make_not_null(&tuples::get<ReceiveTag>(inboxes_)), instance,
@@ -914,7 +937,7 @@ constexpr void AlgorithmImpl<
   // Loop over all phases, once the current phase is found we perform the
   // algorithm in that phase until we are no longer able to because we are
   // waiting on data to be sent or because the algorithm has been marked as
-  // paused.
+  // terminated.
   EXPAND_PACK_LEFT_TO_RIGHT(invoke_for_phase(PhaseDepActionListsPack{}));
   if constexpr (std::is_same_v<Parallel::NodeLock, decltype(node_lock_)>) {
     node_lock_.unlock();
