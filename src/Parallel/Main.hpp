@@ -394,9 +394,12 @@ void Main<Metavariables>::
 template <typename Metavariables>
 void Main<Metavariables>::execute_next_phase() noexcept {
   if (not static_cast<bool>(phase_to_resume_after_sync_phases_)) {
+    current_phase_ = Metavariables::determine_next_phase(
+        current_phase_, const_global_cache_proxy_);
+  } else {
     if (requested_global_sync_phases_.size() == 0) {
-      current_phase_ = Metavariables::determine_next_phase(
-          current_phase_, const_global_cache_proxy_);
+      current_phase_ = *phase_to_resume_after_sync_phases_;
+      phase_to_resume_after_sync_phases_ = boost::none;
     } else {
       // when selecting a next phase, we prioritize those that appear earlier in
       // the enum specification (lower values when treated as integers).
@@ -404,9 +407,6 @@ void Main<Metavariables>::execute_next_phase() noexcept {
       requested_global_sync_phases_.erase(
           requested_global_sync_phases_.begin());
     }
-  } else {
-    current_phase_ = *phase_to_resume_after_sync_phases_;
-    phase_to_resume_after_sync_phases_ = boost::none;
   }
   if (Metavariables::Phase::Exit == current_phase_) {
     Informer::print_exit_info();
