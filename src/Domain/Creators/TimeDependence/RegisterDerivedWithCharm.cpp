@@ -6,8 +6,11 @@
 #include <pup.h>
 
 #include "Domain/CoordinateMaps/CoordinateMap.hpp"
+#include "Domain/CoordinateMaps/CoordinateMap.tpp"
+#include "Domain/CoordinateMaps/Identity.hpp"
 #include "Domain/CoordinateMaps/TimeDependent/CubicScale.hpp"
 #include "Domain/CoordinateMaps/TimeDependent/ProductMaps.hpp"
+#include "Domain/CoordinateMaps/TimeDependent/ProductMaps.tpp"
 #include "Domain/CoordinateMaps/TimeDependent/Translation.hpp"
 #include "Domain/Creators/TimeDependence/CubicScale.hpp"
 #include "Domain/Creators/TimeDependence/None.hpp"
