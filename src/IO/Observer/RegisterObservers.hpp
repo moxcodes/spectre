@@ -18,10 +18,14 @@ struct RegisterObservers {
   static std::pair<observers::TypeOfObservation, observers::ObservationId>
   register_info(const db::DataBox<DbTagsList>& box,
                 const ArrayIndex& /*array_index*/) noexcept {
-    return {
-        observers::TypeOfObservation::ReductionAndVolume,
-        observers::ObservationId{
-            static_cast<double>(db::get<ObservationValueTag>(box)), ObsType{}}};
+    if constexpr (tmpl::list_contains_v<DbTagsList, ObservationValueTag>) {
+      return {observers::TypeOfObservation::ReductionAndVolume,
+              observers::ObservationId{
+                  static_cast<double>(db::get<ObservationValueTag>(box)),
+                  ObsType{}}};
+    } else {
+      ERROR("Observation id not found in box");
+    }
   }
 };
 }  // namespace observers

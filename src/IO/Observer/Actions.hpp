@@ -44,22 +44,72 @@ struct RegisterVolumeContributorWithObserverWriter {
                     const size_t processing_element) noexcept {
     db::mutate<Tags::VolumeObserversRegistered>(
         make_not_null(&box),
-        [&observation_id, &processing_element ](
-            const gsl::not_null<std::unordered_map<size_t, std::set<size_t>>*>
+        [&observation_id, &processing_element](
+            const gsl::not_null<
+                std::unordered_map<size_t, std::unordered_map<size_t, size_t>>*>
                 volume_observers_registered) noexcept {
           // Currently the only part of the observation_id that is used is the
           // `observation_type_hash()`. But in the future with load balancing
           // we will use the full observation_id, and elements will need
-          // to register and unregister themselves at specific times.
+          // to register and deregister themselves at specific times.
           const size_t hash = observation_id.observation_type_hash();
 
-          if (volume_observers_registered->count(hash) == 0) {
-            (*volume_observers_registered)[hash] = std::set<size_t>{};
+          if (volume_observers_registered->count(hash) == 0_st) {
+            volume_observers_registered->emplace(
+                std::make_pair(hash, std::unordered_map<size_t, size_t>{
+                                         {{processing_element, 0_st}}}));
+          } else if (volume_observers_registered->at(hash).count(
+                         processing_element) == 0_st) {
+            volume_observers_registered->at(hash).insert(
+                std::make_pair(processing_element, 0_st));
           }
-          // We don't care if we insert the same processing element
-          // more than once. We care only about which processing
-          // elements have registered.
-          volume_observers_registered->at(hash).insert(processing_element);
+          ++volume_observers_registered->at(hash).at(processing_element);
+        });
+  }
+};
+
+struct DeregisterVolumeContributorWithObserverWriter {
+ public:
+  template <typename ParallelComponent, typename DbTagsList,
+            typename Metavariables, typename ArrayIndex,
+            typename... ReductionDatums,
+            Requires<tmpl::list_contains_v<
+                DbTagsList, Tags::VolumeObserversRegistered>> = nullptr>
+  static void apply(db::DataBox<DbTagsList>& box,
+                    const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
+                    const ArrayIndex& /*array_index*/,
+                    const observers::ObservationId& observation_id,
+                    const size_t processing_element) noexcept {
+    db::mutate<Tags::VolumeObserversRegistered>(
+        make_not_null(&box),
+        [&observation_id, &processing_element](
+            const gsl::not_null<
+                std::unordered_map<size_t, std::unordered_map<size_t, size_t>>*>
+                volume_observers_registered) noexcept {
+          // Currently the only part of the observation_id that is used is the
+          // `observation_type_hash()`. But in the future with load balancing
+          // we will use the full observation_id, and elements will need
+          // to register and deregister themselves at specific times.
+          const size_t hash = observation_id.observation_type_hash();
+          if (volume_observers_registered->count(hash) == 0) {
+            ERROR(
+                "Trying to deregister an observation id that is not yet "
+                "registered");
+          }
+          if (volume_observers_registered->at(hash).count(processing_element) ==
+              0) {
+            ERROR(
+                "Trying to deregister a processor that is not yet registered "
+                "for this observer and observation id.");
+          }
+          --volume_observers_registered->at(hash).at(processing_element);
+          if (volume_observers_registered->at(hash).at(processing_element) ==
+              0) {
+            volume_observers_registered->at(hash).erase(processing_element);
+          }
+          if (volume_observers_registered->at(hash).empty()) {
+            volume_observers_registered->erase(hash);
+          }
         });
   }
 };
@@ -90,20 +140,20 @@ struct RegisterReductionContributorWithObserverWriter {
       // processing_element_or_node is the processing element of the caller.
       db::mutate<Tags::ReductionObserversRegistered>(
           make_not_null(&box),
-          [&cache, &node_id, &observation_id, &processing_element_or_node ](
-              const gsl::not_null<std::unordered_map<size_t, std::set<size_t>>*>
+          [&cache, &node_id, &observation_id, &processing_element_or_node](
+              const gsl::not_null<std::unordered_map<
+                  size_t, std::unordered_map<size_t, size_t>>*>
                   reduction_observers_registered) noexcept {
             // Currently the only part of the observation_id that is used is the
             // `observation_type_hash()`. But in the future with load balancing
             // we will use the full observation_id, and elements will need
-            // to register and unregister themselves at specific times.
+            // to register and deregister themselves at specific times.
             const size_t hash = observation_id.observation_type_hash();
 
-            if (reduction_observers_registered->count(hash) == 0) {
-              (*reduction_observers_registered)[hash] = std::set<size_t>{};
-
-              // If this is not node 0, call this Action on node 0 to register
-              // the nodes that we expect reductions to be called on.
+            if (reduction_observers_registered->count(hash) == 0_st) {
+              reduction_observers_registered->emplace(std::make_pair(
+                  hash, std::unordered_map<size_t, size_t>{
+                            {{processing_element_or_node, 0_st}}}));
               if (node_id != 0) {
                 Parallel::simple_action<
                     Actions::RegisterReductionContributorWithObserverWriter>(
@@ -111,12 +161,12 @@ struct RegisterReductionContributorWithObserverWriter {
                         ObserverWriter<Metavariables>>(cache)[0],
                     observation_id, node_id, true);
               }
+            } else if (reduction_observers_registered->at(hash).count(
+                           processing_element_or_node) == 0_st) {
+              reduction_observers_registered->at(hash).insert(
+                  std::make_pair(processing_element_or_node, 0_st));
             }
-
-            // We don't care if we insert the same processing element
-            // more than once. We care only about which processing
-            // elements have registered.
-            reduction_observers_registered->at(hash).insert(
+            ++reduction_observers_registered->at(hash).at(
                 processing_element_or_node);
           });
     } else if (called_from_other_node) {
@@ -128,17 +178,128 @@ struct RegisterReductionContributorWithObserverWriter {
 
       db::mutate<Tags::ReductionObserversRegisteredNodes>(
           make_not_null(&box),
-          [&processing_element_or_node, &observation_id ](
-              const gsl::not_null<std::unordered_map<size_t, std::set<size_t>>*>
-                  reduction_observers_registered_nodes) noexcept {
+          [&processing_element_or_node,
+           &observation_id](const gsl::not_null<std::unordered_map<
+                                size_t, std::unordered_map<size_t, size_t>>*>
+                                reduction_observers_registered_nodes) noexcept {
+            const size_t hash = observation_id.observation_type_hash();
+
+            if (reduction_observers_registered_nodes->count(hash) == 0_st) {
+              reduction_observers_registered_nodes->emplace(std::make_pair(
+                  hash, std::unordered_map<size_t, size_t>{
+                            {{processing_element_or_node, 0_st}}}));
+            } else if (reduction_observers_registered_nodes->at(hash).count(
+                           processing_element_or_node) == 0_st) {
+              reduction_observers_registered_nodes->at(hash).insert(
+                  std::make_pair(processing_element_or_node, 0_st));
+            }
+            ++reduction_observers_registered_nodes->at(hash).at(
+                processing_element_or_node);
+          });
+    }
+  }
+};
+
+struct DeregisterReductionContributorWithObserverWriter {
+ public:
+  template <
+      typename ParallelComponent, typename DbTagsList, typename Metavariables,
+      typename ArrayIndex, typename... ReductionDatums,
+      Requires<tmpl::list_contains_v<DbTagsList,
+                                     Tags::ReductionObserversRegistered> and
+               tmpl::list_contains_v<DbTagsList,
+                                     Tags::ReductionObserversRegisteredNodes>> =
+          nullptr>
+  static void apply(db::DataBox<DbTagsList>& box,
+                    Parallel::ConstGlobalCache<Metavariables>& cache,
+                    const ArrayIndex& /*array_index*/,
+                    const observers::ObservationId& observation_id,
+                    const size_t processing_element_or_node,
+                    const bool called_from_other_node = false) noexcept {
+    const auto node_id = static_cast<size_t>(Parallel::my_node());
+    if (not called_from_other_node) {
+      // processing_element_or_node is the processing element of the caller.
+      db::mutate<Tags::ReductionObserversRegistered>(
+          make_not_null(&box),
+          [&cache, &node_id, &observation_id, &processing_element_or_node](
+              const gsl::not_null<std::unordered_map<
+                  size_t, std::unordered_map<size_t, size_t>>*>
+                  reduction_observers_registered) noexcept {
+            // Currently the only part of the observation_id that is used is the
+            // `observation_type_hash()`. But in the future with load balancing
+            // we will use the full observation_id, and elements will need
+            // to register and deregister themselves at specific times.
+            const size_t hash = observation_id.observation_type_hash();
+
+            if (reduction_observers_registered->count(hash) == 0) {
+              ERROR(
+                  "Trying to deregister an observation id that is not yet "
+                  "registered");
+            }
+            if (reduction_observers_registered->at(hash).count(
+                    processing_element_or_node) == 0) {
+              ERROR(
+                  "Trying to deregister a processor that is not yet registered "
+                  "for this observer and observation id.");
+            }
+            --reduction_observers_registered->at(hash).at(
+                processing_element_or_node);
+            if (reduction_observers_registered->at(hash).at(
+                    processing_element_or_node) == 0) {
+              reduction_observers_registered->at(hash).erase(
+                  processing_element_or_node);
+            }
+            if (reduction_observers_registered->at(hash).empty()) {
+              reduction_observers_registered->erase(hash);
+
+              // If this is not node 0, call this Action on node 0 to register
+              // the nodes that we expect reductions to be called on.
+              if (node_id != 0) {
+                Parallel::simple_action<
+                    Actions::DeregisterReductionContributorWithObserverWriter>(
+                    Parallel::get_parallel_component<
+                        ObserverWriter<Metavariables>>(cache)[0],
+                    observation_id, node_id, true);
+              }
+            }
+          });
+
+    } else if (called_from_other_node) {
+      // processing_element_or_node is the node_id of the caller.
+
+      ASSERT(node_id == 0, "Only node zero, not node "
+                               << node_id
+                               << ", should be called from another node");
+
+      db::mutate<Tags::ReductionObserversRegisteredNodes>(
+          make_not_null(&box),
+          [&processing_element_or_node,
+           &observation_id](const gsl::not_null<std::unordered_map<
+                                size_t, std::unordered_map<size_t, size_t>>*>
+                                reduction_observers_registered_nodes) noexcept {
             const size_t hash = observation_id.observation_type_hash();
 
             if (reduction_observers_registered_nodes->count(hash) == 0) {
-              (*reduction_observers_registered_nodes)[hash] =
-                  std::set<size_t>{};
+              ERROR(
+                  "Trying to deregister an observation id that is not yet "
+                  "registered");
             }
-            reduction_observers_registered_nodes->at(hash).insert(
+            if (reduction_observers_registered_nodes->at(hash).count(
+                    processing_element_or_node) == 0) {
+              ERROR(
+                  "Trying to deregister a node that is not yet registered "
+                  "for this observer and observation id.");
+            }
+            --reduction_observers_registered_nodes->at(hash).at(
                 processing_element_or_node);
+            if (reduction_observers_registered_nodes->at(hash).at(
+                    processing_element_or_node) == 0) {
+              reduction_observers_registered_nodes->at(hash).erase(
+                  processing_element_or_node);
+            }
+            if (reduction_observers_registered_nodes->at(hash).empty()) {
+              reduction_observers_registered_nodes->erase(hash);
+            }
           });
     }
   }
@@ -163,11 +324,11 @@ struct RegisterSenderWithSelf {
                     const observers::ObservationId& observation_id,
                     const observers::ArrayComponentId& component_id,
                     const TypeOfObservation& type_of_observation) noexcept {
-    const auto register_reduction =
-        [&box, &cache, &component_id, &observation_id ]() noexcept {
+    const auto register_reduction = [&box, &cache, &component_id,
+                                     &observation_id]() noexcept {
       db::mutate<observers::Tags::ReductionArrayComponentIds>(
-          make_not_null(&box), [&component_id](
-                                   const auto array_component_ids) noexcept {
+          make_not_null(&box),
+          [&component_id](const auto array_component_ids) noexcept {
             ASSERT(array_component_ids->count(component_id) == 0,
                    "Trying to insert a component_id more than once for "
                    "reduction. This means an element is registering itself "
@@ -183,11 +344,11 @@ struct RegisterSenderWithSelf {
           Actions::RegisterReductionContributorWithObserverWriter>(
           observer_writer, observation_id, my_proc);
     };
-    const auto register_volume =
-        [&box, &cache, &component_id, &observation_id ]() noexcept {
+    const auto register_volume = [&box, &cache, &component_id,
+                                  &observation_id]() noexcept {
       db::mutate<observers::Tags::VolumeArrayComponentIds>(
-          make_not_null(&box), [&component_id](
-                                   const auto array_component_ids) noexcept {
+          make_not_null(&box),
+          [&component_id](const auto array_component_ids) noexcept {
             ASSERT(array_component_ids->count(component_id) == 0,
                    "Trying to insert a component_id more than once for "
                    "volume observation. This means an element is registering "
@@ -223,6 +384,79 @@ struct RegisterSenderWithSelf {
   }
 };
 
+struct DeregisterSenderWithSelf {
+  template <
+      typename ParallelComponent, typename DbTagList, typename Metavariables,
+      typename ArrayIndex,
+      Requires<tmpl::list_contains_v<
+                   DbTagList, observers::Tags::ReductionArrayComponentIds> and
+               tmpl::list_contains_v<
+                   DbTagList, observers::Tags::VolumeArrayComponentIds>> =
+          nullptr>
+  static void apply(db::DataBox<DbTagList>& box,
+                    Parallel::ConstGlobalCache<Metavariables>& cache,
+                    const ArrayIndex& /*array_index*/,
+                    const observers::ObservationId& observation_id,
+                    const observers::ArrayComponentId& component_id,
+                    const TypeOfObservation& type_of_observation) noexcept {
+    const auto deregister_reduction = [&box, &cache, &component_id,
+                                       &observation_id]() noexcept {
+      db::mutate<observers::Tags::ReductionArrayComponentIds>(
+          make_not_null(&box),
+          [&component_id](const auto array_component_ids) noexcept {
+            ASSERT(array_component_ids->count(component_id) != 0,
+                   "Trying to unregister a component_id that is not yet "
+                   "registered for a reduction.");
+            array_component_ids->erase(component_id);
+          });
+      const auto my_proc = static_cast<size_t>(Parallel::my_proc());
+      auto& observer_writer =
+          *Parallel::get_parallel_component<
+               observers::ObserverWriter<Metavariables>>(cache)
+               .ckLocalBranch();
+      Parallel::simple_action<
+          Actions::DeregisterReductionContributorWithObserverWriter>(
+          observer_writer, observation_id, my_proc);
+    };
+    const auto deregister_volume = [&box, &cache, &component_id,
+                                    &observation_id]() noexcept {
+      db::mutate<observers::Tags::VolumeArrayComponentIds>(
+          make_not_null(&box),
+          [&component_id](const auto array_component_ids) noexcept {
+            ASSERT(array_component_ids->count(component_id) != 0,
+                   "Trying to unregister a component_id that is net yet "
+                   "registered for a volume observation.");
+            array_component_ids->erase(component_id);
+          });
+      const auto my_proc = static_cast<size_t>(Parallel::my_proc());
+      auto& observer_writer =
+          *Parallel::get_parallel_component<
+               observers::ObserverWriter<Metavariables>>(cache)
+               .ckLocalBranch();
+      Parallel::simple_action<
+          Actions::DeregisterVolumeContributorWithObserverWriter>(
+          observer_writer, observation_id, my_proc);
+    };
+
+    switch (type_of_observation) {
+      case TypeOfObservation::ReductionAndVolume:
+        deregister_reduction();
+        deregister_volume();
+        return;
+      case TypeOfObservation::Reduction:
+        deregister_reduction();
+        return;
+      case TypeOfObservation::Volume:
+        deregister_volume();
+        return;
+      default:
+        ERROR(
+            "Registering an unknown TypeOfObservation. Should be one of "
+            "'Reduction', 'Volume', or 'ReductionAndVolume'");
+    };
+  }
+};
+
 /*!
  * \brief Registers itself with the local observer parallel component so the
  * observer knows to expect data from this component, and also whether to expect
@@ -230,15 +464,12 @@ struct RegisterSenderWithSelf {
  */
 template <typename RegisterHelper>
 struct RegisterWithObservers {
-  template <typename DbTagList, typename... InboxTags, typename Metavariables,
-            typename ArrayIndex, typename ActionList,
-            typename ParallelComponent>
-  static std::tuple<db::DataBox<DbTagList>&&> apply(
-      db::DataBox<DbTagList>& box,
-      const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
-      Parallel::GlobalCache<Metavariables>& cache,
-      const ArrayIndex& array_index, const ActionList /*meta*/,
-      const ParallelComponent* const /*meta*/) noexcept {
+ private:
+  template <typename ParallelComponent, typename RegisterOrDeregisterAction,
+            typename DbTagList, typename Metavariables, typename ArrayIndex>
+  static void register_or_deregister_impl(
+      db::DataBox<DbTagList>& box, Parallel::GlobalCache<Metavariables>& cache,
+      const ArrayIndex& array_index) noexcept {
     auto& observer =
         *Parallel::get_parallel_component<observers::Observer<Metavariables>>(
              cache)
@@ -257,7 +488,7 @@ struct RegisterWithObservers {
     //
     // At that point we won't need the template parameter on the class anymore
     // and everything can be read from an input file.
-    Parallel::simple_action<RegisterSenderWithSelf>(
+    Parallel::simple_action<RegisterOrDeregisterAction>(
         observer,
         std::move(                                                // NOLINT
             type_of_observation_and_observation_id_pair.second),  // NOLINT
@@ -266,6 +497,39 @@ struct RegisterWithObservers {
             Parallel::ArrayIndex<std::decay_t<ArrayIndex>>{array_index}),
         std::move(                                                // NOLINT
             type_of_observation_and_observation_id_pair.first));  // NOLINT
+  }
+
+ public:
+  template <typename ParallelComponent, typename DbTagList,
+            typename Metavariables, typename ArrayIndex>
+  static void perform_registration(
+      db::DataBox<DbTagList>& box,
+      Parallel::ConstGlobalCache<Metavariables>& cache,
+      const ArrayIndex& array_index) noexcept {
+    register_or_deregister_impl<ParallelComponent, RegisterSenderWithSelf>(
+        box, cache, array_index);
+  }
+
+  template <typename ParallelComponent, typename DbTagList,
+            typename Metavariables, typename ArrayIndex>
+  static void perform_deregistration(
+      db::DataBox<DbTagList>& box,
+      Parallel::ConstGlobalCache<Metavariables>& cache,
+      const ArrayIndex& array_index) noexcept {
+    register_or_deregister_impl<ParallelComponent, DeregisterSenderWithSelf>(
+        box, cache, array_index);
+  }
+
+  template <typename DbTagList, typename... InboxTags, typename Metavariables,
+            typename ArrayIndex, typename ActionList,
+            typename ParallelComponent>
+  static std::tuple<db::DataBox<DbTagList>&&> apply(
+      db::DataBox<DbTagList>& box,
+      const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
+      Parallel::ConstGlobalCache<Metavariables>& cache,
+      const ArrayIndex& array_index, const ActionList /*meta*/,
+      const ParallelComponent* const /*meta*/) noexcept {
+    perform_registration<ParallelComponent>(box, cache, array_index);
     return {std::move(box)};
   }
 };
@@ -300,15 +564,13 @@ struct RegisterWithObservers {
  */
 template <typename RegisterHelper>
 struct RegisterSingletonWithObserverWriter {
-  template <typename DbTagList, typename... InboxTags, typename Metavariables,
-            typename ArrayIndex, typename ActionList,
-            typename ParallelComponent>
-  static std::tuple<db::DataBox<DbTagList>&&, bool> apply(
+ private:
+  template <typename ParallelComponent, typename RegisterOrDeregisterAction,
+            typename DbTagList, typename Metavariables, typename ArrayIndex>
+  static void register_or_deregister_impl(
       db::DataBox<DbTagList>& box,
-      const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
       Parallel::GlobalCache<Metavariables>& cache,
-      const ArrayIndex& array_index, const ActionList /*meta*/,
-      const ParallelComponent* const /*meta*/) noexcept {
+      const ArrayIndex& array_index) noexcept {
     std::pair<observers::TypeOfObservation, observers::ObservationId>
         type_of_observation_and_observation_id_pair =
             RegisterHelper::template register_info<ParallelComponent>(
@@ -335,13 +597,49 @@ struct RegisterSingletonWithObserverWriter {
 
     // We call only on node 0; the observation call will occur only
     // on node 0.
-    Parallel::simple_action<
-        Actions::RegisterReductionContributorWithObserverWriter>(
+    Parallel::simple_action<RegisterOrDeregisterAction>(
         Parallel::get_parallel_component<
             observers::ObserverWriter<Metavariables>>(cache)[0],
         std::move(                                                // NOLINT
             type_of_observation_and_observation_id_pair.second),  // NOLINT
         fake_processing_element);
+  }
+
+ public:
+  template <typename ParallelComponent, typename DbTagList,
+            typename Metavariables, typename ArrayIndex>
+  static void perform_registration(
+      db::DataBox<DbTagList>& box,
+      Parallel::ConstGlobalCache<Metavariables>& cache,
+      const ArrayIndex& array_index) noexcept {
+    register_or_deregister_impl<
+        ParallelComponent,
+        Actions::RegisterReductionContributorWithObserverWriter>(box, cache,
+                                                                 array_index);
+  }
+
+  template <typename ParallelComponent, typename DbTagList,
+            typename Metavariables, typename ArrayIndex>
+  static void perform_deregistration(
+      db::DataBox<DbTagList>& box,
+      Parallel::ConstGlobalCache<Metavariables>& cache,
+      const ArrayIndex& array_index) noexcept {
+    register_or_deregister_impl<
+        ParallelComponent,
+        Actions::DeregisterReductionContributorWithObserverWriter>(box, cache,
+                                                                   array_index);
+  }
+
+  template <typename DbTagList, typename... InboxTags, typename Metavariables,
+            typename ArrayIndex, typename ActionList,
+            typename ParallelComponent>
+  static std::tuple<db::DataBox<DbTagList>&&, bool> apply(
+      db::DataBox<DbTagList>& box,
+      const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
+      Parallel::ConstGlobalCache<Metavariables>& cache,
+      const ArrayIndex& array_index, const ActionList /*meta*/,
+      const ParallelComponent* const /*meta*/) noexcept {
+    perform_registration<ParallelComponent>(box, cache, array_index);
     return {std::move(box), true};
   }
 };
