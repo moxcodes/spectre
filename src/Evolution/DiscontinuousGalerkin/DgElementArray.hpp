@@ -18,6 +18,27 @@
 #include "Parallel/ParallelComponentHelpers.hpp"
 #include "Utilities/System/ParallelInfo.hpp"
 #include "Utilities/TMPL.hpp"
+#include "Utilities/TaggedTuple.hpp"
+
+
+namespace DgElementArray_detail {
+
+template <typename Metavariables, typename Component,
+          typename check = std::void_t<>>
+struct has_registration_list_impl : std::false_type {};
+
+template <typename Metavariables, typename Component>
+struct has_registration_list_impl<
+    Metavariables, Component,
+    std::void_t<
+        typename Metavariables::template registration_list<Component>::type>>
+    : std::true_type {};
+
+template <typename Metavariables, typename Component>
+constexpr bool has_registration_list =
+    has_registration_list_impl<Metavariables, Component>::value;
+
+}  // namespace DgElementArray_detail
 
 /*!
  * \brief The parallel component responsible for managing the DG elements that
@@ -43,6 +64,37 @@ struct DgElementArray {
   using initialization_tags = Parallel::get_initialization_tags<
       Parallel::get_initialization_actions_list<phase_dependent_action_list>,
       array_allocation_tags>;
+
+  template <typename DbTagList, typename ArrayIndex>
+  static void pup(PUP::er& p, db::DataBox<DbTagList>& box,
+                  typename Metavariables::Phase /*phase*/,
+                  Parallel::GlobalCache<Metavariables>& cache,
+                  const ArrayIndex& local_array_index) noexcept {
+    // The deregistration and registration below does not actually insert
+    // anything into the PUP::er stream, so nothing is done on a sizing pup.
+    if constexpr (DgElementArray_detail::has_registration_list<
+                      Metavariables, DgElementArray>) {
+      using registration_list =
+          typename Metavariables::template registration_list<
+              DgElementArray>::type;
+      if (p.isPacking()) {
+        tmpl::for_each<registration_list>(
+            [&box, &cache, &local_array_index](auto registration_v) noexcept {
+              using registration = typename decltype(registration_v)::type;
+              registration::template perform_deregistration<DgElementArray>(
+                  box, cache, local_array_index);
+            });
+      }
+      if (p.isUnpacking()) {
+        tmpl::for_each<registration_list>(
+            [&box, &cache, &local_array_index](auto registration_v) noexcept {
+              using registration = typename decltype(registration_v)::type;
+              registration::template perform_registration<DgElementArray>(
+                  box, cache, local_array_index);
+            });
+      }
+    }
+  }
 
   static void allocate_array(
       Parallel::CProxy_GlobalCache<Metavariables>& global_cache,
