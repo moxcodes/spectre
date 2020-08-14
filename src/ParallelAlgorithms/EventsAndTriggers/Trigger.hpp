@@ -55,7 +55,7 @@ class Trigger : public PUP::able {
                    Registration::registrants<TriggerRegistrars>>;
 
   template <typename DbTags>
-  bool is_triggered(const db::DataBox<DbTags>& box) noexcept {
+  bool is_triggered(const db::DataBox<DbTags>& box) const noexcept {
     return call_with_dynamic_type<bool, creatable_classes>(
         this, [&box](auto* const trigger) noexcept {
           return db::apply(*trigger, box);
