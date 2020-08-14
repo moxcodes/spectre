@@ -31,6 +31,7 @@
 #include "Parallel/PupStlCpp11.hpp"
 #include "Parallel/SimpleActionVisitation.hpp"
 #include "Parallel/TypeTraits.hpp"
+#include "Utilities/TypeTraits/CreateIsCallable.hpp"
 #include "Utilities/BoostHelpers.hpp"
 #include "Utilities/ErrorHandling/Assert.hpp"
 #include "Utilities/ErrorHandling/Error.hpp"
@@ -55,6 +56,11 @@ namespace Parallel {
 template <typename ParallelComponent, typename PhaseDepActionList>
 class AlgorithmImpl;
 /// \endcond
+
+namespace detail {
+CREATE_IS_CALLABLE(pup)
+CREATE_IS_CALLABLE_V(pup)
+}  // namespace detail
 
 /*!
  * \ingroup ParallelGroup
@@ -195,6 +201,7 @@ class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
     p | inboxes_;
     p | array_index_;
     p | global_cache_;
+    invoke_component_pup_with_current_box(p, box_);
   }
   /// \cond
   ~AlgorithmImpl() override;
@@ -318,8 +325,8 @@ class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
 
   /// Tell the Algorithm it should no longer execute the algorithm. This does
   /// not mean that the execution of the program is terminated, but only that
-  /// the algorithm has terminated. An algorithm can be restarted by pass `true`
-  /// as the second argument to the `receive_data` method or by calling
+  /// the algorithm has terminated. An algorithm can be restarted by passing
+  /// `true` as the second argument to the `receive_data` method or by calling
   /// perform_algorithm(true).
   constexpr void set_terminate(const bool t) noexcept { terminate_ = t; }
 
@@ -373,6 +380,36 @@ class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
   // @}
 
  private:
+  template <typename ThisVariant, typename... Variants, typename... Args>
+  void invoke_component_pup_with_current_box_impl(
+      PUP::er& p, boost::variant<Variants...>& box,
+      const gsl::not_null<int*> iter,
+      const gsl::not_null<bool*> already_visited) noexcept {
+    // void cast to avoid compiler warnings about the unused variable in the
+    // false branch of the constexpr
+    (void)already_visited;
+    if constexpr (detail::is_pup_callable_v<
+                      ParallelComponent, decltype(p), ThisVariant&,
+                      decltype(*global_cache_)&, array_index&>) {
+      if (box.which() == *iter and not *already_visited) {
+        ParallelComponent::pup(p, boost::get<ThisVariant>(box), phase_,
+                               *global_cache_, array_index_);
+        *already_visited = true;
+      }
+    }
+    ++(*iter);
+  }
+
+  template <typename... Variants, typename... Args>
+  void invoke_component_pup_with_current_box(
+      PUP::er& p, boost::variant<Variants...>& box) noexcept {
+    int iter = 0;
+    bool already_visited = false;
+    EXPAND_PACK_LEFT_TO_RIGHT(
+        invoke_component_pup_with_current_box_impl<Variants>(p, box, &iter,
+                                                             &already_visited));
+  }
+
   static constexpr bool is_singleton =
       std::is_same_v<chare_type, Parallel::Algorithms::Singleton>;
 
