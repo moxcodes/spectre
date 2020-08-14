@@ -27,6 +27,7 @@
 #include "Utilities/Overloader.hpp"
 #include "Utilities/TMPL.hpp"
 #include "Utilities/TaggedTuple.hpp"
+#include "Utilities/TypeTraits/CreateHasStaticMemberVariable.hpp"
 
 #include "Parallel/Main.decl.h"
 
@@ -391,6 +392,11 @@ void Main<Metavariables>::
                        this->thisProxy));
 }
 
+namespace detail {
+CREATE_HAS_STATIC_MEMBER_VARIABLE(LoadBalancing)
+CREATE_HAS_STATIC_MEMBER_VARIABLE_V(LoadBalancing)
+}  // namespace detail
+
 template <typename Metavariables>
 void Main<Metavariables>::execute_next_phase() noexcept {
   if (not static_cast<bool>(phase_to_resume_after_sync_phases_)) {
@@ -412,6 +418,18 @@ void Main<Metavariables>::execute_next_phase() noexcept {
     Informer::print_exit_info();
     Parallel::exit();
   }
+  if constexpr (detail::has_LoadBalancing_v<typename Metavariables::Phase>) {
+    if (Metavariables::Phase::LoadBalancing == current_phase_) {
+      Parallel::printf("Starting phase: LoadBalancing at: %f\n",
+                       Parallel::wall_time());
+      CkStartLB();
+      CkStartQD(CkCallback(CkIndex_Main<Metavariables>::execute_next_phase(),
+                           this->thisProxy));
+      return;
+    }
+  }
+  Parallel::printf("Starting phase: %zu at: %f\n",
+                   static_cast<size_t>(current_phase_), Parallel::wall_time());
   tmpl::for_each<component_list>([this](auto parallel_component) noexcept {
     tmpl::type_from<decltype(parallel_component)>::execute_next_phase(
         current_phase_, global_cache_proxy_);
