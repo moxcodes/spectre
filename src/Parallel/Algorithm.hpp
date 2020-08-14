@@ -527,8 +527,9 @@ class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
     // void cast to avoid compiler warnings about the unused variable in the
     // false branch of the constexpr
     (void)already_visited;
-    if constexpr (detail::is_pup_callable_v<ParallelComponent, ThisVariant,
-                                            array_index>) {
+    if constexpr (detail::is_pup_callable_v<
+                      ParallelComponent, decltype(p), ThisVariant&,
+                      decltype(*const_global_cache_)&, array_index&>) {
       if (box.which() == *iter and not *already_visited) {
         ParallelComponent::pup(p, boost::get<ThisVariant>(box),
                                *const_global_cache_, array_index_);
