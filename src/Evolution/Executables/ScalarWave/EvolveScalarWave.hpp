@@ -38,6 +38,7 @@
 #include "NumericalAlgorithms/LinearOperators/ExponentialFilter.hpp"
 #include "NumericalAlgorithms/LinearOperators/FilterAction.hpp"  // IWYU pragma: keep
 #include "Options/Options.hpp"
+#include "Parallel/Actions/ManagePhaseControl.hpp"
 #include "Parallel/Actions/TerminatePhase.hpp"
 #include "Parallel/InitializationFunctions.hpp"
 #include "Parallel/PhaseDependentActionList.hpp"
@@ -119,6 +120,31 @@ struct EvolutionMetavars {
           Dim, typename system::variables_tag, normal_dot_numerical_flux,
           Tags::TimeStepId>>;
 
+  enum class Phase {
+    Initialization,
+    RegisterWithObserver,
+    InitializeTimeStepperHistory,
+    LoadBalancing,
+    Evolve,
+    Exit
+  };
+
+  static std::string phase_name(const Phase phase) noexcept {
+    switch (phase) {
+      case Phase::LoadBalancing:
+        return "LoadBalancing";
+      case Phase::Evolve:
+        return "Evolve";
+      default:
+        ERROR("No name for given phase");
+    }
+  }
+
+  using global_sync_phases =
+      tmpl::list<std::integral_constant<Phase, Phase::LoadBalancing>>;
+
+  static void global_startup_routines() noexcept { TurnManualLBOn(); }
+
   using step_choosers_common =
       tmpl::list<StepChoosers::Registrars::ByBlock<volume_dim>,
                  StepChoosers::Registrars::Cfl<volume_dim, Frame::Inertial>,
@@ -148,6 +174,8 @@ struct EvolutionMetavars {
                      Tags::Time, analytic_solution_fields>,
                  Events::Registrars::ChangeSlabSize<slab_choosers>>;
   using triggers = Triggers::time_triggers;
+  using global_sync_triggers = tmpl::list<Triggers::Registrars::EveryNSlabs,
+                                          Triggers::Registrars::SpecifiedSlabs>;
 
   // A tmpl::list of tags to be added to the GlobalCache by the
   // metavariables
@@ -195,14 +223,6 @@ struct EvolutionMetavars {
                                          ScalarWave::Phi<Dim>>>,
           tmpl::list<>>>>;
 
-  enum class Phase {
-    Initialization,
-    RegisterWithObserver,
-    InitializeTimeStepperHistory,
-    Evolve,
-    Exit
-  };
-
   using initialization_actions = tmpl::list<
       Initialization::Actions::TimeAndTimeStep<EvolutionMetavars>,
       evolution::dg::Initialization::Domain<volume_dim>,
@@ -230,34 +250,45 @@ struct EvolutionMetavars {
       Initialization::Actions::DiscontinuousGalerkin<EvolutionMetavars>,
       Initialization::Actions::RemoveOptionsAndTerminatePhase>;
 
-  using component_list = tmpl::list<
-      observers::Observer<EvolutionMetavars>,
-      observers::ObserverWriter<EvolutionMetavars>,
-      DgElementArray<
-          EvolutionMetavars,
-          tmpl::list<
-              Parallel::PhaseActions<Phase, Phase::Initialization,
-                                     initialization_actions>,
+  using dg_registration_list =
+      tmpl::list<observers::Actions::RegisterWithObservers<
+          observers::RegisterObservers<Tags::Time, element_observation_type>>>;
 
-              Parallel::PhaseActions<
-                  Phase, Phase::InitializeTimeStepperHistory,
-                  SelfStart::self_start_procedure<step_actions>>,
+  using dg_element_array_component = DgElementArray<
+      EvolutionMetavars,
+      tmpl::list<
+          Parallel::PhaseActions<Phase, Phase::Initialization,
+                                 initialization_actions>,
 
-              Parallel::PhaseActions<
-                  Phase, Phase::RegisterWithObserver,
-                  tmpl::list<observers::Actions::RegisterWithObservers<
-                                 observers::RegisterObservers<
-                                     Tags::Time, element_observation_type>>,
-                             Parallel::Actions::TerminatePhase>>,
+          Parallel::PhaseActions<Phase, Phase::InitializeTimeStepperHistory,
+                                 SelfStart::self_start_procedure<step_actions>>,
 
-              Parallel::PhaseActions<
-                  Phase, Phase::Evolve,
-                  tmpl::list<
-                      Actions::RunEventsAndTriggers, Actions::ChangeSlabSize,
-                      tmpl::conditional_t<
-                          local_time_stepping,
-                          Actions::ChangeStepSize<step_choosers>, tmpl::list<>>,
-                      step_actions, Actions::AdvanceTime>>>>>;
+          Parallel::PhaseActions<Phase, Phase::RegisterWithObserver,
+                                 tmpl::list<dg_registration_list,
+                                            Parallel::Actions::TerminatePhase>>,
+
+          Parallel::PhaseActions<
+              Phase, Phase::Evolve,
+              tmpl::list<
+                  Actions::RunEventsAndTriggers, Actions::ChangeSlabSize,
+                  tmpl::conditional_t<local_time_stepping,
+                                      Actions::ChangeStepSize<step_choosers>,
+                                      tmpl::list<>>,
+                  step_actions,
+                  Parallel::Actions::ManagePhaseControl<EvolutionMetavars>,
+                  Actions::AdvanceTime>>>>;
+
+  template <typename component>
+  struct registration_list {
+    using type = std::conditional_t<
+        std::is_same_v<component, dg_element_array_component>,
+        dg_registration_list, tmpl::list<>>;
+  };
+
+  using component_list =
+      tmpl::list<observers::Observer<EvolutionMetavars>,
+                 observers::ObserverWriter<EvolutionMetavars>,
+                 dg_element_array_component>;
 
   static constexpr OptionString help{
       "Evolve a Scalar Wave in Dim spatial dimension.\n\n"
@@ -303,6 +334,8 @@ static const std::vector<void (*)()> charm_init_node_funcs{
     &Parallel::register_derived_classes_with_charm<StepController>,
     &Parallel::register_derived_classes_with_charm<TimeStepper>,
     &Parallel::register_derived_classes_with_charm<
-        Trigger<metavariables::triggers>>};
+        Trigger<metavariables::triggers>>,
+    &Parallel::register_derived_classes_with_charm<
+        Trigger<metavariables::global_sync_triggers>>};
 static const std::vector<void (*)()> charm_init_proc_funcs{
     &enable_floating_point_exceptions};
