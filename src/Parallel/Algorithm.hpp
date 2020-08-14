@@ -157,6 +157,9 @@ using get_charm_base_class_t =
 CREATE_IS_CALLABLE(is_required_sync_phase)
 CREATE_IS_CALLABLE_V(is_required_sync_phase)
 
+CREATE_IS_CALLABLE(pup)
+CREATE_IS_CALLABLE_V(pup)
+
 // for checking the DataBox return of an iterable action
 template <typename FirstIterableActionType>
 struct check_iterable_action_first_return_type : std::false_type {};
@@ -350,6 +353,7 @@ class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
       p | array_index_;
     }
     p | const_global_cache_;
+    invoke_component_pup_with_current_box(p, box_);
   }
   /// \cond
   ~AlgorithmImpl() override;
@@ -490,17 +494,15 @@ class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
 
   /// Tell the Algorithm it should no longer execute the algorithm. This does
   /// not mean that the execution of the program is terminated, but only that
-  /// the algorithm has terminated. An algorithm can be restarted by pass `true`
-  /// as the second argument to the `receive_data` method or by calling
+  /// the algorithm has terminated. An algorithm can be restarted by passing
+  /// `true` as the second argument to the `receive_data` method or by calling
   /// perform_algorithm(true).
   constexpr void set_terminate(const bool terminate) noexcept {
     terminate_ = terminate;
   }
 
   /// Check if an algorithm should continue being evaluated
-  constexpr bool get_terminate() const noexcept {
-    return terminate_;
-  }
+  constexpr bool get_terminate() const noexcept { return terminate_; }
 
   /// Tell the algorithm that on the next designated 'global sync', it should
   /// include `phase` in the collection of phases it requests from the Main
@@ -517,6 +519,35 @@ class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
   }
 
  private:
+  template <typename ThisVariant, typename... Variants, typename... Args>
+  void invoke_component_pup_with_current_box_impl(
+      PUP::er& p, boost::variant<Variants...>& box,
+      const gsl::not_null<int*> iter,
+      const gsl::not_null<bool*> already_visited) noexcept {
+    // void cast to avoid compiler warnings about the unused variable in the
+    // false branch of the constexpr
+    (void)already_visited;
+    if constexpr (detail::is_pup_callable_v<ParallelComponent, ThisVariant,
+                                            array_index>) {
+      if (box.which() == *iter and not *already_visited) {
+        ParallelComponent::pup(p, boost::get<ThisVariant>(box),
+                               *const_global_cache_, array_index_);
+        *already_visited = true;
+      }
+    }
+    ++(*iter);
+  }
+
+  template <typename... Variants, typename... Args>
+  void invoke_component_pup_with_current_box(
+      PUP::er& p, boost::variant<Variants...>& box) noexcept {
+    int iter = 0;
+    bool already_visited = false;
+    EXPAND_PACK_LEFT_TO_RIGHT(
+        invoke_component_pup_with_current_box_impl<Variants>(p, box, &iter,
+                                                             &already_visited));
+  }
+
   static constexpr bool is_singleton =
       std::is_same_v<chare_type, Parallel::Algorithms::Singleton>;
 
