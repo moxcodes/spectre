@@ -154,20 +154,8 @@ using get_charm_base_class_t =
     typename get_charm_base_class<Component,
                                   typename Component::chare_type>::type;
 
-// checks whether the metavariables defines the function
-// `is_required_sync_phase`
-template <typename Metavariables, typename = std::void_t<>>
-struct has_required_phase_sync_function_impl : std::false_type {};
-
-template <typename Metavariables>
-struct has_required_phase_sync_function_impl<
-    Metavariables,
-    std::void_t<decltype(&Metavariables::is_required_sync_phase)>>
-    : std::true_type {};
-
-template <typename Metavariables>
-constexpr bool has_required_phase_sync_function =
-    has_required_phase_sync_function_impl<Metavariables>::value;
+CREATE_IS_CALLABLE(is_required_sync_phase)
+CREATE_IS_CALLABLE_V(is_required_sync_phase)
 
 // for checking the DataBox return of an iterable action
 template <typename FirstIterableActionType>
@@ -214,6 +202,9 @@ struct check_iterable_action_return_type<
     std::tuple<FirstType,
                AlgorithmControl<typename ParallelComponentType::metavariables>>>
     : check_iterable_action_first_return_type<FirstType> {};
+
+CREATE_IS_CALLABLE(global_startup_routines)
+CREATE_IS_CALLABLE_V(global_startup_routines)
 }  // namespace detail
 
 /*!
@@ -451,7 +442,8 @@ class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
     phase_ = next_phase;
 
     bool should_start_phase = false;
-    if constexpr(detail::has_required_phase_sync_function<metavariables>) {
+    if constexpr (detail::is_is_required_sync_phase_callable_v<
+                      metavariables, typename metavariables::Phase>) {
       should_start_phase =
           (not static_cast<bool>(phase_to_resume_after_sync_phases_) or
            phase_ == *phase_to_resume_after_sync_phases_ or
@@ -716,10 +708,13 @@ AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>::
                       initialization_items) noexcept
     : AlgorithmImpl() {
   (void)initialization_items;  // avoid potential compiler warnings if unused
+  if constexpr (detail::is_global_startup_routines_callable_v<metavariables>) {
+    metavariables::global_startup_routines();
+  }
   global_cache_ = global_cache_proxy.ckLocalBranch();
-  box_ =
-      db::create<db::AddSimpleTags<tmpl::flatten<tmpl::list<
-                     Tags::GlobalCacheImpl<metavariables>,
+  box_ = db::create<
+      db::AddSimpleTags<tmpl::flatten<
+          tmpl::list<Tags::GlobalCacheImpl<metavariables>,
                      typename ParallelComponent::initialization_tags>>>,
                  db::AddComputeTags<
                      db::wrap_tags_in<Tags::FromGlobalCache, all_cache_tags>>>(
