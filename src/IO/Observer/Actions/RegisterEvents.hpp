@@ -96,15 +96,12 @@ namespace Actions {
  * contribute data for volume and reduction observations.
  */
 struct RegisterEventsWithObservers {
-  template <typename DbTagList, typename... InboxTags, typename Metavariables,
-            typename ArrayIndex, typename ActionList,
-            typename ParallelComponent>
-  static std::tuple<db::DataBox<DbTagList>&&> apply(
-      db::DataBox<DbTagList>& box,
-      const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
-      Parallel::GlobalCache<Metavariables>& cache,
-      const ArrayIndex& array_index, const ActionList /*meta*/,
-      const ParallelComponent* const /*meta*/) noexcept {
+ private:
+  template <typename ParallelComponent, typename RegisterOrDeregisterAction,
+            typename DbTagList, typename Metavariables, typename ArrayIndex>
+  static void register_or_deregister_impl(
+      db::DataBox<DbTagList>& box, Parallel::GlobalCache<Metavariables>& cache,
+      const ArrayIndex& array_index) noexcept {
     auto& observer =
         *Parallel::get_parallel_component<observers::Observer<Metavariables>>(
              cache)
@@ -136,8 +133,44 @@ struct RegisterEventsWithObservers {
               Parallel::ArrayIndex<std::decay_t<ArrayIndex>>{array_index}),
           type_of_observation);
     }
+  }
+
+ public:
+  template <typename ParallelComponent, typename DbTagList,
+            typename Metavariables, typename ArrayIndex>
+  static void perform_registration(
+      db::DataBox<DbTagList>& box,
+      Parallel::ConstGlobalCache<Metavariables>& cache,
+      const ArrayIndex& array_index) noexcept {
+    register_or_deregister_impl<ParallelComponent,
+                                RegisterContributorWithObserver>(box, cache,
+                                                                 array_index);
+  }
+
+  template <typename ParallelComponent, typename DbTagList,
+            typename Metavariables, typename ArrayIndex>
+  static void perform_deregistration(
+      db::DataBox<DbTagList>& box,
+      Parallel::ConstGlobalCache<Metavariables>& cache,
+      const ArrayIndex& array_index) noexcept {
+    register_or_deregister_impl<ParallelComponent,
+                                DeregisterContributorWithObserver>(box, cache,
+                                                                   array_index);
+  }
+
+  template <typename DbTagList, typename... InboxTags, typename Metavariables,
+            typename ArrayIndex, typename ActionList,
+            typename ParallelComponent>
+  static std::tuple<db::DataBox<DbTagList>&&> apply(
+      db::DataBox<DbTagList>& box,
+      const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
+      Parallel::GlobalCache<Metavariables>& cache,
+      const ArrayIndex& array_index, const ActionList /*meta*/,
+      const ParallelComponent* const /*meta*/) noexcept {
+    perform_registration<ParallelComponent>(box, cache, array_index);
     return {std::move(box)};
   }
 };
+
 }  // namespace Actions
 }  // namespace observers

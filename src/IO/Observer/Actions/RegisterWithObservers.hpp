@@ -37,6 +37,49 @@ namespace observers::Actions {
  */
 template <typename RegisterHelper>
 struct RegisterWithObservers {
+ private:
+  template <typename ParallelComponent, typename RegisterOrDeregisterAction,
+            typename DbTagList, typename Metavariables, typename ArrayIndex>
+  static void register_or_deregister_impl(
+      db::DataBox<DbTagList>& box, Parallel::GlobalCache<Metavariables>& cache,
+      const ArrayIndex& array_index) noexcept {
+    auto& observer =
+        *Parallel::get_parallel_component<observers::Observer<Metavariables>>(
+             cache)
+             .ckLocalBranch();
+    const auto [type_of_observation, observation_id] =
+        RegisterHelper::template register_info<ParallelComponent>(box,
+                                                                  array_index);
+
+    Parallel::simple_action<RegisterOrDeregisterAction>(
+        observer, observation_id,
+        observers::ArrayComponentId(
+            std::add_pointer_t<ParallelComponent>{nullptr},
+            Parallel::ArrayIndex<std::decay_t<ArrayIndex>>{array_index}),
+        type_of_observation);
+  }
+ public:
+  template <typename ParallelComponent, typename DbTagList,
+            typename Metavariables, typename ArrayIndex>
+  static void perform_registration(
+      db::DataBox<DbTagList>& box,
+      Parallel::ConstGlobalCache<Metavariables>& cache,
+      const ArrayIndex& array_index) noexcept {
+    register_or_deregister_impl<ParallelComponent, RegisterSenderWithSelf>(
+        box, cache, array_index);
+  }
+
+  template <typename ParallelComponent, typename DbTagList,
+            typename Metavariables, typename ArrayIndex>
+  static void perform_deregistration(
+      db::DataBox<DbTagList>& box,
+      Parallel::ConstGlobalCache<Metavariables>& cache,
+      const ArrayIndex& array_index) noexcept {
+    register_or_deregister_impl<ParallelComponent, DeregisterSenderWithSelf>(
+        box, cache, array_index);
+  }
+
+
   template <typename DbTagList, typename... InboxTags, typename Metavariables,
             typename ArrayIndex, typename ActionList,
             typename ParallelComponent>
@@ -46,21 +89,7 @@ struct RegisterWithObservers {
       Parallel::GlobalCache<Metavariables>& cache,
       const ArrayIndex& array_index, const ActionList /*meta*/,
       const ParallelComponent* const /*meta*/) noexcept {
-    auto& observer =
-        *Parallel::get_parallel_component<observers::Observer<Metavariables>>(
-             cache)
-             .ckLocalBranch();
-    const auto [type_of_observation, observation_id] =
-        RegisterHelper::template register_info<ParallelComponent>(box,
-                                                                  array_index);
-
-    Parallel::simple_action<
-        observers::Actions::RegisterContributorWithObserver>(
-        observer, observation_id,
-        observers::ArrayComponentId(
-            std::add_pointer_t<ParallelComponent>{nullptr},
-            Parallel::ArrayIndex<std::decay_t<ArrayIndex>>{array_index}),
-        type_of_observation);
+    perform_registration<ParallelComponent>(box, cache, array_index);
     return {std::move(box)};
   }
 };
