@@ -426,8 +426,7 @@ void Main<Metavariables>::execute_next_phase() noexcept {
       Parallel::printf("Starting phase: LoadBalancing at: %f\n",
                        Parallel::wall_time());
       CkStartLB();
-      CkStartQD(CkCallback(CkIndex_Main<Metavariables>::execute_next_phase(),
-                           this->thisProxy));
+      (this->thisProxy).execute_next_phase();
       return;
     }
   }
