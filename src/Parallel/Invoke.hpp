@@ -17,7 +17,7 @@ namespace detail {
 inline bool max_inline_entry_methods_reached() noexcept {
   thread_local size_t approx_stack_depth = 0;
   approx_stack_depth++;
-  if (approx_stack_depth < 64) {
+  if (approx_stack_depth < 0) {
     return false;
   }
   approx_stack_depth = 0;
