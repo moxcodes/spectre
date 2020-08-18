@@ -41,7 +41,10 @@
 #include "Utilities/TMPL.hpp"
 #include "Utilities/TaggedTuple.hpp"
 #include "Utilities/TypeTraits.hpp"
+#include "Utilities/TypeTraits/CreateHasStaticMemberVariable.hpp"
 #include "Utilities/TypeTraits/IsA.hpp"
+
+#include "Parallel/Printf.hpp"
 
 #include "Algorithms/AlgorithmArray.decl.h"
 #include "Algorithms/AlgorithmGroup.decl.h"
@@ -208,6 +211,9 @@ struct check_iterable_action_return_type<
 
 CREATE_IS_CALLABLE(global_startup_routines)
 CREATE_IS_CALLABLE_V(global_startup_routines)
+
+CREATE_HAS_STATIC_MEMBER_VARIABLE(LoadBalancing)
+CREATE_HAS_STATIC_MEMBER_VARIABLE_V(LoadBalancing)
 }  // namespace detail
 
 /*!
@@ -441,7 +447,25 @@ class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
   }
   // @}
 
+  void ResumeFromSync() {
+    (*(const_global_cache_->get_main_proxy())).down_lb_count();
+    return;
+  }
+
   void start_phase(const PhaseType next_phase) noexcept {
+    if constexpr (detail::has_LoadBalancing_v<PhaseType>) {
+      if (next_phase == PhaseType::LoadBalancing) {
+        if constexpr (std::is_same_v<typename ParallelComponent::chare_type,
+                      Algorithms::Array>) {
+          (*(const_global_cache_->get_main_proxy())).up_lb_count();
+          this->AtSync();
+          return;
+        } else {
+          return;
+        }
+      }
+    }
+
     const PhaseType previous_phase = phase_;
     phase_ = next_phase;
 
@@ -739,6 +763,11 @@ AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>::
                   tuples::TaggedTuple<InitializationTags...>
                       initialization_items) noexcept
     : AlgorithmImpl() {
+  if constexpr (std::is_same_v<typename ParallelComponent::chare_type,
+                               Algorithms::Array>) {
+    this->usesAtSync = true;
+    this->setMigratable(true);
+  }
   (void)initialization_items;  // avoid potential compiler warnings if unused
   if constexpr (detail::is_global_startup_routines_callable_v<metavariables>) {
     metavariables::global_startup_routines();

@@ -71,6 +71,15 @@ class Main : public CBase_Main<Metavariables> {
   /// next requested phase will be run.
   void execute_next_phase() noexcept;
 
+  void up_lb_count() noexcept {
+    ++number_of_lb_components_;
+  }
+
+  void down_lb_count() noexcept {
+    ++number_of_lb_components_returned_;
+  }
+
+
   /// Request a collection of phases to execute after the next global sync
   void request_global_sync_phases(
       const std::unordered_set<typename Metavariables::Phase>&
@@ -97,6 +106,10 @@ class Main : public CBase_Main<Metavariables> {
   std::set<typename Metavariables::Phase> requested_global_sync_phases_;
   boost::optional<typename Metavariables::Phase>
       phase_to_resume_after_sync_phases_;
+  size_t number_of_lb_components_ = 0_st;
+  size_t number_of_lb_components_returned_ = 0_st;
+  bool lb_error_timer_;
+  double lb_time_waiting_;
   Options<option_list> options_;
 };
 
@@ -395,13 +408,14 @@ void Main<Metavariables>::
                        this->thisProxy));
 }
 
-namespace detail {
-CREATE_HAS_STATIC_MEMBER_VARIABLE(LoadBalancing)
-CREATE_HAS_STATIC_MEMBER_VARIABLE_V(LoadBalancing)
-}  // namespace detail
-
 template <typename Metavariables>
 void Main<Metavariables>::execute_next_phase() noexcept {
+  if (number_of_lb_components_ != number_of_lb_components_returned_) {
+    // Parallel::printf("Load balancing not finished -- restarting QD\n");
+    CkStartQD(CkCallback(CkIndex_Main<Metavariables>::execute_next_phase(),
+                         this->thisProxy));
+    return;
+  }
   if (not static_cast<bool>(phase_to_resume_after_sync_phases_)) {
     current_phase_ = Metavariables::determine_next_phase(
         current_phase_, global_cache_proxy_);
@@ -410,8 +424,8 @@ void Main<Metavariables>::execute_next_phase() noexcept {
       current_phase_ = *phase_to_resume_after_sync_phases_;
       phase_to_resume_after_sync_phases_ = boost::none;
     } else {
-      // when selecting a next phase, we prioritize those that appear earlier in
-      // the enum specification (lower values when treated as integers).
+      // when selecting a next phase, we prioritize those that appear earlier
+      // in the enum specification (lower values when treated as integers).
       current_phase_ = *(requested_global_sync_phases_.begin());
       requested_global_sync_phases_.erase(
           requested_global_sync_phases_.begin());
@@ -420,15 +434,6 @@ void Main<Metavariables>::execute_next_phase() noexcept {
   if (Metavariables::Phase::Exit == current_phase_) {
     Informer::print_exit_info();
     Parallel::exit();
-  }
-  if constexpr (detail::has_LoadBalancing_v<typename Metavariables::Phase>) {
-    if (Metavariables::Phase::LoadBalancing == current_phase_) {
-      Parallel::printf("Starting phase: LoadBalancing at: %f\n",
-                       Parallel::wall_time());
-      CkStartLB();
-      (this->thisProxy).execute_next_phase();
-      return;
-    }
   }
   Parallel::printf("Starting phase: %zu at: %f\n",
                    static_cast<size_t>(current_phase_), Parallel::wall_time());
