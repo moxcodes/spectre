@@ -105,7 +105,7 @@ struct EvolutionMetavars {
 
   using system = ScalarWave::System<Dim>;
   using temporal_id = Tags::TimeStepId;
-  static constexpr bool local_time_stepping = true;
+  static constexpr bool local_time_stepping = false;
   using boundary_condition_tag = initial_data_tag;
   using normal_dot_numerical_flux =
       Tags::NumericalFlux<ScalarWave::UpwindPenaltyCorrection<Dim>>;
@@ -171,8 +171,7 @@ struct EvolutionMetavars {
       tmpl::list<dg::Events::Registrars::ObserveFields<
                      Dim, Tags::Time, observe_fields, analytic_solution_fields>,
                  dg::Events::Registrars::ObserveErrorNorms<
-                     Tags::Time, analytic_solution_fields>,
-                 Events::Registrars::ChangeSlabSize<slab_choosers>>;
+                     Tags::Time, analytic_solution_fields>>;
   using triggers = Triggers::time_triggers;
   using global_sync_triggers = tmpl::list<Triggers::Registrars::EveryNSlabs,
                                           Triggers::Registrars::SpecifiedSlabs>;
@@ -329,8 +328,6 @@ static const std::vector<void (*)()> charm_init_node_funcs{
     &Parallel::register_derived_classes_with_charm<MathFunction<1>>,
     &Parallel::register_derived_classes_with_charm<
         StepChooser<metavariables::slab_choosers>>,
-    &Parallel::register_derived_classes_with_charm<
-        StepChooser<metavariables::step_choosers>>,
     &Parallel::register_derived_classes_with_charm<StepController>,
     &Parallel::register_derived_classes_with_charm<TimeStepper>,
     &Parallel::register_derived_classes_with_charm<
