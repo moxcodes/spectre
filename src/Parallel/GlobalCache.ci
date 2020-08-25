@@ -20,7 +20,7 @@ module GlobalCache {
                                   tmpl::_1>>>>,
         const CkCallback&);
     entry void set_self_proxy(
-        const CProxy_ConstGlobalCache<Metavariables>& self_proxy);
+        const CProxy_GlobalCache<Metavariables>& self_proxy);
     entry void set_main_proxy(const CProxy_Main<Metavariables>& main_proxy);
   }
   }

@@ -147,7 +147,7 @@ class GlobalCache : public CBase_GlobalCache<Metavariables> {
           tmpl::bind<Parallel::proxy_from_parallel_component, tmpl::_1>>>;
 
  public:
-  using self_proxy_type = CProxy_ConstGlobalCache<Metavariables>;
+  using self_proxy_type = CProxy_GlobalCache<Metavariables>;
   using main_proxy_type = CProxy_Main<Metavariables>;
   /// Access to the Metavariables template parameter
   using metavariables = Metavariables;
@@ -240,7 +240,7 @@ void GlobalCache<Metavariables>::set_parallel_components(
 }
 
 template <typename Metavariables>
-void ConstGlobalCache<Metavariables>::set_self_proxy(
+void GlobalCache<Metavariables>::set_self_proxy(
     const self_proxy_type& self_proxy) noexcept {
   if (not static_cast<bool>(self_proxy_)) {
     self_proxy_ = self_proxy;
@@ -251,13 +251,13 @@ void ConstGlobalCache<Metavariables>::set_self_proxy(
 
 template <typename Metavariables>
 boost::optional<
-    typename Parallel::ConstGlobalCache<Metavariables>::self_proxy_type>
-ConstGlobalCache<Metavariables>::get_self_proxy() noexcept {
+    typename Parallel::GlobalCache<Metavariables>::self_proxy_type>
+GlobalCache<Metavariables>::get_self_proxy() noexcept {
   return self_proxy_;
 }
 
 template <typename Metavariables>
-void ConstGlobalCache<Metavariables>::set_main_proxy(
+void GlobalCache<Metavariables>::set_main_proxy(
     const main_proxy_type& main_proxy) noexcept {
   if (not static_cast<bool>(main_proxy_)) {
     main_proxy_ = main_proxy;
@@ -268,8 +268,8 @@ void ConstGlobalCache<Metavariables>::set_main_proxy(
 
 template <typename Metavariables>
 boost::optional<
-    typename Parallel::ConstGlobalCache<Metavariables>::main_proxy_type>
-ConstGlobalCache<Metavariables>::get_main_proxy() noexcept {
+    typename Parallel::GlobalCache<Metavariables>::main_proxy_type>
+GlobalCache<Metavariables>::get_main_proxy() noexcept {
   return main_proxy_;
 }
 
@@ -375,9 +375,9 @@ namespace PUP {
 /// Serialization of a pointer to the const global cache for Charm++
 template <typename Metavariables>
 inline void pup(PUP::er& p,  // NOLINT
-                Parallel::ConstGlobalCache<Metavariables>*& t) noexcept {
+                Parallel::GlobalCache<Metavariables>*& t) noexcept {
   boost::optional<
-      typename Parallel::ConstGlobalCache<Metavariables>::self_proxy_type>
+      typename Parallel::GlobalCache<Metavariables>::self_proxy_type>
       local_const_global_cache_proxy;
   if (p.isUnpacking()) {
     p | local_const_global_cache_proxy;
@@ -396,7 +396,7 @@ inline void pup(PUP::er& p,  // NOLINT
 /// Serialization of a pointer to the const global cache for Charm++
 template <typename Metavariables>
 inline void operator|(PUP::er& p,  // NOLINT
-                      Parallel::ConstGlobalCache<Metavariables>*& t) {
+                      Parallel::GlobalCache<Metavariables>*& t) {
   pup(p, t);
 }
 }  // namespace PUP

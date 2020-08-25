@@ -127,7 +127,7 @@ struct DgElementArray {
 
   template <typename DbTagList, typename ArrayIndex>
   static void pup(PUP::er& p, db::DataBox<DbTagList>& box,
-                  Parallel::ConstGlobalCache<Metavariables>& cache,
+                  Parallel::GlobalCache<Metavariables>& cache,
                   const ArrayIndex& array_index) noexcept {
     // this does not actually insert anything into the PUP::er stream, so
     // nothing is done on a sizing pup.

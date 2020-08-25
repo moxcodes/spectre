@@ -358,7 +358,7 @@ class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
                                      Algorithms::Singleton>) {
       p | array_index_;
     }
-    p | const_global_cache_;
+    p | global_cache_;
     invoke_component_pup_with_current_box(p, box_);
   }
   /// \cond
@@ -447,17 +447,20 @@ class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
   }
   // @}
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Winconsistent-missing-override"
   void ResumeFromSync() {
-    (*(const_global_cache_->get_main_proxy())).down_lb_count();
+    (*(global_cache_->get_main_proxy())).down_lb_count();
     return;
   }
+#pragma GCC diagnostic pop
 
   void start_phase(const PhaseType next_phase) noexcept {
     if constexpr (detail::has_LoadBalancing_v<PhaseType>) {
       if (next_phase == PhaseType::LoadBalancing) {
         if constexpr (std::is_same_v<typename ParallelComponent::chare_type,
                       Algorithms::Array>) {
-          (*(const_global_cache_->get_main_proxy())).up_lb_count();
+          (*(global_cache_->get_main_proxy())).up_lb_count();
           this->AtSync();
           return;
         } else {
@@ -553,10 +556,10 @@ class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
     (void)already_visited;
     if constexpr (detail::is_pup_callable_v<
                       ParallelComponent, decltype(p), ThisVariant&,
-                      decltype(*const_global_cache_)&, array_index&>) {
+                      decltype(*global_cache_)&, array_index&>) {
       if (box.which() == *iter and not *already_visited) {
         ParallelComponent::pup(p, boost::get<ThisVariant>(box),
-                               *const_global_cache_, array_index_);
+                               *global_cache_, array_index_);
         *already_visited = true;
       }
     }
@@ -638,7 +641,7 @@ class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
   template <typename ThisAction, typename ActionList, typename DbTags>
   void invoke_iterable_action(db::DataBox<DbTags>& my_box) noexcept {
     auto action_return = ThisAction::apply(
-        my_box, inboxes_, *const_global_cache_, std::as_const(array_index_),
+        my_box, inboxes_, *global_cache_, std::as_const(array_index_),
         ActionList{}, std::add_pointer_t<ParallelComponent>{});
 
     static_assert(
@@ -680,7 +683,7 @@ class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
                 number_of_actions_in_phase(phase_)) {
               algorithm_step_to_resume_after_sync_phases_ = 0_st;
             }
-            (*(const_global_cache_->get_main_proxy()))
+            (*(global_cache_ ->get_main_proxy()))
                 .request_global_sync_phases(requested_next_global_sync_phases_);
           case AlgorithmExecution::Halt:
             sleep_algorithm_until_next_phase_ = true;
