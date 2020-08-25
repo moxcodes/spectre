@@ -7,7 +7,7 @@
 
 #include "Options/Options.hpp"
 #include "Parallel/Algorithm.hpp"
-#include "Parallel/ConstGlobalCache.hpp"
+#include "Parallel/GlobalCache.hpp"
 #include "Parallel/Tags.hpp"
 #include "ParallelAlgorithms/EventsAndTriggers/Trigger.hpp"
 #include "Utilities/TMPL.hpp"

@@ -23,7 +23,7 @@
 #include "ErrorHandling/FloatingPointExceptions.hpp"
 #include "Options/Options.hpp"
 #include "Parallel/Actions/TerminatePhase.hpp"
-#include "Parallel/ConstGlobalCache.hpp"
+#include "Parallel/GlobalCache.hpp"
 #include "Parallel/InboxInserters.hpp"
 #include "Parallel/InitializationFunctions.hpp"
 #include "Parallel/Invoke.hpp"
@@ -87,7 +87,7 @@ struct ComponentBeta {
 
   static void execute_next_phase(
       const typename Metavariables::Phase next_phase,
-      const Parallel::CProxy_ConstGlobalCache<Metavariables>& global_cache) {
+      const Parallel::CProxy_GlobalCache<Metavariables>& global_cache) {
     auto& local_cache = *(global_cache.ckLocalBranch());
     Parallel::simple_action<Actions::RecordCurrentPhase>(
         Parallel::get_parallel_component<ComponentBeta>(local_cache),
@@ -134,7 +134,7 @@ struct ComponentAlpha {
 
   static void execute_next_phase(
       const typename Metavariables::Phase next_phase,
-      const Parallel::CProxy_ConstGlobalCache<Metavariables>& global_cache) {
+      const Parallel::CProxy_GlobalCache<Metavariables>& global_cache) {
     auto& local_cache = *(global_cache.ckLocalBranch());
     Parallel::simple_action<Actions::RecordCurrentPhase>(
         Parallel::get_parallel_component<ComponentAlpha>(local_cache),
@@ -166,7 +166,7 @@ struct InitializePhaseRecord {
             typename ParallelComponent>
   static auto apply(db::DataBox<DbTags>& box,
                     const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
-                    const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
+                    const Parallel::GlobalCache<Metavariables>& /*cache*/,
                     const ArrayIndex& /*array_index*/,
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
@@ -186,7 +186,7 @@ struct RecordCurrentPhase {
       typename Metavariables,
       Requires<tmpl::list_contains_v<DbTagsList, Tags::PhaseRecord>> = nullptr>
   static void apply(db::DataBox<DbTagsList>& box,
-                    Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
+                    Parallel::GlobalCache<Metavariables>& /*cache*/,
                     const ArrayIndex& /*array_index*/,
                     const typename Metavariables::Phase& phase) noexcept {
     db::mutate<Tags::PhaseRecord>(
@@ -202,7 +202,7 @@ struct RecordCurrentPhase {
             Requires<not tmpl::list_contains_v<DbTagsList, Tags::PhaseRecord>> =
                 nullptr>
   static void apply(const db::DataBox<DbTagsList>& /*box*/,
-                    const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
+                    const Parallel::GlobalCache<Metavariables>& /*cache*/,
                     const ArrayIndex& /*array_index*/,
                     const typename Metavariables::Phase& /*phase*/) noexcept {}
 };
@@ -215,7 +215,7 @@ struct RecordPhaseIteration {
             typename ParallelComponent>
   static auto apply(db::DataBox<DbTags>& box,
                     const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
-                    const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
+                    const Parallel::GlobalCache<Metavariables>& /*cache*/,
                     const ArrayIndex& /*array_index*/,
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
@@ -242,7 +242,7 @@ struct RestartMe {
   template <typename ParallelComponent, typename... DbTags, typename ArrayIndex,
             typename Metavariables>
   static void apply(db::DataBox<tmpl::list<DbTags...>>& /*box*/,
-                    Parallel::ConstGlobalCache<Metavariables>& cache,
+                    Parallel::GlobalCache<Metavariables>& cache,
                     const ArrayIndex& /*array_index*/) noexcept {
     Parallel::get_parallel_component<ParallelComponent>(cache)
         .perform_algorithm(true);
@@ -256,7 +256,7 @@ struct TerminateAndRestart {
             typename ParallelComponent>
   static auto apply(db::DataBox<DbTags>& box,
                     const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
-                    Parallel::ConstGlobalCache<Metavariables>& cache,
+                    Parallel::GlobalCache<Metavariables>& cache,
                     const ArrayIndex& /*array_index*/,
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
@@ -280,7 +280,7 @@ struct RequestPhaseEntryFunction {
             typename ParallelComponent>
   static auto apply(db::DataBox<DbTags>& box,
                     const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
-                    Parallel::ConstGlobalCache<Metavariables>& cache,
+                    Parallel::GlobalCache<Metavariables>& cache,
                     const ArrayIndex& /*array_index*/,
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
@@ -305,7 +305,7 @@ struct RequestPhaseActionReturn {
             typename ParallelComponent>
   static auto apply(db::DataBox<DbTags>& box,
                     const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
-                    const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
+                    const Parallel::GlobalCache<Metavariables>& /*cache*/,
                     const ArrayIndex& /*array_index*/,
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
@@ -338,7 +338,7 @@ struct StopForSync {
             typename ParallelComponent>
   static auto apply(db::DataBox<DbTags>& box,
                     const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
-                    const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
+                    const Parallel::GlobalCache<Metavariables>& /*cache*/,
                     const ArrayIndex& /*array_index*/,
                     const ActionList /*meta*/,
                     const ParallelComponent* const /*meta*/) noexcept {
@@ -348,7 +348,7 @@ struct StopForSync {
       algorithm_control.execution_flag =
           Parallel::AlgorithmExecution::SleepForSyncPhases;
     }
-    if(db::get<Tags::Step>(box) > 25_st) {
+    if (db::get<Tags::Step>(box) > 25_st) {
       algorithm_control.execution_flag = Parallel::AlgorithmExecution::Halt;
     }
     return std::make_tuple(std::move(box), algorithm_control);
@@ -361,7 +361,7 @@ struct Finalize {
       typename Metavariables,
       Requires<tmpl::list_contains_v<DbTagsList, Tags::PhaseRecord>> = nullptr>
   static auto apply(const db::DataBox<DbTagsList>& box,
-                    const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
+                    const Parallel::GlobalCache<Metavariables>& /*cache*/,
                     const ArrayIndex& /*array_index*/) noexcept {
     const std::string& log = db::get<Tags::PhaseRecord>(box);
     SPECTRE_PARALLEL_REQUIRE(
@@ -373,7 +373,7 @@ struct Finalize {
             Requires<not tmpl::list_contains_v<DbTagsList, Tags::PhaseRecord>> =
                 nullptr>
   static auto apply(const db::DataBox<DbTagsList>& /*box*/,
-                    const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
+                    const Parallel::GlobalCache<Metavariables>& /*cache*/,
                     const ArrayIndex& /*array_index*/) noexcept {
     SPECTRE_PARALLEL_REQUIRE(false);
   }
@@ -569,7 +569,7 @@ struct TestMetavariables {
 
   static Phase determine_next_phase(
       const Phase& current_phase,
-      const Parallel::CProxy_ConstGlobalCache<
+      const Parallel::CProxy_GlobalCache<
           TestMetavariables>& /*cache_proxy*/) noexcept {
     switch (current_phase) {
       case Phase::Initialization:

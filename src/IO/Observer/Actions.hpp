@@ -76,7 +76,7 @@ struct DeregisterVolumeContributorWithObserverWriter {
             Requires<tmpl::list_contains_v<
                 DbTagsList, Tags::VolumeObserversRegistered>> = nullptr>
   static void apply(db::DataBox<DbTagsList>& box,
-                    const Parallel::ConstGlobalCache<Metavariables>& /*cache*/,
+                    const Parallel::GlobalCache<Metavariables>& /*cache*/,
                     const ArrayIndex& /*array_index*/,
                     const observers::ObservationId& observation_id,
                     const size_t processing_element) noexcept {
@@ -211,7 +211,7 @@ struct DeregisterReductionContributorWithObserverWriter {
                                      Tags::ReductionObserversRegisteredNodes>> =
           nullptr>
   static void apply(db::DataBox<DbTagsList>& box,
-                    Parallel::ConstGlobalCache<Metavariables>& cache,
+                    Parallel::GlobalCache<Metavariables>& cache,
                     const ArrayIndex& /*array_index*/,
                     const observers::ObservationId& observation_id,
                     const size_t processing_element_or_node,
@@ -394,7 +394,7 @@ struct DeregisterSenderWithSelf {
                    DbTagList, observers::Tags::VolumeArrayComponentIds>> =
           nullptr>
   static void apply(db::DataBox<DbTagList>& box,
-                    Parallel::ConstGlobalCache<Metavariables>& cache,
+                    Parallel::GlobalCache<Metavariables>& cache,
                     const ArrayIndex& /*array_index*/,
                     const observers::ObservationId& observation_id,
                     const observers::ArrayComponentId& component_id,
@@ -502,10 +502,9 @@ struct RegisterWithObservers {
  public:
   template <typename ParallelComponent, typename DbTagList,
             typename Metavariables, typename ArrayIndex>
-  static void perform_registration(
-      db::DataBox<DbTagList>& box,
-      Parallel::ConstGlobalCache<Metavariables>& cache,
-      const ArrayIndex& array_index) noexcept {
+  static void perform_registration(db::DataBox<DbTagList>& box,
+                                   Parallel::GlobalCache<Metavariables>& cache,
+                                   const ArrayIndex& array_index) noexcept {
     register_or_deregister_impl<ParallelComponent, RegisterSenderWithSelf>(
         box, cache, array_index);
   }
@@ -513,8 +512,7 @@ struct RegisterWithObservers {
   template <typename ParallelComponent, typename DbTagList,
             typename Metavariables, typename ArrayIndex>
   static void perform_deregistration(
-      db::DataBox<DbTagList>& box,
-      Parallel::ConstGlobalCache<Metavariables>& cache,
+      db::DataBox<DbTagList>& box, Parallel::GlobalCache<Metavariables>& cache,
       const ArrayIndex& array_index) noexcept {
     register_or_deregister_impl<ParallelComponent, DeregisterSenderWithSelf>(
         box, cache, array_index);
@@ -526,7 +524,7 @@ struct RegisterWithObservers {
   static std::tuple<db::DataBox<DbTagList>&&> apply(
       db::DataBox<DbTagList>& box,
       const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
-      Parallel::ConstGlobalCache<Metavariables>& cache,
+      Parallel::GlobalCache<Metavariables>& cache,
       const ArrayIndex& array_index, const ActionList /*meta*/,
       const ParallelComponent* const /*meta*/) noexcept {
     perform_registration<ParallelComponent>(box, cache, array_index);
@@ -568,8 +566,7 @@ struct RegisterSingletonWithObserverWriter {
   template <typename ParallelComponent, typename RegisterOrDeregisterAction,
             typename DbTagList, typename Metavariables, typename ArrayIndex>
   static void register_or_deregister_impl(
-      db::DataBox<DbTagList>& box,
-      Parallel::GlobalCache<Metavariables>& cache,
+      db::DataBox<DbTagList>& box, Parallel::GlobalCache<Metavariables>& cache,
       const ArrayIndex& array_index) noexcept {
     std::pair<observers::TypeOfObservation, observers::ObservationId>
         type_of_observation_and_observation_id_pair =
@@ -608,10 +605,9 @@ struct RegisterSingletonWithObserverWriter {
  public:
   template <typename ParallelComponent, typename DbTagList,
             typename Metavariables, typename ArrayIndex>
-  static void perform_registration(
-      db::DataBox<DbTagList>& box,
-      Parallel::ConstGlobalCache<Metavariables>& cache,
-      const ArrayIndex& array_index) noexcept {
+  static void perform_registration(db::DataBox<DbTagList>& box,
+                                   Parallel::GlobalCache<Metavariables>& cache,
+                                   const ArrayIndex& array_index) noexcept {
     register_or_deregister_impl<
         ParallelComponent,
         Actions::RegisterReductionContributorWithObserverWriter>(box, cache,
@@ -621,8 +617,7 @@ struct RegisterSingletonWithObserverWriter {
   template <typename ParallelComponent, typename DbTagList,
             typename Metavariables, typename ArrayIndex>
   static void perform_deregistration(
-      db::DataBox<DbTagList>& box,
-      Parallel::ConstGlobalCache<Metavariables>& cache,
+      db::DataBox<DbTagList>& box, Parallel::GlobalCache<Metavariables>& cache,
       const ArrayIndex& array_index) noexcept {
     register_or_deregister_impl<
         ParallelComponent,
@@ -636,7 +631,7 @@ struct RegisterSingletonWithObserverWriter {
   static std::tuple<db::DataBox<DbTagList>&&, bool> apply(
       db::DataBox<DbTagList>& box,
       const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
-      Parallel::ConstGlobalCache<Metavariables>& cache,
+      Parallel::GlobalCache<Metavariables>& cache,
       const ArrayIndex& array_index, const ActionList /*meta*/,
       const ParallelComponent* const /*meta*/) noexcept {
     perform_registration<ParallelComponent>(box, cache, array_index);
