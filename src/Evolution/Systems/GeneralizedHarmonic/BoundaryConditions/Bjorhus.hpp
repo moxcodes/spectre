@@ -26,11 +26,10 @@
 #include "Evolution/Systems/GeneralizedHarmonic/Characteristics.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Tags.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/Actions/ImposeBoundaryConditions.hpp"
-#include "NumericalAlgorithms/DiscontinuousGalerkin/FluxCommunicationTypes.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/MortarHelpers.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/Tags.hpp"
 #include "Parallel/Abort.hpp"
-#include "Parallel/ConstGlobalCache.hpp"
+#include "Parallel/GlobalCache.hpp"
 #include "Parallel/Invoke.hpp"
 #include "Parallel/Printf.hpp"
 #include "PointwiseFunctions/AnalyticSolutions/Tags.hpp"
@@ -57,7 +56,7 @@ namespace BoundaryConditions_detail {}  // namespace BoundaryConditions_detail
 ///   Tags::Interface<Tags::ExternalBoundaryDirections<volume_dim>, Tag>
 ///
 /// Uses:
-/// - ConstGlobalCache:
+/// - GlobalCache:
 ///   - Metavariables::normal_dot_numerical_flux
 ///   - Metavariables::boundary_condition
 /// - DataBox:
@@ -103,7 +102,7 @@ struct ImposeBjorhusBoundaryConditions {
     static std::tuple<db::DataBox<DbTags>&&> function_impl(
         db::DataBox<DbTags>& box,
         tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
-        Parallel::ConstGlobalCache<Metavariables>& cache,
+        Parallel::GlobalCache<Metavariables>& cache,
         const ArrayIndex& /*array_index*/, const ActionList /*meta*/,
         const ParallelComponent* const /*meta*/) noexcept {
       // Get information about system:
@@ -296,7 +295,7 @@ struct ImposeBjorhusBoundaryConditions {
             typename ActionList, typename ParallelComponent>
   static std::tuple<db::DataBox<DbTags>&&> apply(
       db::DataBox<DbTags>& box, tuples::TaggedTuple<InboxTags...>& inboxes,
-      Parallel::ConstGlobalCache<Metavariables>& cache,
+      Parallel::GlobalCache<Metavariables>& cache,
       const ArrayIndex& array_index, const ActionList action_list,
       const ParallelComponent* const parallel_component) noexcept {
     return apply_impl<Metavariables::system::volume_dim,
