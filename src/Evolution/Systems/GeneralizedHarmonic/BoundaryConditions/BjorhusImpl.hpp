@@ -1170,8 +1170,7 @@ ReturnType set_dt_v_minus<ReturnType, VolumeDim>::
         }
       }
       return tmp_metric;
-    }
-    ();
+    }();
     GeneralizedHarmonic::spatial_projection_tensor(
         make_not_null(&spatial_projection_ij), spatial_metric,
         unit_interface_normal_one_form);

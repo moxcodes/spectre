@@ -126,7 +126,8 @@ class ObserveNorms<ObservationValueTag, tmpl::list<Tensors...>, EventRegistrars>
       const ParallelComponent* const /*meta*/) const noexcept {
     tuples::TaggedTuple<LocalSquareError<Tensors>...> local_square_errors;
     const auto record_errors = [&local_square_errors](
-        const auto tensor_tag_v, const auto& tensor) noexcept {
+                                   const auto tensor_tag_v,
+                                   const auto& tensor) noexcept {
       using tensor_tag = tmpl::type_from<decltype(tensor_tag_v)>;
       double local_square_error = 0.0;
       for (size_t i = 0; i < tensor.size(); ++i) {
