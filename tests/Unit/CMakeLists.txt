@@ -63,6 +63,7 @@ target_link_libraries(
   Options
   SystemUtilities
   Utilities
+  util
   )
 
 add_dependencies(
