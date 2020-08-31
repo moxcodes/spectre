@@ -62,6 +62,7 @@ target_link_libraries(
   Informer
   Options
   Utilities
+  util
   )
 
 add_dependencies(
