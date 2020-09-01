@@ -605,20 +605,44 @@ bool PnWorldtubeDataManager::populate_hypersurface_boundary_data(
             time));
   }
 
-  using tags_to_zero = tmpl::list<Tags::BondiBeta, Tags::BondiU, Tags::BondiQ,
-                                  Tags::Dr<Tags::BondiU>, Tags::BondiW,
-                                  Tags::Du<Tags::BondiR>, Tags::DuRDividedByR>;
-  tmpl::for_each<tags_to_zero>([&boundary_data_variables](auto tag_v) noexcept {
-    using tag = typename decltype(tag_v)::type;
-    get(get<Tags::BoundaryValue<tag>>(*boundary_data_variables)).data() =
-        std::complex<double>(0.0, 0.0);
-  });
-  get(get<Tags::BoundaryValue<Tags::BondiR>>(*boundary_data_variables)).data() =
-      std::complex<double>(1.0, 0.0) * extraction_radius_;
+  const size_t size = Spectral::Swsh::number_of_swsh_collocation_points(l_max);
+  Variables<tmpl::list<Tags::detail::CosPhi, Tags::detail::CosTheta,
+                       Tags::detail::SinPhi, Tags::detail::SinTheta,
+                       Tags::detail::CartesianCoordinates,
+                       Tags::detail::CartesianToSphericalJacobian,
+                       Tags::detail::InverseCartesianToSphericalJacobian>>
+      computation_variables{size};
+
+  auto& cos_phi = get<Tags::detail::CosPhi>(computation_variables);
+  auto& cos_theta = get<Tags::detail::CosTheta>(computation_variables);
+  auto& sin_phi = get<Tags::detail::SinPhi>(computation_variables);
+  auto& sin_theta = get<Tags::detail::SinTheta>(computation_variables);
+  trigonometric_functions_on_swsh_collocation(
+      make_not_null(&cos_phi), make_not_null(&cos_theta),
+      make_not_null(&sin_phi), make_not_null(&sin_theta), l_max);
+
+  auto& cartesian_coords =
+      get<Tags::detail::CartesianCoordinates>(computation_variables);
+  auto& cartesian_to_spherical_jacobian =
+      get<Tags::detail::CartesianToSphericalJacobian>(computation_variables);
+  auto& inverse_cartesian_to_spherical_jacobian =
+      get<Tags::detail::InverseCartesianToSphericalJacobian>(
+          computation_variables);
+  cartesian_to_spherical_coordinates_and_jacobians(
+      make_not_null(&cartesian_coords),
+      make_not_null(&cartesian_to_spherical_jacobian),
+      make_not_null(&inverse_cartesian_to_spherical_jacobian), cos_phi,
+      cos_theta, sin_phi, sin_theta, extraction_radius);
+
+
+  // The (pfaffian) components of the angular part are:
+  //     [Re(J)   Im(J)]
+  // r^2 [Im(J)  -Re(J)]
 
   SpinWeighted<ComplexModalVector, 2> spin_weighted_view;
   spin_weighted_view.set_data_ref(interpolated_j_coefficients_.data(),
                                   interpolated_j_coefficients_.size());
+  // using J as a temporary cache even though we don't really want this as J
   Spectral::Swsh::inverse_swsh_transform(
       l_max_, 1,
       make_not_null(&get(
@@ -627,10 +651,6 @@ bool PnWorldtubeDataManager::populate_hypersurface_boundary_data(
 
   get(get<Tags::BoundaryValue<Tags::BondiJ>>(*boundary_data_variables)) =
       get(get<Tags::BoundaryValue<Tags::BondiJ>>(*boundary_data_variables)) /
-      extraction_radius_;
-  get(get<Tags::BoundaryValue<Tags::Dr<Tags::BondiJ>>>(
-      *boundary_data_variables)) =
-      -get(get<Tags::BoundaryValue<Tags::BondiJ>>(*boundary_data_variables)) /
       extraction_radius_;
 
   spin_weighted_view.set_data_ref(interpolated_h_coefficients_.data(),
@@ -643,9 +663,82 @@ bool PnWorldtubeDataManager::populate_hypersurface_boundary_data(
   get(get<Tags::BoundaryValue<Tags::BondiH>>(*boundary_data_variables)) =
       get(get<Tags::BoundaryValue<Tags::BondiH>>(*boundary_data_variables)) /
       extraction_radius_;
-  get(get<Tags::BoundaryValue<Tags::Du<Tags::BondiJ>>>(
-      *boundary_data_variables)) =
-      get(get<Tags::BoundaryValue<Tags::BondiH>>(*boundary_data_variables));
+
+  if (metric_collocation_.number_of_independent_components() != size) {
+    metric_collocation_ = Variables<cce_metric_collocation_tags>{size};
+  }
+
+  for(size_t i = 0; i <3; ++i) {
+    for (size_t j = i; j < 3; ++j) {
+      const auto& j_collocation =
+          get(get<Tags::BoundaryValue<Tags::BondiJ>>(*boundary_data_variables))
+              .data();
+      const auto& h_collocation =
+          get(get<Tags::BoundaryValue<Tags::BondiH>>(*boundary_data_variables))
+              .data();
+      // TODO modes instead.
+      get<gr::Tags::SpatialMetric<3, ::Frame::Inertial, DataVector>>(
+          metric_collocation_)
+          .get(i, j) =
+          square(inverse_cartesian_to_spherical_jacobian.get(i, 0)) *
+              real(j_collocation) +
+          2.0 * inverse_cartesian_to_spherical_jacobian.get(i, 0) *
+              inverse_cartesian_to_spherical_jacobian.get(i, 1) *
+              imag(j_collocation) -
+          square(inverse_cartesian_to_spherical_jacobian.get(i, 1)) *
+              real(j_collocation);
+      get<Tags::Dr<gr::Tags::SpatialMetric<3, ::Frame::Inertial, DataVector>>>(
+          metric_collocation_)
+          .get(i, j) =
+          -get<gr::Tags::SpatialMetric<3, ::Frame::Inertial, DataVector>>(
+               metric_collocation_)
+               .get(i, j) /
+          extraction_radius_;
+      get<::Tags::dt<
+          gr::Tags::SpatialMetric<3, ::Frame::Inertial, DataVector>>>(
+          metric_collocation_)
+          .get(i, j) =
+          square(inverse_cartesian_to_spherical_jacobian.get(i, 0)) *
+              real(h_collocation) +
+          2.0 * inverse_cartesian_to_spherical_jacobian.get(i, 0) *
+              inverse_cartesian_to_spherical_jacobian.get(i, 1) *
+              imag(h_collocation) -
+          square(inverse_cartesian_to_spherical_jacobian.get(i, 1)) *
+              real(h_collocation);
+    }
+    get<gr::Tags::Shift<3, ::Frame::Inertial, DataVector>>(metric_collocation_)
+        .get(i) = 0.0;
+    get<Tags::Dr<gr::Tags::Shift<3, ::Frame::Inertial, DataVector>>>(
+        metric_collocation_)
+        .get(i) = 0.0;
+    get<::Tags::dt<gr::Tags::Shift<3, ::Frame::Inertial, DataVector>>>(
+        metric_collocation_)
+        .get(i) = 0.0;
+  }
+  // this will need to be modified in the future pending Keefe's new worldtube
+  // data -- that'll be scalar so I think we don't need to do as much caching
+  get<gr::Tags::Lapse<3, ::Frame::Inertial, DataVector>>(metric_collocation_)
+      .get(i) = -1.0;
+  get<Tags::Dr<gr::Tags::Lapse<3, ::Frame::Inertial, DataVector>>>(
+      metric_collocation_)
+      .get(i) = 0.0;
+  get<::Tags::dt<gr::Tags::Lapse<3, ::Frame::Inertial, DataVector>>>(
+      metric_collocation_)
+      .get(i) = 0.0;
+
+  create_bondi_boundary_data(
+      boundary_data_variables,
+      get<Tags::detail::SpatialMetric>(interpolated_coefficients_),
+      get<::Tags::dt<Tags::detail::SpatialMetric>>(interpolated_coefficients_),
+      get<Tags::detail::Dr<Tags::detail::SpatialMetric>>(
+          interpolated_coefficients_),
+      get<Tags::detail::Shift>(interpolated_coefficients_),
+      get<::Tags::dt<Tags::detail::Shift>>(interpolated_coefficients_),
+      get<Tags::detail::Dr<Tags::detail::Shift>>(interpolated_coefficients_),
+      get<Tags::detail::Lapse>(interpolated_coefficients_),
+      get<::Tags::dt<Tags::detail::Lapse>>(interpolated_coefficients_),
+      get<Tags::detail::Dr<Tags::detail::Lapse>>(interpolated_coefficients_),
+      buffer_updater_->get_extraction_radius(), l_max_);
 
   return true;
 }

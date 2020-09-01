@@ -280,6 +280,8 @@ class PnWorldtubeDataManager : public WorldtubeDataManager {
   size_t l_max_ = 0;
   double extraction_radius_ = 0.0;
 
+  mutable Variables<cce_metric_input_tags> metric_collocation_;
+
   // These buffers are just kept around to avoid allocations; they're
   // updated every time a time is requested
   mutable ComplexModalVector interpolated_j_coefficients_;
