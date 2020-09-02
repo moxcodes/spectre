@@ -280,12 +280,13 @@ class PnWorldtubeDataManager : public WorldtubeDataManager {
   size_t l_max_ = 0;
   double extraction_radius_ = 0.0;
 
-  mutable Variables<cce_metric_input_tags> metric_collocation_;
+  mutable Variables<cce_metric_input_tags> metric_coefficients_;
 
   // These buffers are just kept around to avoid allocations; they're
   // updated every time a time is requested
   mutable ComplexModalVector interpolated_j_coefficients_;
   mutable ComplexModalVector interpolated_h_coefficients_;
+  mutable ComplexModalVector interpolated_conformal_coefficients_;
 
   // note: buffers store data in an 'time-varies-fastest' manner
   mutable ComplexModalVector coefficients_buffers_;
@@ -294,4 +295,9 @@ class PnWorldtubeDataManager : public WorldtubeDataManager {
 
   std::unique_ptr<intrp::SpanInterpolator> interpolator_;
 };
+
+double find_first_downgoing_zero_crossing(
+    const std::unique_ptr<WorldtubeDataManager> manager,
+    const double start_time, const double time_step) noexcept;
+
 }  // namespace Cce

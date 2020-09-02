@@ -25,7 +25,8 @@ struct JHypersurfaceData : Parallel::InboxInserters::Value<JHypersurfaceData> {
   using temporal_id = size_t;
   using type = std::unordered_map<
       size_t,
-      tuples::TaggedTuple<Tags::BondiJ, Tags::LMax<InitializationRun>,
+      tuples::TaggedTuple<Tags::BondiJ, Tags::InertialRetardedTime,
+                          Tags::LMax<InitializationRun>,
                           Tags::NumberOfRadialPoints<InitializationRun>>>;
 };
 

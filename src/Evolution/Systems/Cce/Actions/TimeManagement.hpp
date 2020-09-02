@@ -91,9 +91,11 @@ struct ExitIfEndTimeReached<InitializationRun> {
               MainRun, H5WorldtubeBoundary<MainRun, Metavariables>,
               Metavariables>>(cache),
           0_st,
-          tuples::TaggedTuple<Tags::BondiJ, Tags::LMax<InitializationRun>,
+          tuples::TaggedTuple<Tags::BondiJ, Tags::InertialRetardedTime,
+                              Tags::LMax<InitializationRun>,
                               Tags::NumberOfRadialPoints<InitializationRun>>(
               db::get<Tags::BondiJ>(box),
+              db::get<Tags::InertialRetardedTime>(box),
               db::get<Spectral::Swsh::Tags::LMaxBase>(box),
               db::get<Spectral::Swsh::Tags::NumberOfRadialPointsBase>(box)),
           true);

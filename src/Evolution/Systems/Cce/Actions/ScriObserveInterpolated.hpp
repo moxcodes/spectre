@@ -25,6 +25,8 @@
 #include "Utilities/MakeString.hpp"
 #include "Utilities/TMPL.hpp"
 
+#include "Parallel/Printf.hpp"
+
 namespace Cce {
 namespace Actions {
 namespace detail {
@@ -223,6 +225,7 @@ struct ScriObserveInterpolated {
         Spectral::Swsh::swsh_transform(l_max, 1, to_transform), l_max);
 
     (*data_to_write_buffer)[0] = time;
+    Parallel::printf("dumping time : %f\n", time);
     for (size_t i = 0; i < square(observation_l_max + 1); ++i) {
       (*data_to_write_buffer)[2 * i + 1] = real(goldberg_modes.data()[i]);
       (*data_to_write_buffer)[2 * i + 2] = imag(goldberg_modes.data()[i]);

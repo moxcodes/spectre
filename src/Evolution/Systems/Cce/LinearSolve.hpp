@@ -106,7 +106,8 @@ void transpose_to_reals_then_imags_radial_stripes(
  * roles, and have different extents, it is better for tag management to give
  * separated lists for the dependencies.
  */
-template <template <typename> class BoundaryPrefix, typename Tag>
+template <template <typename> class BoundaryPrefix, typename Tag,
+          bool BackwardsBoundary = false>
 struct RadialIntegrateBondi {
   using boundary_tags = tmpl::list<BoundaryPrefix<Tag>>;
   using integrand_tags = tmpl::list<Tags::Integrand<Tag>>;
@@ -128,7 +129,7 @@ struct RadialIntegrateBondi {
 };
 
 template <template <typename> class BoundaryPrefix>
-struct RadialIntegrateBondi<BoundaryPrefix, Tags::BondiQ> {
+struct RadialIntegrateBondi<BoundaryPrefix, Tags::BondiQ, false> {
   using boundary_tags = tmpl::list<BoundaryPrefix<Tags::BondiQ>>;
   using integrand_tags = tmpl::list<Tags::PoleOfIntegrand<Tags::BondiQ>,
                                     Tags::RegularIntegrand<Tags::BondiQ>>;
@@ -150,7 +151,7 @@ struct RadialIntegrateBondi<BoundaryPrefix, Tags::BondiQ> {
 };
 
 template <template <typename> class BoundaryPrefix>
-struct RadialIntegrateBondi<BoundaryPrefix, Tags::BondiW> {
+struct RadialIntegrateBondi<BoundaryPrefix, Tags::BondiW, false> {
   using boundary_tags = tmpl::list<BoundaryPrefix<Tags::BondiW>>;
   using integrand_tags = tmpl::list<Tags::PoleOfIntegrand<Tags::BondiW>,
                                     Tags::RegularIntegrand<Tags::BondiW>>;
@@ -172,7 +173,7 @@ struct RadialIntegrateBondi<BoundaryPrefix, Tags::BondiW> {
 };
 
 template <template <typename> class BoundaryPrefix>
-struct RadialIntegrateBondi<BoundaryPrefix, Tags::BondiH> {
+struct RadialIntegrateBondi<BoundaryPrefix, Tags::BondiH, false> {
   using boundary_tags = tmpl::list<BoundaryPrefix<Tags::BondiH>>;
   using integrand_tags =
       tmpl::list<Tags::PoleOfIntegrand<Tags::BondiH>,

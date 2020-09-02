@@ -10,6 +10,7 @@
 #include "DataStructures/DataBox/DataBox.hpp"
 #include "Evolution/Systems/Cce/Initialize/InitializeJ.hpp"
 #include "Evolution/Systems/Cce/Initialize/InitializeJCoordinatesForVolumeValue.hpp"
+#include "Evolution/Systems/Cce/Initialize/InverseCubic.hpp"
 #include "Evolution/Systems/Cce/OptionTags.hpp"
 #include "Evolution/Systems/Cce/ScriPlusValues.hpp"
 #include "Evolution/Systems/Cce/System.hpp"
@@ -134,20 +135,26 @@ struct InitializeFirstHypersurface<MainRun> {
          std::ref(radial_interpolation_matrix)}};
     db::mutate<Tags::BondiJ>(
         make_not_null(&box),
-        [&matrix_array, &mesh, &shell_interpolated_j](
+        [&matrix_array, &mesh, &shell_interpolated_j, &initialization_j](
             const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*>
                 bondi_j) noexcept {
-          apply_matrices(make_not_null(&get(*bondi_j).data()), matrix_array,
-                         shell_interpolated_j.data(), mesh.extents());
+          get(*bondi_j).data() = initialization_j.data();
+          // Debugging resampling
+          // apply_matrices(make_not_null(&get(*bondi_j).data()), matrix_array,
+                         // shell_interpolated_j.data(), mesh.extents());
         });
 
     db::mutate_apply<InitializeJ::InitializeJ::mutate_tags,
                      InitializeJ::InitializeJ::argument_tags>(
-        InitializeJ::InitializeJCoordinatesForVolumeValue{1.0e-10, 1000_st},
-        make_not_null(&box));
-    db::mutate_apply<InitializeScriPlusValue<Tags::InertialRetardedTime>>(
+        InitializeJ::InitializeJCoordinatesForVolumeValue{1.0e-15, 1000_st},
+        /*InitializeJ::InverseCubic(),*/ make_not_null(&box));
+    db::mutate<Tags::InertialRetardedTime>(
         make_not_null(&box),
-        db::get<::Tags::TimeStepId>(box).substep_time().value());
+        [&initialization_j_hypersurface_data](
+            const gsl::not_null<Scalar<DataVector>*> retarded_time) noexcept {
+          get(*retarded_time) = blaze::max(get(get<Tags::InertialRetardedTime>(
+              initialization_j_hypersurface_data)));
+        });
     return {std::move(box)};
   }
 

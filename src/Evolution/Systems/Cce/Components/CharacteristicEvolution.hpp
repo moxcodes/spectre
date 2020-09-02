@@ -101,10 +101,10 @@ struct CharacteristicEvolution {
   using initialize_action_list =
       tmpl::list<Actions::InitializeCharacteristicEvolutionVariables<RunStage>,
                  Actions::InitializeCharacteristicEvolutionTime<RunStage>,
-                 tmpl::conditional_t<
-                     std::is_same_v<RunStage, MainRun>,
-                     Actions::InitializeCharacteristicEvolutionScri<RunStage>,
-                     tmpl::list<>>,
+                 // tmpl::conditional_t<
+                     // std::is_same_v<RunStage, MainRun>,
+                 Actions::InitializeCharacteristicEvolutionScri<RunStage>//,
+                 ,                     // tmpl::list<>>,
                  Initialization::Actions::RemoveOptionsAndTerminatePhase>;
 
   using initialization_tags =
@@ -119,8 +119,11 @@ struct CharacteristicEvolution {
       tmpl::transform<integrand_terms_to_compute_for_bondi_variable<BondiTag>,
                       tmpl::bind<::Actions::MutateApply,
                                  tmpl::bind<ComputeBondiIntegrand, tmpl::_1>>>,
-      ::Actions::MutateApply<
-          RadialIntegrateBondi<Tags::EvolutionGaugeBoundaryValue, BondiTag>>,
+      ::Actions::MutateApply<RadialIntegrateBondi<
+          Tags::EvolutionGaugeBoundaryValue, BondiTag,
+          std::is_same_v<RunStage, InitializationRun> and
+              (std::is_same_v<BondiTag, Tags::BondiU> or
+               std::is_same_v<BondiTag, Tags::BondiBeta>)>>,
       // Once we finish the U computation, we need to update all the quantities
       // that depend on the time derivative of the gauge
       tmpl::conditional_t<
@@ -171,8 +174,8 @@ struct CharacteristicEvolution {
       Actions::FilterSwshVolumeQuantity<Tags::BondiH>,
       ::Actions::MutateApply<
           CalculateScriPlusValue<::Tags::dt<Tags::InertialRetardedTime>>>,
-      tmpl::conditional_t<std::is_same_v<RunStage, MainRun>,
-                          compute_scri_quantities_and_observe, tmpl::list<>>,
+      // tmpl::conditional_t<std::is_same_v<RunStage, MainRun>,
+    compute_scri_quantities_and_observe,// tmpl::list<>>,
       Actions::ExitIfEndTimeReached<RunStage>,
       record_time_stepper_data_and_step,
       Actions::ReceiveWorldtubeData<Metavariables>,

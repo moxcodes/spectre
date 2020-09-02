@@ -147,8 +147,9 @@ void transpose_to_reals_then_imags_radial_stripes(
 }  // namespace detail
 
 // generic template applies to `Tags::BondiBeta` and `Tags::BondiU`
-template <template <typename> class BoundaryPrefix, typename Tag>
-void RadialIntegrateBondi<BoundaryPrefix, Tag>::apply(
+template <template <typename> class BoundaryPrefix, typename Tag,
+          bool BackwardsBoundary>
+void RadialIntegrateBondi<BoundaryPrefix, Tag, BackwardsBoundary>::apply(
     const gsl::not_null<
         Scalar<SpinWeighted<ComplexDataVector, Tag::type::type::spin>>*>
         integral_result,
@@ -168,12 +169,21 @@ void RadialIntegrateBondi<BoundaryPrefix, Tag>::apply(
         get(*integral_result).data().data() +
             Spectral::Swsh::number_of_swsh_collocation_points(l_max) * i,
         Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
-    angular_view += get(boundary).data();
+    if constexpr (BackwardsBoundary) {
+      ComplexDataVector outer_angular_view{
+          get(*integral_result).data().data() +
+              Spectral::Swsh::number_of_swsh_collocation_points(l_max) *
+                  (number_of_radial_points - 1),
+          Spectral::Swsh::number_of_swsh_collocation_points(l_max)};
+      angular_view -= outer_angular_view;
+    } else {
+      angular_view += get(boundary).data();
+    }
   }
 }
 
 template <template <typename> class BoundaryPrefix>
-void RadialIntegrateBondi<BoundaryPrefix, Tags::BondiQ>::apply(
+void RadialIntegrateBondi<BoundaryPrefix, Tags::BondiQ, false>::apply(
     const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 1>>*>
         integral_result,
     const Scalar<SpinWeighted<ComplexDataVector, 1>>& pole_of_integrand,
@@ -189,7 +199,7 @@ void RadialIntegrateBondi<BoundaryPrefix, Tags::BondiQ>::apply(
 }
 
 template <template <typename> class BoundaryPrefix>
-void RadialIntegrateBondi<BoundaryPrefix, Tags::BondiW>::apply(
+void RadialIntegrateBondi<BoundaryPrefix, Tags::BondiW, false>::apply(
     const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*>
         integral_result,
     const Scalar<SpinWeighted<ComplexDataVector, 0>>& pole_of_integrand,
@@ -205,7 +215,7 @@ void RadialIntegrateBondi<BoundaryPrefix, Tags::BondiW>::apply(
 }
 
 template <template <typename> class BoundaryPrefix>
-void RadialIntegrateBondi<BoundaryPrefix, Tags::BondiH>::apply(
+void RadialIntegrateBondi<BoundaryPrefix, Tags::BondiH, false>::apply(
     const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*>
         integral_result,
     const Scalar<SpinWeighted<ComplexDataVector, 2>>& pole_of_integrand,
@@ -320,17 +330,25 @@ void RadialIntegrateBondi<BoundaryPrefix, Tags::BondiH>::apply(
                 2 * number_of_angular_points);
 }
 
-template struct RadialIntegrateBondi<Tags::BoundaryValue, Tags::BondiBeta>;
+template struct RadialIntegrateBondi<Tags::BoundaryValue, Tags::BondiBeta,
+                                     false>;
+template struct RadialIntegrateBondi<Tags::BoundaryValue, Tags::BondiBeta,
+                                     true>;
 template struct RadialIntegrateBondi<Tags::BoundaryValue, Tags::BondiQ>;
-template struct RadialIntegrateBondi<Tags::BoundaryValue, Tags::BondiU>;
+template struct RadialIntegrateBondi<Tags::BoundaryValue, Tags::BondiU, true>;
+template struct RadialIntegrateBondi<Tags::BoundaryValue, Tags::BondiU, false>;
 template struct RadialIntegrateBondi<Tags::BoundaryValue, Tags::BondiW>;
 template struct RadialIntegrateBondi<Tags::BoundaryValue, Tags::BondiH>;
 template struct RadialIntegrateBondi<Tags::EvolutionGaugeBoundaryValue,
-                                     Tags::BondiBeta>;
+                                     Tags::BondiBeta, true>;
+template struct RadialIntegrateBondi<Tags::EvolutionGaugeBoundaryValue,
+                                     Tags::BondiBeta, false>;
 template struct RadialIntegrateBondi<Tags::EvolutionGaugeBoundaryValue,
                                      Tags::BondiQ>;
 template struct RadialIntegrateBondi<Tags::EvolutionGaugeBoundaryValue,
-                                     Tags::BondiU>;
+                                     Tags::BondiU, true>;
+template struct RadialIntegrateBondi<Tags::EvolutionGaugeBoundaryValue,
+                                     Tags::BondiU, false>;
 template struct RadialIntegrateBondi<Tags::EvolutionGaugeBoundaryValue,
                                      Tags::BondiW>;
 template struct RadialIntegrateBondi<Tags::EvolutionGaugeBoundaryValue,

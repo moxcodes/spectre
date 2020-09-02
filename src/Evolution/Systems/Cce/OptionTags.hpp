@@ -371,14 +371,19 @@ struct StartTimeFromFile;
 template <>
 struct StartTimeFromFile<MainRun> : Tags::StartTime, db::SimpleTag {
   using type = double;
-  using option_tags = tmpl::list<OptionTags::StartTime<MainRun>,
-                                 OptionTags::BoundaryDataFilename<MainRun>,
-                                 OptionTags::H5IsBondiData>;
+  using option_tags =
+      tmpl::list<OptionTags::StartTime<MainRun>,
+                 OptionTags::BoundaryDataFilename<MainRun>,
+                 OptionTags::H5IsBondiData, OptionTags::LMax<MainRun>,
+                 OptionTags::H5LookaheadTimes, OptionTags::H5Interpolator,
+                 OptionTags::TargetStepSize<MainRun>>;
 
   static constexpr bool pass_metavariables = false;
-  static double create_from_options(double start_time,
-                                    const std::string& filename,
-                                    const bool is_bondi_data) noexcept {
+  static double create_from_options(
+      double start_time, const std::string& filename, const bool is_bondi_data,
+      const size_t l_max, const size_t number_of_lookahead_times,
+      const std::unique_ptr<intrp::SpanInterpolator>& interpolator,
+      const double initial_time_step) noexcept {
     if (start_time == -std::numeric_limits<double>::infinity()) {
       if (is_bondi_data) {
         BondiWorldtubeH5BufferUpdater h5_boundary_updater{filename};
@@ -390,6 +395,14 @@ struct StartTimeFromFile<MainRun> : Tags::StartTime, db::SimpleTag {
         start_time = time_buffer[0];
       }
     }
+    ASSERT(not is_bondi_data, "currently unsupported bondi data");
+    // find first down-going zero crossing of H boundary data for matching
+    MetricWorldtubeH5BufferUpdater h5_boundary_updater{filename};
+    find_first_downgoing_zero_crossing(
+        std::make_unique<MetricWorldtubeDataManager>(
+            h5_boundary_updater.get_clone(), l_max, number_of_lookahead_times,
+            interpolator->get_clone()),
+        start_time, 0.1 * initial_time_step);
     return start_time;
   }
 };
@@ -457,11 +470,28 @@ struct EndTimeFromFile<MainRun> : Tags::EndTime, db::SimpleTag {
 template <>
 struct EndTimeFromFile<InitializationRun> : db::SimpleTag {
   using type = double;
-  using option_tags = tmpl::list<OptionTags::EndTime<InitializationRun>>;
+  using option_tags =
+      tmpl::list<OptionTags::EndTime<InitializationRun>,
+                 OptionTags::LMax<InitializationRun>,
+                 OptionTags::BoundaryDataFilename<InitializationRun>,
+                 OptionTags::H5LookaheadTimes, OptionTags::H5Interpolator,
+                 OptionTags::ExtractionRadius,
+                 OptionTags::TargetStepSize<InitializationRun>>;
 
   static constexpr bool pass_metavariables = false;
-  static double create_from_options(const double end_time) noexcept {
-    return end_time;
+  static double create_from_options(
+      const double end_time, const size_t l_max, const std::string& filename,
+      const size_t number_of_lookahead_times,
+      const std::unique_ptr<intrp::SpanInterpolator>& interpolator,
+      const double extraction_radius, const double initial_time_step) noexcept {
+    // find first down-going zero crossing of H boundary data for matching
+    return find_first_downgoing_zero_crossing(
+        std::make_unique<PnWorldtubeDataManager>(
+            std::make_unique<ModeSetBoundaryH5BufferUpdater>(filename, "/",
+                                                             8_st, 2_st),
+            l_max, number_of_lookahead_times, extraction_radius,
+            interpolator->get_clone()),
+        end_time, 0.1 * initial_time_step);
   }
 };
 
