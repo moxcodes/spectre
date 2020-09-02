@@ -38,6 +38,14 @@ using SpatialMetric =
 using Shift = gr::Tags::Shift<3, ::Frame::Inertial, ComplexModalVector>;
 using Lapse = gr::Tags::Lapse<ComplexModalVector>;
 
+struct Strain : db::SimpleTag {
+  using type = Scalar<ComplexModalVector>;
+};
+
+struct ConformalFactor : db::SimpleTag {
+  using type = Scalar<ComplexModalVector>;
+};
+
 // radial derivative prefix tag to be used with the modal input worldtube data
 template <typename Tag>
 struct Dr : db::SimpleTag, db::PrefixTag {
@@ -103,6 +111,21 @@ using cce_bondi_input_tags =
                Spectral::Swsh::Tags::SwshTransform<Tags::Du<Tags::BondiJ>>,
                Spectral::Swsh::Tags::SwshTransform<Tags::BondiR>,
                Spectral::Swsh::Tags::SwshTransform<Tags::Du<Tags::BondiR>>>;
+
+using cce_pn_input_tags =
+    tmpl::list<Tags::detail::Shift,// Tags::detail::Dr<Tags::detail::Shift>,
+               Tags::detail::Lapse,// Tags::detail::Dr<Tags::detail::Lapse>,
+               Tags::detail::Strain, Tags::detail::ConformalFactor>;
+
+using interpolated_cce_pn_input_tags =
+    tmpl::list<Tags::detail::Shift, Tags::detail::Dr<Tags::detail::Shift>,
+               ::Tags::dt<Tags::detail::Shift>, Tags::detail::Lapse,
+               Tags::detail::Dr<Tags::detail::Lapse>,
+               ::Tags::dt<Tags::detail::Lapse>, Tags::detail::Strain,
+               Tags::detail::Dr<Tags::detail::Strain>,
+               ::Tags::dt<Tags::detail::Strain>, Tags::detail::ConformalFactor,
+               Tags::detail::Dr<Tags::detail::ConformalFactor>,
+               ::Tags::dt<Tags::detail::ConformalFactor>>;
 
 /// \cond
 class MetricWorldtubeH5BufferUpdater;
@@ -345,16 +368,14 @@ class ModeSetBoundaryH5BufferUpdater {
   ModeSetBoundaryH5BufferUpdater() = default;
 
   ModeSetBoundaryH5BufferUpdater(const std::string& cce_data_filename,
-                                 const std::string& dataset_name,
-                                 const size_t l_max,
-                                 const size_t l_min) noexcept;
+                                 const size_t l_max) noexcept;
 
-  double update_buffer_for_time(gsl::not_null<ComplexModalVector*> buffer,
-                                gsl::not_null<size_t*> time_span_start,
-                                gsl::not_null<size_t*> time_span_end,
-                                double time, size_t computation_l_max,
-                                size_t interpolator_length,
-                                size_t buffer_depth) const noexcept;
+  double update_buffer_for_time(
+      gsl::not_null<Variables<cce_pn_input_tags>*> buffer,
+      gsl::not_null<size_t*> time_span_start,
+      gsl::not_null<size_t*> time_span_end, double time,
+      size_t computation_l_max, size_t interpolator_length,
+      size_t buffer_depth) const noexcept;
 
   bool time_is_outside_range(const double time) const noexcept {
     return time < time_buffer_[0] or
@@ -362,8 +383,7 @@ class ModeSetBoundaryH5BufferUpdater {
   }
 
   std::unique_ptr<ModeSetBoundaryH5BufferUpdater> get_clone() const noexcept {
-    return std::make_unique<ModeSetBoundaryH5BufferUpdater>(
-        filename_, dataset_name_, l_max_, l_min_);
+    return std::make_unique<ModeSetBoundaryH5BufferUpdater>(filename_, l_max_);
   }
 
   size_t get_l_max() const noexcept { return l_max_; }
@@ -375,7 +395,10 @@ class ModeSetBoundaryH5BufferUpdater {
  private:
   h5::H5File<h5::AccessType::ReadOnly> mode_file_;
   std::string filename_;
-  std::string dataset_name_;
+  tuples::tagged_tuple_from_typelist<
+      db::wrap_tags_in<Tags::detail::InputDataSet, cce_pn_input_tags>>
+      dataset_names_;
+  size_t strain_l_min_ = 2;
   size_t l_max_ = 0;
   size_t l_min_ = 0;
 

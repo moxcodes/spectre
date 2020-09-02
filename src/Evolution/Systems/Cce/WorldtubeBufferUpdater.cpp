@@ -24,6 +24,7 @@
 #include "NumericalAlgorithms/Spectral/SwshCoefficients.hpp"
 #include "NumericalAlgorithms/Spectral/SwshTags.hpp"
 #include "Parallel/CharmPupable.hpp"
+#include "Parallel/Printf.hpp"
 #include "Utilities/Gsl.hpp"
 #include "Utilities/Literals.hpp"
 #include "Utilities/MakeString.hpp"
@@ -444,15 +445,25 @@ void BondiWorldtubeH5BufferUpdater::pup(PUP::er& p) noexcept {
 }
 
 ModeSetBoundaryH5BufferUpdater::ModeSetBoundaryH5BufferUpdater(
-    const std::string& cce_data_filename, const std::string& dataset_name,
-    const size_t input_l_max, const size_t input_l_min) noexcept
+    const std::string& cce_data_filename, const size_t l_max) noexcept
     : mode_file_{cce_data_filename},
       filename_{cce_data_filename},
-      dataset_name_{dataset_name},
-      l_max_{input_l_max},
-      l_min_{input_l_min} {
+      l_max_{l_max} {
+  get<Tags::detail::InputDataSet<Tags::detail::Strain>>(dataset_names_) =
+      "/Strain";
+  get<Tags::detail::InputDataSet<Tags::detail::Shift>>(dataset_names_) =
+      "/Shift";
+  // get<Tags::detail::InputDataSet<Tags::detail::Dr<Tags::detail::Shift>>>(
+      // dataset_names_) = "/DrShift";
+  get<Tags::detail::InputDataSet<Tags::detail::Lapse>>(dataset_names_) =
+      "/Lapse";
+  // get<Tags::detail::InputDataSet<Tags::detail::Dr<Tags::detail::Lapse>>>(
+      // dataset_names_) = "/DrLapse";
+  get<Tags::detail::InputDataSet<Tags::detail::ConformalFactor>>(
+      dataset_names_) = "/ConformalFactor";
+
   // assume that any valid mode file has at least the 2, 2 mode.
-  const auto& mode22_data = mode_file_.get<h5::Dat>(dataset_name + "Y_l2_m2");
+  const auto& mode22_data = mode_file_.get<h5::Dat>("/Strain/Y_l2_m2");
   const auto data_table_dimensions = mode22_data.get_dimensions();
   const Matrix time_matrix = mode22_data.get_data_subset(
       std::vector<size_t>{0}, 0, data_table_dimensions[0]);
@@ -466,7 +477,7 @@ ModeSetBoundaryH5BufferUpdater::ModeSetBoundaryH5BufferUpdater(
 }
 
 double ModeSetBoundaryH5BufferUpdater::update_buffer_for_time(
-    gsl::not_null<ComplexModalVector*> buffer,
+    gsl::not_null<Variables<cce_pn_input_tags>*> buffer,
     gsl::not_null<size_t*> time_span_start,
     gsl::not_null<size_t*> time_span_end, double time, size_t computation_l_max,
     size_t interpolator_length, size_t buffer_depth) const noexcept {
@@ -485,28 +496,69 @@ double ModeSetBoundaryH5BufferUpdater::update_buffer_for_time(
   *time_span_start = new_span_pair.first;
   *time_span_end = new_span_pair.second;
 
-  *buffer = 0.0;
   std::vector<size_t> columns = {{1, 2}};
-  for (int l = l_min_;
-       l <= static_cast<int>(std::min(computation_l_max, l_max_)); ++l) {
-    for (int m = -l; m <= l; ++m) {
-      const h5::Dat& read_data = mode_file_.get<h5::Dat>(
-          MakeString{} << dataset_name_ << "Y_l" << l << "_m" << m);
+  tmpl::for_each<cce_pn_input_tags>([this, computation_l_max,
+                                     interpolator_length, buffer_depth, buffer,
+                                     columns, time_span_start,
+                                     time_span_end](auto tag_v) noexcept {
+    using tag = typename decltype(tag_v)::type;
+    if constexpr(std::is_same_v<tag, Tags::detail::Shift>) {
+      for (size_t i = 0; i < 3; ++i) {
+        get<tag>(*buffer).get(i) = 0.0;
+      }
+    } else {
+      get(get<tag>(*buffer)) = 0.0;
+    }
+    for (int l = std::is_same_v<tag, Tags::detail::Strain> ? strain_l_min_
+                                                           : l_min_;
+         l <= static_cast<int>(std::min(computation_l_max, l_max_)); ++l) {
+      for (int m = -l; m <= l; ++m) {
+        if constexpr (std::is_same_v<tag, Tags::detail::Shift>) {
+          for (size_t i = 0; i < 3; ++i) {
+            const h5::Dat& read_data = mode_file_.get<h5::Dat>(
+                MakeString{}
+                << get<Tags::detail::InputDataSet<tag>>(dataset_names_)
+                << static_cast<char>(static_cast<int>('x') + i) << "/Y_l" << l
+                << "_m" << m);
 
-      const Matrix data_matrix = read_data.get_data_subset(
-          columns, *time_span_start, *time_span_end - *time_span_start);
+            const Matrix data_matrix = read_data.get_data_subset(
+                columns, *time_span_start, *time_span_end - *time_span_start);
 
-      for (size_t time_row = 0; time_row < *time_span_end - *time_span_start;
-           ++time_row) {
-        (*buffer)[Spectral::Swsh::goldberg_mode_index(
-                      computation_l_max, static_cast<size_t>(l), m) *
-                      (*time_span_end - *time_span_start) +
-                  time_row] = std::complex<double>(data_matrix(time_row, 0),
-                                                   data_matrix(time_row, 1));
-        mode_file_.close_current_object();
+            for (size_t time_row = 0;
+                 time_row < *time_span_end - *time_span_start; ++time_row) {
+              get<tag>(*buffer).get(
+                  i)[Spectral::Swsh::goldberg_mode_index(
+                         computation_l_max, static_cast<size_t>(l), m) *
+                         (*time_span_end - *time_span_start) +
+                     time_row] = std::complex<double>(data_matrix(time_row, 0),
+                                                      data_matrix(time_row, 1));
+              mode_file_.close_current_object();
+            }
+          }
+        } else {
+          const h5::Dat& read_data =
+              mode_file_.get<h5::Dat>(
+                  MakeString{}
+                  << get<Tags::detail::InputDataSet<tag>>(dataset_names_)
+                  << "/Y_l" << l << "_m" << m);
+
+          const Matrix data_matrix = read_data.get_data_subset(
+              columns, *time_span_start, *time_span_end - *time_span_start);
+          for (size_t time_row = 0;
+               time_row < *time_span_end - *time_span_start; ++time_row) {
+            get(get<tag>(*buffer))[Spectral::Swsh::goldberg_mode_index(
+                                       computation_l_max,
+                                       static_cast<size_t>(l), m) *
+                                       (*time_span_end - *time_span_start) +
+                                   time_row] =
+                std::complex<double>(data_matrix(time_row, 0),
+                                     data_matrix(time_row, 1));
+          }
+          mode_file_.close_current_object();
+        }
       }
     }
-  }
+  });
   return time_buffer_[std::min(*time_span_end - interpolator_length + 1,
                                time_buffer_.size() - 1)];
 }
@@ -514,7 +566,7 @@ double ModeSetBoundaryH5BufferUpdater::update_buffer_for_time(
 void ModeSetBoundaryH5BufferUpdater::pup(PUP::er& p) noexcept {
   p | time_buffer_;
   p | filename_;
-  p | dataset_name_;
+  p | dataset_names_;
   p | l_max_;
   p | l_min_;
   if (p.isUnpacking()) {

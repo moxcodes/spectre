@@ -120,10 +120,7 @@ struct CharacteristicEvolution {
                       tmpl::bind<::Actions::MutateApply,
                                  tmpl::bind<ComputeBondiIntegrand, tmpl::_1>>>,
       ::Actions::MutateApply<RadialIntegrateBondi<
-          Tags::EvolutionGaugeBoundaryValue, BondiTag,
-          std::is_same_v<RunStage, InitializationRun> and
-              (std::is_same_v<BondiTag, Tags::BondiU> or
-               std::is_same_v<BondiTag, Tags::BondiBeta>)>>,
+          Tags::EvolutionGaugeBoundaryValue, BondiTag, false>>,
       // Once we finish the U computation, we need to update all the quantities
       // that depend on the time derivative of the gauge
       tmpl::conditional_t<

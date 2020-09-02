@@ -275,9 +275,8 @@ struct H5WorldtubeBoundaryDataManager<InitializationRun> : db::SimpleTag {
       const std::unique_ptr<intrp::SpanInterpolator>& interpolator,
       const double extraction_radius) noexcept {
     return std::make_unique<PnWorldtubeDataManager>(
-        std::make_unique<ModeSetBoundaryH5BufferUpdater>(filename, "/", 8_st,
-                                                         2_st),
-        l_max, number_of_lookahead_times, extraction_radius,
+        std::make_unique<ModeSetBoundaryH5BufferUpdater>(filename, 8_st), l_max,
+        number_of_lookahead_times, extraction_radius,
         interpolator->get_clone());
   }
 };
@@ -395,11 +394,11 @@ struct StartTimeFromFile<MainRun> : Tags::StartTime, db::SimpleTag {
         start_time = time_buffer[0];
       }
     }
-    ASSERT(not is_bondi_data, "currently unsupported bondi data");
+    ASSERT(is_bondi_data, "currently unsupported metric data");
     // find first down-going zero crossing of H boundary data for matching
-    MetricWorldtubeH5BufferUpdater h5_boundary_updater{filename};
+    BondiWorldtubeH5BufferUpdater h5_boundary_updater{filename};
     find_first_downgoing_zero_crossing(
-        std::make_unique<MetricWorldtubeDataManager>(
+        std::make_unique<BondiWorldtubeDataManager>(
             h5_boundary_updater.get_clone(), l_max, number_of_lookahead_times,
             interpolator->get_clone()),
         start_time, 0.1 * initial_time_step);
@@ -487,8 +486,7 @@ struct EndTimeFromFile<InitializationRun> : db::SimpleTag {
     // find first down-going zero crossing of H boundary data for matching
     return find_first_downgoing_zero_crossing(
         std::make_unique<PnWorldtubeDataManager>(
-            std::make_unique<ModeSetBoundaryH5BufferUpdater>(filename, "/",
-                                                             8_st, 2_st),
+            std::make_unique<ModeSetBoundaryH5BufferUpdater>(filename, 8_st),
             l_max, number_of_lookahead_times, extraction_radius,
             interpolator->get_clone()),
         end_time, 0.1 * initial_time_step);

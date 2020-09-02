@@ -24,10 +24,10 @@ struct BoundaryData
 struct JHypersurfaceData : Parallel::InboxInserters::Value<JHypersurfaceData> {
   using temporal_id = size_t;
   using type = std::unordered_map<
-      size_t,
-      tuples::TaggedTuple<Tags::BondiJ, Tags::InertialRetardedTime,
-                          Tags::LMax<InitializationRun>,
-                          Tags::NumberOfRadialPoints<InitializationRun>>>;
+      size_t, tuples::TaggedTuple<
+                  Tags::BondiJ, Tags::InertialRetardedTime,
+                  Tags::CauchyCartesianCoords, Tags::LMax<InitializationRun>,
+                  Tags::NumberOfRadialPoints<InitializationRun>>>;
 };
 
 }  // namespace ReceiveTags

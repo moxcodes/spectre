@@ -284,12 +284,11 @@ class PnWorldtubeDataManager : public WorldtubeDataManager {
 
   // These buffers are just kept around to avoid allocations; they're
   // updated every time a time is requested
-  mutable ComplexModalVector interpolated_j_coefficients_;
-  mutable ComplexModalVector interpolated_h_coefficients_;
-  mutable ComplexModalVector interpolated_conformal_coefficients_;
+  mutable Variables<interpolated_cce_pn_input_tags>
+      interpolated_coefficients_buffers_;
 
   // note: buffers store data in an 'time-varies-fastest' manner
-  mutable ComplexModalVector coefficients_buffers_;
+  mutable Variables<cce_pn_input_tags> coefficients_buffers_;
 
   size_t buffer_depth_ = 0;
 

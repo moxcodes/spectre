@@ -133,28 +133,39 @@ struct InitializeFirstHypersurface<MainRun> {
     std::array<std::reference_wrapper<const Matrix>, 3> matrix_array{
         {std::ref(empty_matrix), std::ref(empty_matrix),
          std::ref(radial_interpolation_matrix)}};
-    db::mutate<Tags::BondiJ>(
+    db::mutate<Tags::BondiJ, Tags::CauchyCartesianCoords,
+               Tags::InertialRetardedTime>(
         make_not_null(&box),
-        [&matrix_array, &mesh, &shell_interpolated_j, &initialization_j](
+        [&matrix_array, &mesh, &shell_interpolated_j, &initialization_j,
+         &initialization_j_hypersurface_data](
             const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*>
-                bondi_j) noexcept {
+                bondi_j,
+            const gsl::not_null<tnsr::i<DataVector, 3>*>
+                cartesian_cauchy_coordinates,
+            const gsl::not_null<Scalar<DataVector>*>
+                inertial_retarded_time) noexcept {
           get(*bondi_j).data() = initialization_j.data();
+          *cartesian_cauchy_coordinates =
+              tuples::get<Tags::CauchyCartesianCoords>(
+                  initialization_j_hypersurface_data);
+          *inertial_retarded_time = tuples::get<Tags::InertialRetardedTime>(
+              initialization_j_hypersurface_data);
           // Debugging resampling
           // apply_matrices(make_not_null(&get(*bondi_j).data()), matrix_array,
-                         // shell_interpolated_j.data(), mesh.extents());
+          // shell_interpolated_j.data(), mesh.extents());
         });
 
     db::mutate_apply<InitializeJ::InitializeJ::mutate_tags,
                      InitializeJ::InitializeJ::argument_tags>(
         InitializeJ::InitializeJCoordinatesForVolumeValue{1.0e-15, 1000_st},
         /*InitializeJ::InverseCubic(),*/ make_not_null(&box));
-    db::mutate<Tags::InertialRetardedTime>(
-        make_not_null(&box),
-        [&initialization_j_hypersurface_data](
-            const gsl::not_null<Scalar<DataVector>*> retarded_time) noexcept {
-          get(*retarded_time) = blaze::max(get(get<Tags::InertialRetardedTime>(
-              initialization_j_hypersurface_data)));
-        });
+    // db::mutate<Tags::InertialRetardedTime>(
+    // make_not_null(&box),
+    // [&initialization_j_hypersurface_data](
+    // const gsl::not_null<Scalar<DataVector>*> retarded_time) noexcept {
+    // get(*retarded_time) = blaze::max(get(get<Tags::InertialRetardedTime>(
+    // initialization_j_hypersurface_data)));
+    // });
     return {std::move(box)};
   }
 
@@ -181,11 +192,10 @@ struct InitializeFirstHypersurface<MainRun> {
       Requires<tmpl::list_contains_v<tmpl::list<InboxTags...>,
                                      Cce::ReceiveTags::JHypersurfaceData>> =
           nullptr>
-  static bool is_ready(
-      const db::DataBox<DbTags>& /*box*/,
-      const tuples::TaggedTuple<InboxTags...>& inboxes,
-      const Parallel::GlobalCache<Metavariables>& /*cache*/,
-      const ArrayIndex& /*array_index*/) noexcept {
+  static bool is_ready(const db::DataBox<DbTags>& /*box*/,
+                       const tuples::TaggedTuple<InboxTags...>& inboxes,
+                       const Parallel::GlobalCache<Metavariables>& /*cache*/,
+                       const ArrayIndex& /*array_index*/) noexcept {
     Parallel::printf("checking readiness : %d\n",
                      tuples::get<ReceiveTags::JHypersurfaceData>(inboxes).count(
                          0_st) == 1_st);
@@ -199,11 +209,10 @@ struct InitializeFirstHypersurface<MainRun> {
       Requires<not tmpl::list_contains_v<tmpl::list<InboxTags...>,
                                          Cce::ReceiveTags::JHypersurfaceData>> =
           nullptr>
-  static bool is_ready(
-      const db::DataBox<DbTags>& /*box*/,
-      const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
-      const Parallel::GlobalCache<Metavariables>& /*cache*/,
-      const ArrayIndex& /*array_index*/) noexcept {
+  static bool is_ready(const db::DataBox<DbTags>& /*box*/,
+                       const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
+                       const Parallel::GlobalCache<Metavariables>& /*cache*/,
+                       const ArrayIndex& /*array_index*/) noexcept {
     Parallel::printf("not ready, appropriate tag not present\n");
     return false;
   }
