@@ -210,8 +210,6 @@ struct EvolutionMetavars {
   using global_sync_phases =
       tmpl::list<std::integral_constant<Phase, Phase::LoadBalancing>>;
 
-  static void global_startup_routines() noexcept { TurnManualLBOn(); }
-
   // HACK until we merge in a compute tag StrahlkorperGr::AreaCompute.
   // For now, simply do a surface integral of unity on the horizon to get the
   // horizon area.
@@ -391,8 +389,11 @@ struct EvolutionMetavars {
                          Parallel::Actions::TerminatePhase>>,
           Parallel::PhaseActions<
               Phase, Phase::Evolve,
-              tmpl::list<Actions::RunEventsAndTriggers, Actions::ChangeSlabSize,
-                         step_actions, Actions::AdvanceTime>>>>,
+              tmpl::list<
+                  Actions::RunEventsAndTriggers, Actions::ChangeSlabSize,
+                  step_actions,
+                  Parallel::Actions::ManagePhaseControl<EvolutionMetavars>,
+                  Actions::AdvanceTime>>>>,
       tmpl::conditional_t<evolution::is_numeric_initial_data_v<initial_data>,
                           ImportNumericInitialData<
                               Phase, Phase::ImportInitialData, initial_data>,
