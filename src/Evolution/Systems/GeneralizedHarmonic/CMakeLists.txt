@@ -18,6 +18,7 @@ spectre_target_headers(
   ${LIBRARY}
   INCLUDE_DIRECTORY ${CMAKE_SOURCE_DIR}/src
   HEADERS
+  Actions/CheckpointGh.hpp
   Characteristics.hpp
   Constraints.hpp
   DuDtTempTags.hpp

@@ -27,6 +27,7 @@
 #include "Evolution/Initialization/NonconservativeSystem.hpp"
 #include "Evolution/Initialization/SetVariables.hpp"
 #include "Evolution/NumericInitialData.hpp"
+#include "Evolution/Systems/GeneralizedHarmonic/Actions/CheckpointGh.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Equations.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/GaugeSourceFunctions/InitializeDampedHarmonic.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Initialize.hpp"
@@ -63,6 +64,7 @@
 #include "NumericalAlgorithms/Interpolation/Tags.hpp"
 #include "NumericalAlgorithms/Interpolation/TryToInterpolate.hpp"
 #include "Options/Options.hpp"
+#include "Parallel/Actions/ManagePhaseControl.hpp"
 #include "Parallel/Actions/TerminatePhase.hpp"
 #include "Parallel/InitializationFunctions.hpp"
 #include "Parallel/PhaseDependentActionList.hpp"
@@ -149,6 +151,7 @@ struct EvolutionMetavars {
     InitializeTimeStepperHistory,
     Register,
     LoadBalancing,
+    Checkpointing,
     Evolve,
     Exit
   };
@@ -200,6 +203,8 @@ struct EvolutionMetavars {
     switch (phase) {
       case Phase::LoadBalancing:
         return "LoadBalancing";
+      case Phase::Checkpointing:
+        return "Checkpointing";
       case Phase::Evolve:
         return "Evolve";
       default:
@@ -207,8 +212,13 @@ struct EvolutionMetavars {
     }
   }
 
+  static bool is_required_sync_phase(const Phase phase) noexcept {
+    return phase == Phase::Checkpointing;
+  }
+
   using global_sync_phases =
-      tmpl::list<std::integral_constant<Phase, Phase::LoadBalancing>>;
+      tmpl::list<std::integral_constant<Phase, Phase::LoadBalancing>,
+                 std::integral_constant<Phase, Phase::Checkpointing>>;
 
   // HACK until we merge in a compute tag StrahlkorperGr::AreaCompute.
   // For now, simply do a surface integral of unity on the horizon to get the
@@ -387,6 +397,9 @@ struct EvolutionMetavars {
               tmpl::list<intrp::Actions::RegisterElementWithInterpolator,
                          dg_registration_list,
                          Parallel::Actions::TerminatePhase>>,
+          Parallel::PhaseActions<Phase, Phase::Checkpointing,
+                                 tmpl::list<gh::Actions::CheckpointGh,
+                                            Parallel::Actions::TerminatePhase>>,
           Parallel::PhaseActions<
               Phase, Phase::Evolve,
               tmpl::list<
