@@ -243,7 +243,8 @@ struct GeneralizedHarmonicTemplateBase<
       EvolutionMetavarsDerived<InitialData, BoundaryConditions>;
 
   using initial_data = InitialData;
-  using boundary_conditions = BoundaryConditions;
+  using boundary_conditions = GeneralizedHarmonic::BoundaryConditions::Bjorhus::
+      ConstraintPreservingPhysical;
   // Only Dirichlet boundary conditions imposed by an analytic solution are
   // supported right now.
   using analytic_solution = boundary_conditions;
@@ -328,16 +329,17 @@ struct GeneralizedHarmonicTemplateBase<
       evolution::Actions::AddMeshVelocityNonconservative,
       dg::Actions::ComputeNonconservativeBoundaryFluxes<
           domain::Tags::BoundaryDirectionsInterior<volume_dim>>,
-      dg::Actions::ImposeDirichletBoundaryConditions<derived_metavars>,
-      dg::Actions::CollectDataForFluxes<
-          boundary_scheme,
-          domain::Tags::BoundaryDirectionsInterior<volume_dim>>,
       dg::Actions::ReceiveDataForFluxes<boundary_scheme>,
-      std::conditional_t<local_time_stepping,
-                         tmpl::list<Actions::RecordTimeStepperData<>,
-                                    Actions::MutateApply<boundary_scheme>>,
-                         tmpl::list<Actions::MutateApply<boundary_scheme>,
-                                    Actions::RecordTimeStepperData<>>>,
+      std::conditional_t<
+          local_time_stepping,
+          tmpl::list<GeneralizedHarmonic::Actions::
+                         ImposeBjorhusBoundaryConditions<EvolutionMetavars>,
+                     Actions::RecordTimeStepperData<>,
+                     Actions::MutateApply<boundary_scheme>>,
+          tmpl::list<Actions::MutateApply<boundary_scheme>,
+                     GeneralizedHarmonic::Actions::
+                         ImposeBjorhusBoundaryConditions<EvolutionMetavars>,
+                     Actions::RecordTimeStepperData<>>>,
       Actions::UpdateU<>>;
 
   using initialization_actions = tmpl::list<
@@ -360,6 +362,7 @@ struct GeneralizedHarmonicTemplateBase<
               gr::Tags::Shift<volume_dim, frame, DataVector>,
               gr::Tags::Lapse<DataVector>>,
           dg::Initialization::slice_tags_to_exterior<
+              typename system::variables_tag,
               gr::Tags::SpatialMetric<volume_dim, frame, DataVector>,
               gr::Tags::DetAndInverseSpatialMetricCompute<volume_dim, frame,
                                                           DataVector>,
@@ -384,11 +387,11 @@ struct GeneralizedHarmonicTemplateBase<
                                                                  frame>,
               GeneralizedHarmonic::CharacteristicFieldsCompute<volume_dim,
                                                                frame>>,
-          true, true>,
+          false, true>,
       Initialization::Actions::AddComputeTags<
           tmpl::list<evolution::Tags::AnalyticCompute<
               volume_dim, analytic_solution_tag, analytic_solution_fields>>>,
-      dg::Actions::InitializeMortars<boundary_scheme, true>,
+      dg::Actions::InitializeMortars<boundary_scheme, false>,
       Initialization::Actions::DiscontinuousGalerkin<derived_metavars>,
       Initialization::Actions::RemoveOptionsAndTerminatePhase>;
 

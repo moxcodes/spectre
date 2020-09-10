@@ -33,6 +33,7 @@
 #include "Evolution/Systems/Cce/Tags.hpp"
 #include "Evolution/Systems/Cce/WorldtubeBufferUpdater.hpp"
 #include "Evolution/Systems/Cce/WorldtubeDataManager.hpp"
+#include "Evolution/Systems/GeneralizedHarmonic/BoundaryConditions/Bjorhus.hpp"
 #include "IO/Observer/Actions.hpp"
 #include "IO/Observer/ObserverComponent.hpp"
 #include "IO/Observer/RegisterObservers.hpp"
@@ -185,16 +186,17 @@ struct EvolutionMetavars
       evolution::Actions::AddMeshVelocityNonconservative,
       dg::Actions::ComputeNonconservativeBoundaryFluxes<
           domain::Tags::BoundaryDirectionsInterior<volume_dim>>,
-      dg::Actions::ImposeDirichletBoundaryConditions<EvolutionMetavars>,
-      dg::Actions::CollectDataForFluxes<
-          boundary_scheme,
-          domain::Tags::BoundaryDirectionsInterior<volume_dim>>,
       dg::Actions::ReceiveDataForFluxes<boundary_scheme>,
-      tmpl::conditional_t<local_time_stepping,
-                          tmpl::list<Actions::RecordTimeStepperData<>,
-                                     Actions::MutateApply<boundary_scheme>>,
-                          tmpl::list<Actions::MutateApply<boundary_scheme>,
-                                     Actions::RecordTimeStepperData<>>>,
+      tmpl::conditional_t<
+          local_time_stepping,
+          GeneralizedHarmonic::Actions::ImposeBjorhusBoundaryConditions<
+              EvolutionMetavars>,
+          tmpl::list<Actions::RecordTimeStepperData<>,
+                     Actions::MutateApply<boundary_scheme>>,
+          tmpl::list<Actions::MutateApply<boundary_scheme>,
+                     GeneralizedHarmonic::Actions::
+                         ImposeBjorhusBoundaryConditions<EvolutionMetavars>,
+                     Actions::RecordTimeStepperData<>>>,
       Cce::Actions::SendNextTimeToCce<CceWorldtubeTarget>,
       intrp::Actions::InterpolateToTarget<CceWorldtubeTarget>,
       Actions::UpdateU<>>>;
@@ -247,11 +249,11 @@ struct EvolutionMetavars
                                                                  frame>,
               GeneralizedHarmonic::CharacteristicFieldsCompute<volume_dim,
                                                                frame>>,
-          true, true>,
+          false, true>,
       Initialization::Actions::AddComputeTags<
           tmpl::list<evolution::Tags::AnalyticCompute<
               volume_dim, analytic_solution_tag, analytic_solution_fields>>>,
-      dg::Actions::InitializeMortars<boundary_scheme, true>,
+      dg::Actions::InitializeMortars<boundary_scheme, false>,
       Initialization::Actions::DiscontinuousGalerkin<EvolutionMetavars>,
       intrp::Actions::ElementInitInterpPoints,
       Initialization::Actions::RemoveOptionsAndTerminatePhase>;
