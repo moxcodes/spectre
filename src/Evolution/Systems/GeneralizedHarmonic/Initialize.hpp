@@ -126,7 +126,7 @@ struct InitializeGhAnd3Plus1Variables {
         GeneralizedHarmonic::Tags::ThreeIndexConstraintCompute<Dim, frame>,
         GeneralizedHarmonic::Tags::ConstraintGamma0Compute<Dim, frame>,
         GeneralizedHarmonic::Tags::ConstraintGamma1Compute<Dim, frame>,
-        GeneralizedHarmonic::Tags::ConstraintGamma2Compute<Dim, frame>>;
+        GeneralizedHarmonic::Tags::ConstraintGamma2Compute<Dim, frame>,
         GeneralizedHarmonic::Tags::ExtrinsicCurvatureCompute<Dim, frame>,
         GeneralizedHarmonic::Tags::TraceExtrinsicCurvatureCompute<Dim, frame>>;
 
