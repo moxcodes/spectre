@@ -28,6 +28,7 @@
 #include "Evolution/Initialization/NonconservativeSystem.hpp"
 #include "Evolution/Initialization/SetVariables.hpp"
 #include "Evolution/NumericInitialData.hpp"
+#include "Evolution/Systems/GeneralizedHarmonic/BoundaryConditions/Bjorhus.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Equations.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/GaugeSourceFunctions/InitializeDampedHarmonic.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Initialize.hpp"
@@ -131,7 +132,7 @@ struct GeneralizedHarmonicDefaults {
   static constexpr bool local_time_stepping = false;
 
   using normal_dot_numerical_flux = Tags::NumericalFlux<
-    GeneralizedHarmonic::UpwindPenaltyCorrection<volume_dim>>;
+      GeneralizedHarmonic::UpwindPenaltyCorrection<volume_dim>>;
 
   using step_choosers_common =
       tmpl::list<StepChoosers::Registrars::Cfl<volume_dim, Frame::Inertial>,
@@ -198,8 +199,7 @@ struct GeneralizedHarmonicDefaults {
     using post_interpolation_callback =
         intrp::callbacks::FindApparentHorizon<AhA>;
     using post_horizon_find_callback =
-        intrp::callbacks::ObserveTimeSeriesOnSurface<tags_to_observe, AhA,
-                                                     AhA>;
+        intrp::callbacks::ObserveTimeSeriesOnSurface<tags_to_observe, AhA, AhA>;
   };
 
   using interpolation_target_tags = tmpl::list<AhA>;
@@ -264,16 +264,16 @@ struct GeneralizedHarmonicTemplateBase<
                          tmpl::list<>>>;
 
   using observation_events = tmpl::list<
-    dg::Events::Registrars::ObserveErrorNorms<Tags::Time,
-                                              analytic_solution_fields>,
-    dg::Events::Registrars::ObserveFields<
-      volume_dim, Tags::Time, observe_fields, analytic_solution_fields>,
-    Events::Registrars::ChangeSlabSize<slab_choosers>>;
+      dg::Events::Registrars::ObserveErrorNorms<Tags::Time,
+                                                analytic_solution_fields>,
+      dg::Events::Registrars::ObserveFields<
+          volume_dim, Tags::Time, observe_fields, analytic_solution_fields>,
+      Events::Registrars::ChangeSlabSize<slab_choosers>>;
 
   // Events include the observation events and finding the horizon
-  using events = tmpl::push_back<observation_events,
-                                 intrp::Events::Registrars::Interpolate<
-                                   3, AhA, interpolator_source_vars>>;
+  using events = tmpl::push_back<
+      observation_events,
+      intrp::Events::Registrars::Interpolate<3, AhA, interpolator_source_vars>>;
 
   // A tmpl::list of tags to be added to the GlobalCache by the
   // metavariables
@@ -282,8 +282,8 @@ struct GeneralizedHarmonicTemplateBase<
                  time_stepper_tag, Tags::EventsAndTriggers<events, triggers>>;
 
   using observed_reduction_data_tags = observers::collect_reduction_data_tags<
-    tmpl::push_back<typename Event<observation_events>::creatable_classes,
-                    typename AhA::post_horizon_find_callback>>;
+      tmpl::push_back<typename Event<observation_events>::creatable_classes,
+                      typename AhA::post_horizon_find_callback>>;
 
   static Phase determine_next_phase(
       const Phase& current_phase,
