@@ -189,9 +189,9 @@ struct EvolutionMetavars
       dg::Actions::ReceiveDataForFluxes<boundary_scheme>,
       tmpl::conditional_t<
           local_time_stepping,
-          GeneralizedHarmonic::Actions::ImposeBjorhusBoundaryConditions<
-              EvolutionMetavars>,
-          tmpl::list<Actions::RecordTimeStepperData<>,
+          tmpl::list<GeneralizedHarmonic::Actions::
+                         ImposeBjorhusBoundaryConditions<EvolutionMetavars>,
+                     Actions::RecordTimeStepperData<>,
                      Actions::MutateApply<boundary_scheme>>,
           tmpl::list<Actions::MutateApply<boundary_scheme>,
                      GeneralizedHarmonic::Actions::

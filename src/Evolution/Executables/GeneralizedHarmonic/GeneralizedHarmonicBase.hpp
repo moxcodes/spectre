@@ -332,14 +332,16 @@ struct GeneralizedHarmonicTemplateBase<
       dg::Actions::ReceiveDataForFluxes<boundary_scheme>,
       std::conditional_t<
           local_time_stepping,
-          tmpl::list<GeneralizedHarmonic::Actions::
-                         ImposeBjorhusBoundaryConditions<EvolutionMetavars>,
-                     Actions::RecordTimeStepperData<>,
-                     Actions::MutateApply<boundary_scheme>>,
-          tmpl::list<Actions::MutateApply<boundary_scheme>,
-                     GeneralizedHarmonic::Actions::
-                         ImposeBjorhusBoundaryConditions<EvolutionMetavars>,
-                     Actions::RecordTimeStepperData<>>>,
+          tmpl::list<
+              GeneralizedHarmonic::Actions::ImposeBjorhusBoundaryConditions<
+                  EvolutionMetavarsDerived<InitialData, BoundaryConditions>>,
+              Actions::RecordTimeStepperData<>,
+              Actions::MutateApply<boundary_scheme>>,
+          tmpl::list<
+              Actions::MutateApply<boundary_scheme>,
+              GeneralizedHarmonic::Actions::ImposeBjorhusBoundaryConditions<
+                  EvolutionMetavarsDerived<InitialData, BoundaryConditions>>,
+              Actions::RecordTimeStepperData<>>>,
       Actions::UpdateU<>>;
 
   using initialization_actions = tmpl::list<
