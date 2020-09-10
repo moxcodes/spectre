@@ -247,8 +247,8 @@ struct GeneralizedHarmonicTemplateBase<
       ConstraintPreservingPhysical;
   // Only Dirichlet boundary conditions imposed by an analytic solution are
   // supported right now.
-  using analytic_solution = boundary_conditions;
-  using analytic_solution_tag = Tags::AnalyticSolution<boundary_conditions>;
+  using analytic_solution = BoundaryConditions;
+  using analytic_solution_tag = Tags::AnalyticSolution<BoundaryConditions>;
   using boundary_condition_tag = analytic_solution_tag;
 
   using observe_fields = tmpl::append<
