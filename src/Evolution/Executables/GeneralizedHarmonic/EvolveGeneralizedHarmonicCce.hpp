@@ -174,6 +174,7 @@ struct EvolutionMetavars
   // use the default same step actions except for sending the next time and
   // interpolating to the CCE target. Assumes that the last action is `UpdateU`,
   // so that the insert places the new actions before that.
+  template <bool send_to_cce>
   using step_actions = tmpl::flatten<tmpl::list<
       dg::Actions::ComputeNonconservativeBoundaryFluxes<
           domain::Tags::InternalDirections<volume_dim>>,
@@ -195,8 +196,11 @@ struct EvolutionMetavars
                                      Actions::MutateApply<boundary_scheme>>,
                           tmpl::list<Actions::MutateApply<boundary_scheme>,
                                      Actions::RecordTimeStepperData<>>>,
-      Cce::Actions::SendNextTimeToCce<CceWorldtubeTarget>,
-      intrp::Actions::InterpolateToTarget<CceWorldtubeTarget>,
+      tmpl::conditional_t<
+          send_to_cce,
+          tmpl::list<Cce::Actions::SendNextTimeToCce<CceWorldtubeTarget>,
+                     intrp::Actions::InterpolateToTarget<CceWorldtubeTarget>>,
+          tmpl::list<>>,
       Actions::UpdateU<>>>;
 
   // initialization actions are the same as the default, with the single
@@ -271,8 +275,9 @@ struct EvolutionMetavars
           Parallel::PhaseActions<
               Phase, Phase::InitializeInitialDataDependentQuantities,
               initialize_initial_data_dependent_quantities_actions>,
-          Parallel::PhaseActions<Phase, Phase::InitializeTimeStepperHistory,
-                                 SelfStart::self_start_procedure<step_actions>>,
+          Parallel::PhaseActions<
+              Phase, Phase::InitializeTimeStepperHistory,
+              SelfStart::self_start_procedure<step_actions<false>>>,
           Parallel::PhaseActions<
               Phase, Phase::Register,
               tmpl::flatten<
@@ -284,7 +289,7 @@ struct EvolutionMetavars
           Parallel::PhaseActions<
               Phase, Phase::Evolve,
               tmpl::list<Actions::RunEventsAndTriggers, Actions::ChangeSlabSize,
-                         step_actions, Actions::AdvanceTime>>>>,
+                         step_actions<true>, Actions::AdvanceTime>>>>,
       std::conditional_t<evolution::is_numeric_initial_data_v<initial_data>,
                          ImportNumericInitialData<
                              Phase, Phase::ImportInitialData, initial_data>,
