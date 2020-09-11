@@ -89,6 +89,10 @@ struct SendNextTimeToCce {
 
     if (UNLIKELY(db::get<::Tags::TimeStepId>(box).substep() == 0 and
                  element_coord_holders.count(element_ids[0]) != 0)) {
+      Parallel::printf(MakeString{} << "Sending next time to CCE from element: "
+                                    << array_index << " at time "
+                                    << db::get<::Tags::TimeStepId>(box)
+                                    << "\n");
       // find the next step time via the timestepper
       auto next_step_id = db::get<::Tags::Next<::Tags::TimeStepId>>(box);
       while (next_step_id.substep() != 0) {

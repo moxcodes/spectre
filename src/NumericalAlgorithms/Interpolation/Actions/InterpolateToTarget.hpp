@@ -17,6 +17,9 @@
 #include "Parallel/Invoke.hpp"
 #include "Utilities/TMPL.hpp"
 
+#include "Utilities/MakeString.hpp"
+#include "Parallel/Printf.hpp"
+
 /// \cond
 namespace tuples {
 template <typename... Tags>
@@ -82,7 +85,8 @@ struct InterpolateToTarget {
       // to do anything.
       return std::forward_as_tuple(std::move(box));
     }
-
+    // Parallel::printf(MakeString{} << "Interpolating to CCE from element: "
+                                  // << array_index << "\n");
     // There are points in this element, so interpolate to them and
     // send the interpolated data to the target.  This is done
     // in several steps:

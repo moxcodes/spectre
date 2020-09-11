@@ -19,6 +19,9 @@
 #include "Utilities/Algorithm.hpp"
 #include "Utilities/BoostHelpers.hpp"
 
+#include "Utilities/MakeString.hpp"
+#include "Parallel/Printf.hpp"
+
 namespace Cce::InterfaceManagers {
 
 std::unique_ptr<GhInterfaceManager> GhLocalTimeStepping::get_clone()
@@ -93,6 +96,12 @@ void GhLocalTimeStepping::insert_gh_data(
 
 void GhLocalTimeStepping::insert_next_gh_time(
     TimeStepId time_id, TimeStepId next_time_id) noexcept {
+  if (times_seen_.count(time_id) != 0) {
+    return;
+  }
+  times_seen_.insert(time_id);
+  Parallel::printf(MakeString{} << "inserting time ids " << time_id << " and "
+                                << next_time_id << "\n");
   // retrieve an iterator position if the next time has already been
   // inserted for this data
   const auto previous_deque_entry = alg::find_if(
@@ -111,6 +120,7 @@ void GhLocalTimeStepping::insert_next_gh_time(
     pre_history_.emplace_back(std::move(time_id), boost::none,
                               // NOLINTNEXTLINE(performance-move-const-arg)
                               std::move(next_time_id), boost::none);
+    Parallel::printf("done inserting.\n");
     return;
   } else if (requests_.empty() or
              requests_.front().substep_time().value() <=
@@ -119,6 +129,7 @@ void GhLocalTimeStepping::insert_next_gh_time(
     // NOLINTNEXTLINE(performance-move-const-arg)
     get<2>(*previous_deque_entry) = std::move(next_time_id);
     update_history();
+    Parallel::printf("done inserting.\n");
     return;
   }
 
@@ -135,6 +146,7 @@ void GhLocalTimeStepping::insert_next_gh_time(
         boundary_history_.begin() +
         static_cast<ptrdiff_t>(boundary_history_.size() - order_));
   }
+  Parallel::printf("done inserting.\n");
 }
 
 void GhLocalTimeStepping::request_gh_data(const TimeStepId& time_id) noexcept {
