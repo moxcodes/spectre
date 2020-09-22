@@ -6,10 +6,12 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <string>
 
 #include "DataStructures/DataBox/Tag.hpp"
 #include "ErrorHandling/Assert.hpp"
+#include "ErrorHandling/Error.hpp"
 #include "Parallel/CharmRegistration.hpp"
 #include "Parallel/ParallelComponentHelpers.hpp"
 #include "Utilities/PrettyType.hpp"
@@ -340,7 +342,7 @@ struct GlobalCache : db::BaseTag {};
 
 template <class Metavariables>
 struct GlobalCacheImpl : GlobalCache, db::SimpleTag {
-  using type = const Parallel::GlobalCache<Metavariables>*;
+  using type = Parallel::GlobalCache<Metavariables>*;
   static std::string name() noexcept { return "GlobalCache"; }
 };
 

@@ -41,7 +41,7 @@ struct AlgorithmControlTriggers {
   template <typename PhaseConstant>
   struct PhaseTrigger {
     using type = std::unique_ptr<Trigger<typename Metavariables::triggers>>;
-    static constexpr OptionString help = {"Trigger for a global sync phase"};
+    static constexpr Options::String help = {"Trigger for a global sync phase"};
     static std::string name() noexcept {
       return Metavariables::phase_name(PhaseConstant::value);
     };
@@ -55,7 +55,7 @@ struct AlgorithmControlTriggers {
   struct GlobalSyncTrigger {
     using type =
         std::unique_ptr<Trigger<typename Metavariables::global_sync_triggers>>;
-    static constexpr OptionString help = {
+    static constexpr Options::String help = {
         "Trigger for imposing a global sync and running sync phases."};
     static std::string name() noexcept { return "GlobalSync"; }
     static type default_value() noexcept {
@@ -68,7 +68,8 @@ struct AlgorithmControlTriggers {
 
   struct PauseTrigger {
     using type = std::unique_ptr<Trigger<typename Metavariables::triggers>>;
-    static constexpr OptionString help = {"Trigger for pausing the algorithm."};
+    static constexpr Options::String help = {
+        "Trigger for pausing the algorithm."};
     static std::string name() noexcept { return "Pause"; }
     static type default_value() noexcept {
       return std::make_unique<Triggers::Not<typename Metavariables::triggers>>(
@@ -79,7 +80,8 @@ struct AlgorithmControlTriggers {
 
   struct HaltTrigger {
     using type = std::unique_ptr<Trigger<typename Metavariables::triggers>>;
-    static constexpr OptionString help = {"Trigger for halting the algorithm."};
+    static constexpr Options::String help = {
+        "Trigger for halting the algorithm."};
     static std::string name() noexcept { return "Halt"; }
     static type default_value() noexcept {
       return std::make_unique<Triggers::Not<typename Metavariables::triggers>>(
@@ -93,7 +95,7 @@ struct AlgorithmControlTriggers {
                  tmpl::transform<typename Metavariables::global_sync_phases,
                                  tmpl::bind<PhaseTrigger, tmpl::_1>>>>;
 
-  static constexpr OptionString help = {
+  static constexpr Options::String help = {
       "A collection of triggers for determining run-time algorithm control "
       "flow."};
 
@@ -157,7 +159,7 @@ namespace OptionTags {
 template <typename Metavariables>
 struct AlgorithmControlTriggers {
   using type = ::Parallel::AlgorithmControlTriggers<Metavariables>;
-  static constexpr OptionString help =
+  static constexpr Options::String help =
       "triggers for determining the algorithm control-flow";
 };
 }  // namespace OptionTags

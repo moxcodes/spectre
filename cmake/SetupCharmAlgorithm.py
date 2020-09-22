@@ -135,9 +135,7 @@ def create_header_file(args):
         "template <typename ParallelComponent,\n" \
         "          typename SpectreArrayIndex>\n" \
         "class Algorithm%s\n" \
-        "    : public CBase_Algorithm%s<ParallelComponent, \n" \
-        "                      SpectreArrayIndex>,\n" \
-        "      public Parallel::AlgorithmImpl<ParallelComponent,\n" \
+        "    : public Parallel::AlgorithmImpl<ParallelComponent,\n" \
         "        typename ParallelComponent::phase_dependent_action_list> {\n" \
         "  using algorithm = Parallel::Algorithms::%s;\n" \
         " public:\n" \

@@ -278,7 +278,8 @@ CREATE_HAS_STATIC_MEMBER_VARIABLE_V(LoadBalancing)
  * necessary to reproduce the issue.
  */
 template <typename ParallelComponent, typename... PhaseDepActionListsPack>
-class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>> {
+class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
+    : public detail::get_charm_base_class_t<ParallelComponent> {
   static_assert(
       sizeof...(PhaseDepActionListsPack) > 0,
       "Must have at least one phase dependent action list "
@@ -771,15 +772,14 @@ AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>::
     metavariables::global_startup_routines();
   }
   global_cache_ = global_cache_proxy.ckLocalBranch();
-  box_ = db::create<
-      db::AddSimpleTags<tmpl::flatten<
-          tmpl::list<Tags::GlobalCacheImpl<metavariables>,
+  box_ =
+      db::create<db::AddSimpleTags<tmpl::flatten<tmpl::list<
+                     Tags::GlobalCacheImpl<metavariables>,
                      typename ParallelComponent::initialization_tags>>>,
-      db::AddComputeTags<
-          db::wrap_tags_in<Tags::FromGlobalCache, all_cache_tags>>>(
-      static_cast<const Parallel::GlobalCache<metavariables>*>(
-          global_cache_),
-      std::move(get<InitializationTags>(initialization_items))...);
+                 db::AddComputeTags<
+                     db::wrap_tags_in<Tags::FromGlobalCache, all_cache_tags>>>(
+          global_cache_,
+          std::move(get<InitializationTags>(initialization_items))...);
 }
 
 template <typename ParallelComponent, typename... PhaseDepActionListsPack>

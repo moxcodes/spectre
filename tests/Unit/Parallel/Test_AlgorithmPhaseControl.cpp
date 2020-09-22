@@ -436,7 +436,7 @@ struct TestMetavariables {
     }
   }
 
-  static constexpr OptionString help =
+  static constexpr Options::String help =
       "An executable for testing basic phase control flow.";
 
   static std::string repeat(const std::string& input,

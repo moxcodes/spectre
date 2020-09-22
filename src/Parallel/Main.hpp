@@ -103,7 +103,6 @@ class Main : public CBase_Main<Metavariables> {
       Metavariables::Phase::Initialization};
 
   CProxy_GlobalCache<Metavariables> global_cache_proxy_;
-  Options::Parser<option_list> options_;
   std::set<typename Metavariables::Phase> requested_global_sync_phases_;
   boost::optional<typename Metavariables::Phase>
       phase_to_resume_after_sync_phases_;
