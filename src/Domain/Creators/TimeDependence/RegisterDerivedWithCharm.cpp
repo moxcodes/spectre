@@ -5,16 +5,15 @@
 #include <memory>
 #include <pup.h>
 
+#include "Domain/CoordinateMaps/CoordinateMap.hpp"
+#include "Domain/CoordinateMaps/CoordinateMap.tpp"
 #include "Domain/CoordinateMaps/TimeDependent/CubicScale.hpp"
 #include "Domain/CoordinateMaps/TimeDependent/ProductMaps.hpp"
 #include "Domain/CoordinateMaps/TimeDependent/ProductMaps.tpp"
 #include "Domain/CoordinateMaps/TimeDependent/Translation.hpp"
-#include "Domain/Creators/TimeDependence/Composition.hpp"
-#include "Domain/Creators/TimeDependence/Composition.tpp"
 #include "Domain/Creators/TimeDependence/CubicScale.hpp"
 #include "Domain/Creators/TimeDependence/None.hpp"
 #include "Domain/Creators/TimeDependence/TimeDependence.hpp"
-#include "Domain/Creators/TimeDependence/UniformRotationAboutZAxis.hpp"
 #include "Domain/Creators/TimeDependence/UniformTranslation.hpp"
 #include "Parallel/RegisterDerivedClassesWithCharm.hpp"
 #include "Utilities/TMPL.hpp"
@@ -28,9 +27,12 @@ struct get_maps {
 
 template <size_t Dim>
 void register_maps_with_charm() noexcept {
-  using maps_to_register = tmpl::remove_duplicates<tmpl::flatten<
-      tmpl::transform<typename TimeDependence<Dim>::creatable_classes,
-                      get_maps<tmpl::_1>>>>;
+  using maps_to_register =
+      tmpl::remove_duplicates<tmpl::flatten<tmpl::push_back<
+          tmpl::transform<typename TimeDependence<Dim>::creatable_classes,
+                          get_maps<tmpl::_1>>,
+          domain::CoordinateMap<Frame::Grid, Frame::Inertial,
+                                CoordinateMaps::Identity<Dim>>>>>;
 
   Parallel::register_classes_in_list<maps_to_register>();
 }

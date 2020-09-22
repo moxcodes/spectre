@@ -61,24 +61,23 @@ struct RegisterWithObservers {
  public:
   template <typename ParallelComponent, typename DbTagList,
             typename Metavariables, typename ArrayIndex>
-  static void perform_registration(
-      db::DataBox<DbTagList>& box,
-      Parallel::ConstGlobalCache<Metavariables>& cache,
-      const ArrayIndex& array_index) noexcept {
-    register_or_deregister_impl<ParallelComponent, RegisterSenderWithSelf>(
-        box, cache, array_index);
+  static void perform_registration(db::DataBox<DbTagList>& box,
+                                   Parallel::GlobalCache<Metavariables>& cache,
+                                   const ArrayIndex& array_index) noexcept {
+    register_or_deregister_impl<ParallelComponent,
+                                RegisterContributorWithObserver>(box, cache,
+                                                                 array_index);
   }
 
   template <typename ParallelComponent, typename DbTagList,
             typename Metavariables, typename ArrayIndex>
   static void perform_deregistration(
-      db::DataBox<DbTagList>& box,
-      Parallel::ConstGlobalCache<Metavariables>& cache,
+      db::DataBox<DbTagList>& box, Parallel::GlobalCache<Metavariables>& cache,
       const ArrayIndex& array_index) noexcept {
-    register_or_deregister_impl<ParallelComponent, DeregisterSenderWithSelf>(
-        box, cache, array_index);
+    register_or_deregister_impl<ParallelComponent,
+                                DeregisterContributorWithObserver>(box, cache,
+                                                                   array_index);
   }
-
 
   template <typename DbTagList, typename... InboxTags, typename Metavariables,
             typename ArrayIndex, typename ActionList,

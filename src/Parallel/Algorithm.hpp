@@ -114,6 +114,11 @@ struct AlgorithmControl {
 
 namespace detail {
 
+template <typename CBaseInherit>
+class CBaseWithResume : public CBaseInherit {
+  virtual void ResumeFromSync() = 0;
+};
+
 // obtains the Chare type for the component associated with a template
 // instantiation of the `AlgorithmImpl`, for choosing the appropriate type from
 // which to inherit.
@@ -129,23 +134,23 @@ struct get_charm_base_class<Component, Parallel::Algorithms::Array> {
 
 template <typename Component>
 struct get_charm_base_class<Component, Parallel::Algorithms::Group> {
-  using type = CBase_AlgorithmGroup<
+  using type = CBaseWithResume<CBase_AlgorithmGroup<
       Component, typename get_array_index<
-                     Parallel::Algorithms::Group>::template f<Component>>;
+                   Parallel::Algorithms::Group>::template f<Component>>>;
 };
 
 template <typename Component>
 struct get_charm_base_class<Component, Parallel::Algorithms::Nodegroup> {
-  using type = CBase_AlgorithmNodegroup<
+  using type = CBaseWithResume<CBase_AlgorithmNodegroup<
       Component, typename get_array_index<
-                     Parallel::Algorithms::Nodegroup>::template f<Component>>;
+                   Parallel::Algorithms::Nodegroup>::template f<Component>>>;
 };
 
 template <typename Component>
 struct get_charm_base_class<Component, Parallel::Algorithms::Singleton> {
-  using type = CBase_AlgorithmSingleton<
+  using type = CBaseWithResume<CBase_AlgorithmSingleton<
       Component, typename get_array_index<
-                     Parallel::Algorithms::Singleton>::template f<Component>>;
+                     Parallel::Algorithms::Singleton>::template f<Component>>>;
 };
 
 template <typename Component>
@@ -443,13 +448,10 @@ class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
   }
   // @}
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Winconsistent-missing-override"
-  void ResumeFromSync() {
+  void ResumeFromSync() override {
     (*(global_cache_->get_main_proxy())).down_lb_count();
     return;
   }
-#pragma GCC diagnostic pop
 
   void start_phase(const PhaseType next_phase) noexcept {
     if constexpr (detail::has_LoadBalancing_v<PhaseType>) {

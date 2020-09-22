@@ -26,6 +26,8 @@
 #include "Utilities/TMPL.hpp"
 #include "Utilities/TaggedTuple.hpp"
 
+#include "Utilities/MakeString.hpp"
+
 /*!
  * \brief Don't try to import initial data from a data file
  *

@@ -116,7 +116,9 @@ struct DeregisterVolumeContributorWithObserverWriter {
 
             volume_observers_registered->at(observation_key)
                 .erase(id_of_caller);
-            if(UNLIKELY(volume_observers_registered->at(observation_key).size() == 0)) {
+            if (UNLIKELY(
+                    volume_observers_registered->at(observation_key).size() ==
+                    0)) {
               volume_observers_registered->erase(observation_key);
             }
           });
@@ -241,7 +243,6 @@ struct DeregisterReductionNodeWithWritingNode {
   }
 };
 
-
 /// \brief Register an `ArrayComponentId` that will call
 /// `observers::ThreadedActions::WriteReductionData` or
 /// `observers::ThreadedActions::ContributeReductionData` for a specific
@@ -335,9 +336,10 @@ struct DeregisterReductionContributorWithObserverWriter {
                            .end())) {
               reduction_observers_registered->at(observation_key)
                   .erase(id_of_caller);
-              if(reduction_observers_registered->at(observation_key).size() == 0) {
+              if (reduction_observers_registered->at(observation_key).size() ==
+                  0) {
                 Parallel::simple_action<
-                    Actions::DeregisterReductionNoodeWithWritingNode>(
+                    Actions::DeregisterReductionNodeWithWritingNode>(
                     Parallel::get_parallel_component<
                         ObserverWriter<Metavariables>>(cache)[0],
                     observation_key, node_id);
@@ -462,8 +464,7 @@ struct DeregisterContributorWithObserver {
       bool observation_key_not_registered = true;
       db::mutate<observers::Tags::ExpectedContributorsForObservations>(
           make_not_null(&box),
-          [&component_id, &observation_key,
-           &observation_key_already_registered](
+          [&component_id, &observation_key, &observation_key_not_registered](
               const gsl::not_null<std::unordered_map<
                   ObservationKey, std::unordered_set<ArrayComponentId>>*>
                   array_component_ids) noexcept {
@@ -480,14 +481,16 @@ struct DeregisterContributorWithObserver {
                   << component_id << " and the observation key is "
                   << observation_key);
             }
-            array_component_ids->at(observation_key)
-                .erase(component_id);
-            if(array_component_ids->at(observation_key).size() == 0) {
+            array_component_ids->at(observation_key).erase(component_id);
+            if (array_component_ids->at(observation_key).size() == 0) {
               array_component_ids->erase(observation_key);
+              observation_key_not_registered = true;
             }
           });
 
-      if (observation_key_not_registered) {
+      // TODO this logic is currently confusing and a better variable name with
+      // reversed logic would improve matters.
+      if (not observation_key_not_registered) {
         // if the observation key is not registered, no need to re-call the
         // deregistration actions.
         return;

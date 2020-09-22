@@ -102,46 +102,52 @@ struct RegisterEventsWithObservers {
   static void register_or_deregister_impl(
       db::DataBox<DbTagList>& box, Parallel::GlobalCache<Metavariables>& cache,
       const ArrayIndex& array_index) noexcept {
-    auto& observer =
-        *Parallel::get_parallel_component<observers::Observer<Metavariables>>(
-             cache)
-             .ckLocalBranch();
-    std::vector<
-        std::pair<observers::TypeOfObservation, observers::ObservationKey>>
-        type_of_observation_and_observation_key_pairs;
+    if constexpr (db::tag_is_retrievable<::Tags::EventsAndTriggersBase,
+                  db::DataBox<DbTagList>>::value) {
+      auto& observer =
+          *Parallel::get_parallel_component<observers::Observer<Metavariables>>(
+               cache)
+               .ckLocalBranch();
+      std::vector<
+          std::pair<observers::TypeOfObservation, observers::ObservationKey>>
+          type_of_observation_and_observation_key_pairs;
 
-    const auto& triggers_and_events =
-        db::get<::Tags::EventsAndTriggersBase>(box);
-    for (const auto& trigger_and_events :
-         triggers_and_events.events_and_triggers()) {
-      for (const auto& event : trigger_and_events.second) {
-        if (auto obs_type_and_obs_key =
-                get_registration_observation_type_and_key(*event, box);
-            obs_type_and_obs_key.has_value()) {
-          type_of_observation_and_observation_key_pairs.push_back(
-              *obs_type_and_obs_key);
+      const auto& triggers_and_events =
+          db::get<::Tags::EventsAndTriggersBase>(box);
+      for (const auto& trigger_and_events :
+           triggers_and_events.events_and_triggers()) {
+        for (const auto& event : trigger_and_events.second) {
+          if (auto obs_type_and_obs_key =
+                  get_registration_observation_type_and_key(*event, box);
+              obs_type_and_obs_key.has_value()) {
+            type_of_observation_and_observation_key_pairs.push_back(
+                *obs_type_and_obs_key);
+          }
         }
       }
-    }
 
-    for (const auto& [type_of_observation, observation_key] :
-         type_of_observation_and_observation_key_pairs) {
-      Parallel::simple_action<RegisterContributorWithObserver>(
-          observer, observation_key,
-          observers::ArrayComponentId(
-              std::add_pointer_t<ParallelComponent>{nullptr},
-              Parallel::ArrayIndex<std::decay_t<ArrayIndex>>{array_index}),
-          type_of_observation);
+      for (const auto& [type_of_observation, observation_key] :
+           type_of_observation_and_observation_key_pairs) {
+        Parallel::simple_action<RegisterOrDeregisterAction>(
+            observer, observation_key,
+            observers::ArrayComponentId(
+                std::add_pointer_t<ParallelComponent>{nullptr},
+                Parallel::ArrayIndex<std::decay_t<ArrayIndex>>{array_index}),
+            type_of_observation);
+      }
+    } else {
+      ERROR(
+          "DataBox has no `::Tags::EventsAndTriggersBase`, so cannot proceed "
+          "with registering or deregistering events.");
     }
   }
 
  public:
   template <typename ParallelComponent, typename DbTagList,
             typename Metavariables, typename ArrayIndex>
-  static void perform_registration(
-      db::DataBox<DbTagList>& box,
-      Parallel::ConstGlobalCache<Metavariables>& cache,
-      const ArrayIndex& array_index) noexcept {
+  static void perform_registration(db::DataBox<DbTagList>& box,
+                                   Parallel::GlobalCache<Metavariables>& cache,
+                                   const ArrayIndex& array_index) noexcept {
     register_or_deregister_impl<ParallelComponent,
                                 RegisterContributorWithObserver>(box, cache,
                                                                  array_index);
@@ -150,8 +156,7 @@ struct RegisterEventsWithObservers {
   template <typename ParallelComponent, typename DbTagList,
             typename Metavariables, typename ArrayIndex>
   static void perform_deregistration(
-      db::DataBox<DbTagList>& box,
-      Parallel::ConstGlobalCache<Metavariables>& cache,
+      db::DataBox<DbTagList>& box, Parallel::GlobalCache<Metavariables>& cache,
       const ArrayIndex& array_index) noexcept {
     register_or_deregister_impl<ParallelComponent,
                                 DeregisterContributorWithObserver>(box, cache,
