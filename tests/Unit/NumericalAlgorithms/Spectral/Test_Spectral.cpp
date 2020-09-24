@@ -109,6 +109,13 @@ void test_weak_differentiation() {
       }
     }
 
+    // some architectures end up with slightly higher errors than the default
+    // approx for high numbers of collocation points
+    Approx differentiation_approx =
+        Approx::custom()
+            .epsilon(std::numeric_limits<double>::epsilon() * 1.0e3)
+            .scale(1.0);
+
     if (QuadratureType == Spectral::Quadrature::GaussLobatto) {
       for (size_t p = 0; p <= n - 1; p++) {
         const auto& collocation_pts =
@@ -121,7 +128,8 @@ void test_weak_differentiation() {
         const auto analytic_derivative =
             unit_polynomial_derivative(p, collocation_pts);
         for (size_t i = 1; i < n - 1; ++i) {
-          CHECK(numeric_derivative[i] == approx(-analytic_derivative[i]));
+          CHECK(numeric_derivative[i] ==
+                differentiation_approx(-analytic_derivative[i]));
         }
       }
     }
