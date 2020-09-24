@@ -30,17 +30,17 @@ function(add_single_input_file_test INPUT_FILE EXECUTABLE CHECK_TYPE TIMEOUT)
 
   set(
     CTEST_NAME
-    "\"InputFiles.${EXECUTABLE_DIR_NAME}.${INPUT_FILE_NAME}.${CHECK_TYPE}\""
+    "InputFiles.${EXECUTABLE_DIR_NAME}.${INPUT_FILE_NAME}.${CHECK_TYPE}"
     )
   if ("${CHECK_TYPE}" STREQUAL "parse")
     add_test(
-      NAME "${CTEST_NAME}"
+      NAME ${CTEST_NAME}
       COMMAND ${CMAKE_BINARY_DIR}/bin/${EXECUTABLE}
       --check-options --input-file ${INPUT_FILE}
       )
   elseif("${CHECK_TYPE}" STREQUAL "execute")
     add_test(
-      NAME "${CTEST_NAME}"
+      NAME ${CTEST_NAME}
       # This script is written below, and only once
       COMMAND sh ${PROJECT_BINARY_DIR}/tmp/InputFileExecuteAndClean.sh
       ${EXECUTABLE} ${INPUT_FILE}
@@ -64,7 +64,7 @@ function(add_single_input_file_test INPUT_FILE EXECUTABLE CHECK_TYPE TIMEOUT)
   endif()
 
   set_tests_properties(
-    "${CTEST_NAME}"
+    ${CTEST_NAME}
     PROPERTIES
     FAIL_REGULAR_EXPRESSION "ERROR"
     TIMEOUT ${TIMEOUT}
