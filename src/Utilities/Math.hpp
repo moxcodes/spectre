@@ -121,8 +121,13 @@ DataType smoothstep(const double lower_edge, const double upper_edge,
           return {0., 0., 0., 0., 35., -84., 70., -20.};
         }
       }(),
-      static_cast<DataType>(
-          clamp((arg - lower_edge) / (upper_edge - lower_edge), 0., 1.)));
+      // The casts here evaluate blaze expression template to avoid occasional
+      // architecture-dependent failures of the blaze expression template
+      // system. If the casts are removed, the unit tests should be run on all
+      // supported systems to confirm no surprising blaze failures appear.
+      static_cast<DataType>(clamp(
+          static_cast<DataType>((arg - lower_edge) / (upper_edge - lower_edge)),
+          0., 1.)));
 }
 
 /// \ingroup UtilitiesGroup
