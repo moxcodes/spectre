@@ -131,7 +131,6 @@ void test_weak_differentiation() {
               approx(weak_diff_matrix(i, l)));
       }
     }
-
     if (QuadratureType == Spectral::Quadrature::GaussLobatto) {
       for (size_t p = 0; p <= n - 1; p++) {
         const auto& collocation_pts =
