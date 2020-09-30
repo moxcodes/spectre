@@ -327,8 +327,7 @@ struct EvolutionMetavars
     using compute_items_on_target = tmpl::list<>;
     using compute_target_points =
         intrp::TargetPoints::KerrHorizon<CceWorldtubeTarget, ::Frame::Inertial>;
-    using post_interpolation_callback = intrp::callbacks::SendGhWorldtubeData<
-        Cce::CharacteristicEvolution<EvolutionMetavars>>;
+    using post_interpolation_callback = intrp::callbacks::DumpGhWorldtubeData;
     using vars_to_interpolate_to_target = tmpl::list<
         gr::Tags::SpacetimeMetric<volume_dim, frame>,
         GeneralizedHarmonic::Tags::Pi<volume_dim, frame>,

@@ -24,6 +24,7 @@
 #include "Utilities/Gsl.hpp"
 #include "Utilities/Spherepack.hpp"
 #include "Utilities/TMPL.hpp"
+#include "NumericalAlgorithms/Spectral/SwshCollocation.hpp"
 
 namespace {
 struct MockMetavariables {
@@ -129,6 +130,18 @@ void test_interpolation_target_kerr_horizon(
         }
       }
     } else {
+      auto collocation_iterator =
+          Spectral::Swsh::cached_collocation_metadata<
+              Spectral::Swsh::ComplexRepresentation::Interleaved>(l_max)
+              .begin();
+      for (size_t i_theta = 0; i_theta < n_theta; ++i_theta) {
+        for (size_t i_phi = 0; i_phi < n_phi; ++i_phi) {
+          CHECK((*collocation_iterator).theta == approx(theta_points[i_theta]));
+          CHECK((*collocation_iterator).phi ==
+                approx(two_pi_over_n_phi * i_phi));
+          ++collocation_iterator;
+        }
+      }
       for (size_t i_theta = 0; i_theta < n_theta; ++i_theta) {
         for (size_t i_phi = 0; i_phi < n_phi; ++i_phi) {
           const double phi = two_pi_over_n_phi * i_phi;
