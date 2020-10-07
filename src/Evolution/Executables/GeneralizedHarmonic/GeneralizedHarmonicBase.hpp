@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <vector>
 
+#include "AlgorithmSingleton.hpp"
 #include "ApparentHorizons/ComputeItems.hpp"
 #include "ApparentHorizons/Tags.hpp"
 #include "DataStructures/DataBox/PrefixHelpers.hpp"
@@ -26,6 +27,7 @@
 #include "Evolution/Initialization/NonconservativeSystem.hpp"
 #include "Evolution/Initialization/SetVariables.hpp"
 #include "Evolution/NumericInitialData.hpp"
+#include "Evolution/Systems/GeneralizedHarmonic/BoundaryConditions/Bjorhus.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Equations.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/GaugeSourceFunctions/InitializeDampedHarmonic.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Initialize.hpp"
@@ -84,6 +86,7 @@
 #include "ParallelAlgorithms/Events/ObserveErrorNorms.hpp"
 #include "ParallelAlgorithms/Events/ObserveFields.hpp"
 #include "ParallelAlgorithms/Events/ObserveTimeStep.hpp"
+#include "ParallelAlgorithms/Events/ObserveVolumeIntegrals.hpp"
 #include "ParallelAlgorithms/EventsAndTriggers/Actions/RunEventsAndTriggers.hpp"
 #include "ParallelAlgorithms/EventsAndTriggers/Event.hpp"
 #include "ParallelAlgorithms/EventsAndTriggers/EventsAndTriggers.hpp"
@@ -263,9 +266,10 @@ template <typename EvolutionMetavarsDerived>
 struct GeneralizedHarmonicTemplateBase;
 
 template <template <typename, typename> class EvolutionMetavarsDerived,
-          typename InitialData, typename BoundaryConditions>
-struct GeneralizedHarmonicTemplateBase<
-    EvolutionMetavarsDerived<InitialData, BoundaryConditions>>
+          typename InitialData, typename BoundaryConditions,
+          bool BjorhusExternalBoundary = false>
+struct GeneralizedHarmonicTemplateBase<EvolutionMetavarsDerived<
+    InitialData, BoundaryConditions, BjorhusExternalBoundary>>
     : public virtual GeneralizedHarmonicDefaults {
   using derived_metavars =
       EvolutionMetavarsDerived<InitialData, BoundaryConditions>;
@@ -315,16 +319,28 @@ struct GeneralizedHarmonicTemplateBase<
 
   // A tmpl::list of tags to be added to the GlobalCache by the
   // metavariables
-  using const_global_cache_tags = tmpl::list<
-      analytic_solution_tag, normal_dot_numerical_flux, time_stepper_tag,
-      Tags::EventsAndTriggers<events, triggers>,
-      GeneralizedHarmonic::ConstraintDamping::Tags::DampingFunctionGamma0<
-          volume_dim, frame>,
-      GeneralizedHarmonic::ConstraintDamping::Tags::DampingFunctionGamma1<
-          volume_dim, frame>,
-      GeneralizedHarmonic::ConstraintDamping::Tags::DampingFunctionGamma2<
-          volume_dim, frame>,
-      PhaseControl::Tags::PhaseChangeAndTriggers<phase_changes, triggers>>;
+  using const_global_cache_tags = tmpl::conditional_t<
+      evolution::is_analytic_solution_v<analytic_solution>,
+      tmpl::list<
+          analytic_solution_tag, normal_dot_numerical_flux, time_stepper_tag,
+          Tags::EventsAndTriggers<events, triggers>,
+          GeneralizedHarmonic::ConstraintDamping::Tags::DampingFunctionGamma0<
+              volume_dim, frame>,
+          GeneralizedHarmonic::ConstraintDamping::Tags::DampingFunctionGamma1<
+              volume_dim, frame>,
+          GeneralizedHarmonic::ConstraintDamping::Tags::DampingFunctionGamma2<
+              volume_dim, frame>,
+          PhaseControl::Tags::PhaseChangeAndTriggers<phase_changes, triggers>>,
+      tmpl::list<
+          normal_dot_numerical_flux, time_stepper_tag,
+          Tags::EventsAndTriggers<events, triggers>,
+          GeneralizedHarmonic::ConstraintDamping::Tags::DampingFunctionGamma0<
+              volume_dim, frame>,
+          GeneralizedHarmonic::ConstraintDamping::Tags::DampingFunctionGamma1<
+              volume_dim, frame>,
+          GeneralizedHarmonic::ConstraintDamping::Tags::DampingFunctionGamma2<
+              volume_dim, frame>,
+          PhaseControl::Tags::PhaseChangeAndTriggers<phase_changes, triggers>>>;
 
   using dg_registration_list =
       tmpl::list<intrp::Actions::RegisterElementWithInterpolator,
@@ -376,19 +392,34 @@ struct GeneralizedHarmonicTemplateBase<
     }
   }
 
+  static_assert(
+      not local_time_stepping,
+      "This version of the branch cannot be made to support local time "
+      "stepping. The reason is that the bjorhus boundary condition directly "
+      "modifies the first derivative of the volume data, and so cannot be "
+      "imposed before the time stepper data is recorded (in "
+      "`ComputeTimeDerivative`). The combination of local time stepping and "
+      "Bjorhus BCs requires full conversion of the Bjorhus BCs to the new "
+      "infrastructure (PRs 2997-3000 + executable conversion work).");
   using step_actions = tmpl::list<
       evolution::dg::Actions::ComputeTimeDerivative<derived_metavars>,
       dg::Actions::ComputeNonconservativeBoundaryFluxes<
           domain::Tags::BoundaryDirectionsInterior<volume_dim>>,
-      dg::Actions::ImposeDirichletBoundaryConditions<derived_metavars>,
-      dg::Actions::CollectDataForFluxes<
-          boundary_scheme,
-          domain::Tags::BoundaryDirectionsInterior<volume_dim>>,
+      tmpl::conditional_t<
+          BjorhusExternalBoundary, tmpl::list<>,
+          tmpl::list<
+              dg::Actions::ImposeDirichletBoundaryConditions<EvolutionMetavars>,
+              dg::Actions::CollectDataForFluxes<
+                  boundary_scheme,
+                  domain::Tags::BoundaryDirectionsInterior<volume_dim>>>>,
       dg::Actions::ReceiveDataForFluxes<boundary_scheme>,
       Actions::MutateApply<boundary_scheme>,
       tmpl::conditional_t<
-          local_time_stepping, tmpl::list<>,
-          tmpl::list<Actions::RecordTimeStepperData<>, Actions::UpdateU<>>>>;
+          BjorhusExternalBoundary,
+          tmpl::list<GeneralizedHarmonic::Actions::
+                         ImposeBjorhusBoundaryConditions<EvolutionMetavars>>,
+          tmpl::list<>>,
+      Actions::RecordTimeStepperData<>, Actions::UpdateU<>>;
 
   using initialization_actions = tmpl::list<
       Actions::SetupDataBox,
@@ -414,15 +445,33 @@ struct GeneralizedHarmonicTemplateBase<
               GeneralizedHarmonic::ConstraintDamping::Tags::ConstraintGamma0,
               GeneralizedHarmonic::ConstraintDamping::Tags::ConstraintGamma1,
               GeneralizedHarmonic::ConstraintDamping::Tags::ConstraintGamma2>,
-          dg::Initialization::slice_tags_to_exterior<
-              gr::Tags::SpatialMetric<volume_dim, frame, DataVector>,
-              typename gr::Tags::DetAndInverseSpatialMetricCompute<
-                  volume_dim, frame, DataVector>::base,
-              gr::Tags::Shift<volume_dim, frame, DataVector>,
-              gr::Tags::Lapse<DataVector>,
-              GeneralizedHarmonic::ConstraintDamping::Tags::ConstraintGamma0,
-              GeneralizedHarmonic::ConstraintDamping::Tags::ConstraintGamma1,
-              GeneralizedHarmonic::ConstraintDamping::Tags::ConstraintGamma2>,
+          tmpl::conditional_t<
+              BjorhusExternalBoundary,
+              dg::Initialization::slice_tags_to_exterior<
+                  typename system::variables_tag,
+                  gr::Tags::SpatialMetric<volume_dim, frame, DataVector>,
+                  typename gr::Tags::DetAndInverseSpatialMetricCompute<
+                      volume_dim, frame, DataVector>::base,
+                  gr::Tags::Shift<volume_dim, frame, DataVector>,
+                  gr::Tags::Lapse<DataVector>,
+                  GeneralizedHarmonic::ConstraintDamping::Tags::
+                      ConstraintGamma0,
+                  GeneralizedHarmonic::ConstraintDamping::Tags::
+                      ConstraintGamma1,
+                  GeneralizedHarmonic::ConstraintDamping::Tags::
+                      ConstraintGamma2>,
+              dg::Initialization::slice_tags_to_exterior<
+                  gr::Tags::SpatialMetric<volume_dim, frame, DataVector>,
+                  typename gr::Tags::DetAndInverseSpatialMetricCompute<
+                      volume_dim, frame, DataVector>::base,
+                  gr::Tags::Shift<volume_dim, frame, DataVector>,
+                  gr::Tags::Lapse<DataVector>,
+                  GeneralizedHarmonic::ConstraintDamping::Tags::
+                      ConstraintGamma0,
+                  GeneralizedHarmonic::ConstraintDamping::Tags::
+                      ConstraintGamma1,
+                  GeneralizedHarmonic::ConstraintDamping::Tags::
+                      ConstraintGamma2>>,
           dg::Initialization::face_compute_tags<
               domain::Tags::BoundaryCoordinates<volume_dim, true>,
               GeneralizedHarmonic::CharacteristicFieldsCompute<volume_dim,
@@ -430,13 +479,19 @@ struct GeneralizedHarmonicTemplateBase<
           dg::Initialization::exterior_compute_tags<
               GeneralizedHarmonic::CharacteristicFieldsCompute<volume_dim,
                                                                frame>>,
-          true, true>,
+          !BjorhusExternalBoundary, true>,
+      tmpl::conditional_t<evolution::is_analytic_solution_v<analytic_solution>,
+                          Initialization::Actions::AddComputeTags<
+                              tmpl::list<evolution::Tags::AnalyticCompute<
+                                  volume_dim, analytic_solution_tag,
+                                  analytic_solution_fields>>>,
+                          tmpl::list<>>,
+      dg::Actions::InitializeMortars<boundary_scheme, !BjorhusExternalBoundary>,
       Initialization::Actions::AddComputeTags<tmpl::push_back<
           StepChoosers::step_chooser_compute_tags<
               GeneralizedHarmonicTemplateBase>,
           evolution::Tags::AnalyticCompute<volume_dim, analytic_solution_tag,
                                            analytic_solution_fields>>>,
-      dg::Actions::InitializeMortars<boundary_scheme, true>,
       Initialization::Actions::DiscontinuousGalerkin<derived_metavars>,
       Initialization::Actions::RemoveOptionsAndTerminatePhase>;
 
