@@ -27,11 +27,12 @@ class CProxy_GlobalCache;
 }  // namespace Parallel
 /// \endcond
 
-template <typename InitialData, typename BoundaryConditions>
+template <typename InitialData, typename BoundaryConditions,
+          bool BjorhusExternalBoundary = false>
 struct EvolutionMetavars
-    : public virtual GeneralizedHarmonicDefaults,
-      public GeneralizedHarmonicTemplateBase<
-          EvolutionMetavars<InitialData, BoundaryConditions>> {
+    : public GeneralizedHarmonicTemplateBase<EvolutionMetavars<
+          InitialData, BoundaryConditions, BjorhusExternalBoundary>>,
+      public virtual GeneralizedHarmonicDefaults {
   using events = typename GeneralizedHarmonicTemplateBase<
       EvolutionMetavars<InitialData, BoundaryConditions>>::events;
 
