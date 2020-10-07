@@ -61,9 +61,15 @@ struct InitializeConstraints {
 
   using compute_tags = tmpl::flatten<db::AddComputeTags<
       GeneralizedHarmonic::Tags::GaugeConstraintCompute<Dim, frame>,
+      GeneralizedHarmonic::Tags::FConstraintCompute<Dim, frame>,
+      GeneralizedHarmonic::Tags::TwoIndexConstraintCompute<Dim, frame>,
       // following tags added to observe constraints
       ::Tags::PointwiseL2NormCompute<
           GeneralizedHarmonic::Tags::GaugeConstraint<Dim, frame>>,
+      ::Tags::PointwiseL2NormCompute<
+          GeneralizedHarmonic::Tags::FConstraint<Dim, frame>>,
+      ::Tags::PointwiseL2NormCompute<
+          GeneralizedHarmonic::Tags::TwoIndexConstraint<Dim, frame>>,
       ::Tags::PointwiseL2NormCompute<
           GeneralizedHarmonic::Tags::ThreeIndexConstraint<Dim, frame>>,
       // The 4-index constraint is only implemented in 3d
@@ -71,8 +77,11 @@ struct InitializeConstraints {
           Dim == 3,
           tmpl::list<
               GeneralizedHarmonic::Tags::FourIndexConstraintCompute<Dim, frame>,
+              GeneralizedHarmonic::Tags::ConstraintEnergyCompute<Dim, frame>,
               ::Tags::PointwiseL2NormCompute<
-                  GeneralizedHarmonic::Tags::FourIndexConstraint<Dim, frame>>>,
+                  GeneralizedHarmonic::Tags::FourIndexConstraint<Dim, frame>>,
+              ::Tags::PointwiseL2NormCompute<
+                  GeneralizedHarmonic::Tags::ConstraintEnergy<Dim, frame>>>,
           tmpl::list<>>>>;
 
   template <typename DbTagsList, typename... InboxTags, typename Metavariables,
@@ -106,6 +115,7 @@ struct InitializeGhAnd3Plus1Variables {
       ConstraintDamping::Tags::ConstraintGamma2Compute<Dim, frame>>;
 
   using const_global_cache_tags = tmpl::list<
+      GeneralizedHarmonic::Tags::ExtrinsicCurvatureCompute<Dim, frame>,
       GeneralizedHarmonic::ConstraintDamping::Tags::DampingFunctionGamma0<
           Dim, frame>,
       GeneralizedHarmonic::ConstraintDamping::Tags::DampingFunctionGamma1<
