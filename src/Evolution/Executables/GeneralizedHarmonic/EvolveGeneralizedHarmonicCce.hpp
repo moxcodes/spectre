@@ -80,10 +80,11 @@ class CProxy_ConstGlobalCache;
 }  // namespace Parallel
 /// \endcond
 
-template <typename InitialData, typename BoundaryConditions>
+template <typename InitialData, typename BoundaryConditions,
+          bool BjorhusExternalBoundary = false>
 struct EvolutionMetavars
-    : public GeneralizedHarmonicTemplateBase<
-          EvolutionMetavars<InitialData, BoundaryConditions>>,
+    : public GeneralizedHarmonicTemplateBase<EvolutionMetavars<
+          InitialData, BoundaryConditions, BjorhusExternalBoundary>>,
       public virtual GeneralizedHarmonicDefaults {
   using evolved_swsh_tag = Cce::Tags::BondiJ;
   using evolved_swsh_dt_tag = Cce::Tags::BondiH;
@@ -360,6 +361,7 @@ struct EvolutionMetavars
 
 static const std::vector<void (*)()> charm_init_node_funcs{
     &setup_error_handling,
+    &disable_openblas_multithreading,
     &domain::creators::time_dependence::register_derived_with_charm,
     &domain::FunctionsOfTime::register_derived_with_charm,
     &domain::creators::register_derived_with_charm,
