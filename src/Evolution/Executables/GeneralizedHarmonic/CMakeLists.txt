@@ -3,7 +3,6 @@
 
 set(LIBS_TO_LINK
   ApparentHorizons
-  Cce
   CoordinateMaps
   DiscontinuousGalerkin
   Domain
@@ -18,30 +17,28 @@ set(LIBS_TO_LINK
   LinearOperators
   MathFunctions
   Options
-  Parallel
-  Spectral
   Time
   Utilities
   )
 
 function(add_generalized_harmonic_executable
-    INITIAL_DATA_NAME INITIAL_DATA BOUNDARY_CONDITIONS)
+    INITIAL_DATA_NAME INITIAL_DATA BOUNDARY_CONDITIONS BJORHUS)
   add_spectre_parallel_executable(
     "EvolveGh${INITIAL_DATA_NAME}"
     EvolveGeneralizedHarmonic
     Evolution/Executables/GeneralizedHarmonic
-    "EvolutionMetavars<${INITIAL_DATA}, ${BOUNDARY_CONDITIONS}>"
+    "EvolutionMetavars<${INITIAL_DATA}, ${BOUNDARY_CONDITIONS}, ${BJORHUS}>"
     "${LIBS_TO_LINK}"
     )
 endfunction(add_generalized_harmonic_executable)
 
 function(add_generalized_harmonic_cce_executable
-  EXECUTABLE_NAME INITIAL_DATA BOUNDARY_CONDITIONS)
+  EXECUTABLE_NAME INITIAL_DATA BOUNDARY_CONDITIONS BJORHUS)
   add_spectre_parallel_executable(
     "EvolveGh${EXECUTABLE_NAME}WithCce"
     EvolveGeneralizedHarmonicCce
     Evolution/Executables/GeneralizedHarmonic
-    "EvolutionMetavars<${INITIAL_DATA}, ${BOUNDARY_CONDITIONS}>"
+    "EvolutionMetavars<${INITIAL_DATA}, ${BOUNDARY_CONDITIONS}, ${BJORHUS}>"
     "${LIBS_TO_LINK}"
     )
 endfunction(add_generalized_harmonic_cce_executable)
@@ -50,6 +47,7 @@ add_generalized_harmonic_executable(
   KerrSchild
   GeneralizedHarmonic::Solutions::WrappedGr<gr::Solutions::KerrSchild>
   GeneralizedHarmonic::Solutions::WrappedGr<gr::Solutions::KerrSchild>
+  false
 )
 target_link_libraries(
   EvolveGhKerrSchild
@@ -60,6 +58,7 @@ add_generalized_harmonic_cce_executable(
   KerrSchild
   GeneralizedHarmonic::Solutions::WrappedGr<gr::Solutions::KerrSchild>
   GeneralizedHarmonic::Solutions::WrappedGr<gr::Solutions::KerrSchild>
+  false
 )
 target_link_libraries(
   EvolveGhKerrSchildWithCce
@@ -67,10 +66,60 @@ target_link_libraries(
   GeneralRelativitySolutions
   )
 
+
+add_generalized_harmonic_executable(
+  KerrSchildCPBjorhus
+  GeneralizedHarmonic::Solutions::WrappedGr<gr::Solutions::KerrSchild>
+  GeneralizedHarmonic::BoundaryConditions::Bjorhus::ConstraintPreserving
+  true
+)
+target_link_libraries(
+  EvolveGhKerrSchildCPBjorhus
+  PRIVATE
+  GeneralRelativitySolutions
+  )
+add_generalized_harmonic_cce_executable(
+  KerrSchildCPBjorhus
+  GeneralizedHarmonic::Solutions::WrappedGr<gr::Solutions::KerrSchild>
+  GeneralizedHarmonic::BoundaryConditions::Bjorhus::ConstraintPreserving
+  true
+)
+target_link_libraries(
+  EvolveGhKerrSchildCPBjorhusWithCce
+  PRIVATE
+  GeneralRelativitySolutions
+  )
+
+
+add_generalized_harmonic_executable(
+  KerrSchildCPPBjorhus
+  GeneralizedHarmonic::Solutions::WrappedGr<gr::Solutions::KerrSchild>
+  GeneralizedHarmonic::BoundaryConditions::Bjorhus::ConstraintPreservingPhysical
+  true
+)
+target_link_libraries(
+  EvolveGhKerrSchildCPPBjorhus
+  PRIVATE
+  GeneralRelativitySolutions
+  )
+add_generalized_harmonic_cce_executable(
+  KerrSchildCPPBjorhus
+  GeneralizedHarmonic::Solutions::WrappedGr<gr::Solutions::KerrSchild>
+  GeneralizedHarmonic::BoundaryConditions::Bjorhus::ConstraintPreservingPhysical
+  true
+)
+target_link_libraries(
+  EvolveGhKerrSchildCPPBjorhusWithCce
+  PRIVATE
+  GeneralRelativitySolutions
+  )
+
+
 add_generalized_harmonic_executable(
   KerrSchildNumericInitialData
   evolution::NumericInitialData
   GeneralizedHarmonic::Solutions::WrappedGr<gr::Solutions::KerrSchild>
+  false
 )
 target_link_libraries(
   EvolveGhKerrSchildNumericInitialData
@@ -81,9 +130,58 @@ add_generalized_harmonic_cce_executable(
   KerrSchildNumericInitialData
   evolution::NumericInitialData
   GeneralizedHarmonic::Solutions::WrappedGr<gr::Solutions::KerrSchild>
+  false
 )
 target_link_libraries(
   EvolveGhKerrSchildNumericInitialDataWithCce
+  PRIVATE
+  GeneralRelativitySolutions
+  )
+
+
+add_generalized_harmonic_executable(
+  KerrSchildNumericInitialDataCPBjorhus
+  evolution::NumericInitialData
+  GeneralizedHarmonic::BoundaryConditions::Bjorhus::ConstraintPreserving
+  true
+)
+target_link_libraries(
+  EvolveGhKerrSchildNumericInitialDataCPBjorhus
+  PRIVATE
+  GeneralRelativitySolutions
+  )
+add_generalized_harmonic_cce_executable(
+  KerrSchildNumericInitialDataCPBjorhus
+  evolution::NumericInitialData
+  GeneralizedHarmonic::BoundaryConditions::Bjorhus::ConstraintPreserving
+  true
+)
+target_link_libraries(
+  EvolveGhKerrSchildNumericInitialDataCPBjorhusWithCce
+  PRIVATE
+  GeneralRelativitySolutions
+  )
+
+
+add_generalized_harmonic_executable(
+  KerrSchildNumericInitialDataCPPBjorhus
+  evolution::NumericInitialData
+  GeneralizedHarmonic::BoundaryConditions::Bjorhus::ConstraintPreservingPhysical
+  true
+)
+target_link_libraries(
+  EvolveGhKerrSchildNumericInitialDataCPPBjorhus
+  PRIVATE
+  GeneralRelativitySolutions
+  )
+add_generalized_harmonic_cce_executable(
+  KerrSchildNumericInitialDataCPPBjorhus
+  evolution::NumericInitialData
+  GeneralizedHarmonic::BoundaryConditions::Bjorhus::ConstraintPreservingPhysical
+  true
+)
+target_link_libraries(
+  EvolveGhKerrSchildNumericInitialDataCPPBjorhusWithCce
   PRIVATE
   GeneralRelativitySolutions
   )

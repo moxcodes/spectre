@@ -6,6 +6,9 @@
 #include <cstddef>
 #include <vector>
 
+
+#include "Evolution/Systems/GeneralizedHarmonic/BoundaryConditions/Bjorhus.hpp"
+#include "ParallelAlgorithms/Events/ObserveVolumeIntegrals.hpp"
 #include "AlgorithmSingleton.hpp"
 #include "ApparentHorizons/ComputeItems.hpp"
 #include "ApparentHorizons/Tags.hpp"
@@ -250,9 +253,10 @@ template <typename EvolutionMetavarsDerived>
 struct GeneralizedHarmonicTemplateBase;
 
 template <template <typename, typename> class EvolutionMetavarsDerived,
-          typename InitialData, typename BoundaryConditions>
-struct GeneralizedHarmonicTemplateBase<
-    EvolutionMetavarsDerived<InitialData, BoundaryConditions>>
+          typename InitialData, typename BoundaryConditions,
+          bool BjorhusExternalBoundary = false>
+struct GeneralizedHarmonicTemplateBase<EvolutionMetavarsDerived<
+    InitialData, BoundaryConditions, BjorhusExternalBoundary>>
     : public virtual GeneralizedHarmonicDefaults {
   using derived_metavars =
       EvolutionMetavarsDerived<InitialData, BoundaryConditions>;
@@ -292,9 +296,12 @@ struct GeneralizedHarmonicTemplateBase<
 
   // A tmpl::list of tags to be added to the GlobalCache by the
   // metavariables
-  using const_global_cache_tags =
+  using const_global_cache_tags = tmpl::conditional_t<
+      evolution::is_analytic_solution_v<analytic_solution>,
       tmpl::list<analytic_solution_tag, normal_dot_numerical_flux,
-                 time_stepper_tag, Tags::EventsAndTriggers<events, triggers>>;
+                 time_stepper_tag, Tags::EventsAndTriggers<events, triggers>>,
+      tmpl::list<normal_dot_numerical_flux, time_stepper_tag,
+                 Tags::EventsAndTriggers<events, triggers>>>;
 
   using observed_reduction_data_tags = observers::collect_reduction_data_tags<
     tmpl::push_back<typename Event<observation_events>::creatable_classes,
@@ -337,16 +344,31 @@ struct GeneralizedHarmonicTemplateBase<
       dg::Actions::SendDataForFluxes<boundary_scheme>,
       dg::Actions::ComputeNonconservativeBoundaryFluxes<
           domain::Tags::BoundaryDirectionsInterior<volume_dim>>,
-      dg::Actions::ImposeDirichletBoundaryConditions<derived_metavars>,
-      dg::Actions::CollectDataForFluxes<
-          boundary_scheme,
-          domain::Tags::BoundaryDirectionsInterior<volume_dim>>,
-      dg::Actions::ReceiveDataForFluxes<boundary_scheme>,
-      std::conditional_t<local_time_stepping,
-                         tmpl::list<Actions::RecordTimeStepperData<>,
-                                    Actions::MutateApply<boundary_scheme>>,
-                         tmpl::list<Actions::MutateApply<boundary_scheme>,
-                                    Actions::RecordTimeStepperData<>>>,
+      tmpl::conditional_t<
+          BjorhusExternalBoundary, tmpl::list<>,
+          tmpl::list<
+              dg::Actions::ImposeDirichletBoundaryConditions<EvolutionMetavars>,
+              dg::Actions::CollectDataForFluxes<
+                  boundary_scheme,
+                  domain::Tags::BoundaryDirectionsInterior<volume_dim>>>>,
+      tmpl::conditional_t<
+          local_time_stepping,
+          tmpl::list<tmpl::conditional_t<
+                         BjorhusExternalBoundary,
+                         tmpl::list<GeneralizedHarmonic::Actions::
+                                        ImposeBjorhusBoundaryConditions<
+                                            EvolutionMetavars>>,
+                         tmpl::list<>>,
+                     Actions::RecordTimeStepperData<>,
+                     Actions::MutateApply<boundary_scheme>>,
+          tmpl::list<Actions::MutateApply<boundary_scheme>,
+                     tmpl::conditional_t<
+                         BjorhusExternalBoundary,
+                         tmpl::list<GeneralizedHarmonic::Actions::
+                                        ImposeBjorhusBoundaryConditions<
+                                            EvolutionMetavars>>,
+                         tmpl::list<>>,
+                     Actions::RecordTimeStepperData<>>>,
       Actions::UpdateU<>>;
 
   using initialization_actions = tmpl::list<
@@ -369,12 +391,21 @@ struct GeneralizedHarmonicTemplateBase<
                   volume_dim, frame, DataVector>::base,
               gr::Tags::Shift<volume_dim, frame, DataVector>,
               gr::Tags::Lapse<DataVector>>,
-          dg::Initialization::slice_tags_to_exterior<
-              gr::Tags::SpatialMetric<volume_dim, frame, DataVector>,
-              typename gr::Tags::DetAndInverseSpatialMetricCompute<
-                  volume_dim, frame, DataVector>::base,
-              gr::Tags::Shift<volume_dim, frame, DataVector>,
-              gr::Tags::Lapse<DataVector>>,
+          tmpl::conditional_t<
+              BjorhusExternalBoundary,
+              dg::Initialization::slice_tags_to_exterior<
+                  typename system::variables_tag,
+                  gr::Tags::SpatialMetric<volume_dim, frame, DataVector>,
+                  typename gr::Tags::DetAndInverseSpatialMetricCompute<
+                      volume_dim, frame, DataVector>::base,
+                  gr::Tags::Shift<volume_dim, frame, DataVector>,
+                  gr::Tags::Lapse<DataVector>>,
+              dg::Initialization::slice_tags_to_exterior<
+                  gr::Tags::SpatialMetric<volume_dim, frame, DataVector>,
+                  typename gr::Tags::DetAndInverseSpatialMetricCompute<
+                      volume_dim, frame, DataVector>::base,
+                  gr::Tags::Shift<volume_dim, frame, DataVector>,
+                  gr::Tags::Lapse<DataVector>>>,
           dg::Initialization::face_compute_tags<
               domain::Tags::BoundaryCoordinates<volume_dim, true>,
               GeneralizedHarmonic::Tags::ConstraintGamma0Compute<volume_dim,
@@ -394,7 +425,14 @@ struct GeneralizedHarmonicTemplateBase<
                                                                  frame>,
               GeneralizedHarmonic::CharacteristicFieldsCompute<volume_dim,
                                                                frame>>,
-          true, true>,
+          !BjorhusExternalBoundary, true>,
+      tmpl::conditional_t<evolution::is_analytic_solution_v<analytic_solution>,
+                          Initialization::Actions::AddComputeTags<
+                              tmpl::list<evolution::Tags::AnalyticCompute<
+                                  volume_dim, analytic_solution_tag,
+                                  analytic_solution_fields>>>,
+                          tmpl::list<>>,
+      dg::Actions::InitializeMortars<boundary_scheme, !BjorhusExternalBoundary>,
       Initialization::Actions::AddComputeTags<
           tmpl::list<evolution::Tags::AnalyticCompute<
               volume_dim, analytic_solution_tag, analytic_solution_fields>>>,
