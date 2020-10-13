@@ -1715,8 +1715,57 @@ SPECTRE_ALWAYS_INLINE constexpr auto mutate_apply(
       "The stateless mutator does not specify both 'argument_tags' and "
       "'return_tags'. Did you forget to add these tag lists to the mutator "
       "class? The class is listed as the first template parameter below.");
-  mutate_apply(F{}, box, std::forward<Args>(args)...);
+  return mutate_apply(F{}, box, std::forward<Args>(args)...);
 }
+
+// @{
+/*!
+ * \ingroup DataBoxGroup
+ * \brief Perform a mutation to the \ref DataBoxGroup `box`, assigning the
+ * `args` to the tags `MutateTags` in order.
+ */
+template <typename... MutateTags, typename BoxTags, typename... Args>
+SPECTRE_ALWAYS_INLINE constexpr void mutate_assign(
+    // NOLINTNEXTLINE(readability-avoid-const-params-in-decls)
+    const gsl::not_null<DataBox<BoxTags>*> box, Args&&... args) noexcept {
+  static_assert(sizeof...(MutateTags) == sizeof...(args),
+                "The number of arguments passed to `mutate_assign` must be "
+                "equal to the number of tags passed.");
+  const auto assign = [](const auto lhs, auto&& rhs) noexcept {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+    *lhs = std::forward<decltype(rhs)>(rhs);
+  };
+  db::mutate<MutateTags...>(
+      box,
+      // NOLINTNEXTLINE(modernize-avoid-c-arrays)
+      [&assign, &args...](const auto... box_args) noexcept {
+        // silence unused capture warnings
+        (void)assign;
+        EXPAND_PACK_LEFT_TO_RIGHT((void)args);
+        EXPAND_PACK_LEFT_TO_RIGHT(assign(box_args, std::forward<Args>(args)));
+      });
+}
+
+template <typename... MutateTags, typename BoxTags, typename... Args>
+SPECTRE_ALWAYS_INLINE constexpr void mutate_assign(
+    // NOLINTNEXTLINE(readability-avoid-const-params-in-decls)
+    const gsl::not_null<DataBox<BoxTags>*> box,
+    tmpl::list<MutateTags...> /*meta*/, Args&&... args) noexcept {
+  static_assert(sizeof...(MutateTags) == sizeof...(args),
+                "The number of arguments passed to `mutate_assign` must be "
+                "equal to the number of tags passed.");
+  const auto assign = [](const auto lhs, auto&& rhs) noexcept {
+    *lhs = std::forward<decltype(rhs)>(rhs);
+  };
+  db::mutate<MutateTags...>(
+      box, [&assign, &args...](const auto... box_args) noexcept {
+        // silence unused capture warnings
+        (void)assign;
+        EXPAND_PACK_LEFT_TO_RIGHT((void)args);
+        EXPAND_PACK_LEFT_TO_RIGHT(assign(box_args, std::forward<Args>(args)));
+      });
+}
+// @}
 
 /*!
  * \ingroup DataBoxGroup
