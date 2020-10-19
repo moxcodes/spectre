@@ -33,9 +33,7 @@
 #include "Evolution/Systems/Cce/Tags.hpp"
 #include "Evolution/Systems/Cce/WorldtubeBufferUpdater.hpp"
 #include "Evolution/Systems/Cce/WorldtubeDataManager.hpp"
-#include "IO/Observer/Actions.hpp"
 #include "IO/Observer/ObserverComponent.hpp"
-#include "IO/Observer/RegisterObservers.hpp"
 #include "IO/Observer/Tags.hpp"
 #include "Informer/Tags.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/Actions/ComputeNonconservativeBoundaryFluxes.hpp"
@@ -51,6 +49,7 @@
 #include "NumericalAlgorithms/Interpolation/SpanInterpolator.hpp"
 #include "NumericalAlgorithms/Interpolation/Tags.hpp"
 #include "Options/Options.hpp"
+#include "Parallel/Actions/SetupDataBox.hpp"
 #include "Parallel/Actions/TerminatePhase.hpp"
 #include "ParallelAlgorithms/DiscontinuousGalerkin/CollectDataForFluxes.hpp"
 #include "ParallelAlgorithms/DiscontinuousGalerkin/FluxCommunication.hpp"
@@ -175,15 +174,9 @@ struct EvolutionMetavars
   // interpolating to the CCE target. Assumes that the last action is `UpdateU`,
   // so that the insert places the new actions before that.
   template <bool send_to_cce>
-  using step_actions = tmpl::flatten<tmpl::list<
-      dg::Actions::ComputeNonconservativeBoundaryFluxes<
-          domain::Tags::InternalDirections<volume_dim>>,
-      dg::Actions::CollectDataForFluxes<
-          boundary_scheme, domain::Tags::InternalDirections<volume_dim>>,
+  using step_actions = tmpl::list<
+      evolution::dg::Actions::ComputeTimeDerivative<EvolutionMetavars>,
       dg::Actions::SendDataForFluxes<boundary_scheme>,
-      Actions::ComputeTimeDerivative<
-          GeneralizedHarmonic::ComputeDuDt<volume_dim>>,
-      evolution::Actions::AddMeshVelocityNonconservative,
       dg::Actions::ComputeNonconservativeBoundaryFluxes<
           domain::Tags::BoundaryDirectionsInterior<volume_dim>>,
       dg::Actions::ImposeDirichletBoundaryConditions<EvolutionMetavars>,
@@ -191,26 +184,27 @@ struct EvolutionMetavars
           boundary_scheme,
           domain::Tags::BoundaryDirectionsInterior<volume_dim>>,
       dg::Actions::ReceiveDataForFluxes<boundary_scheme>,
-      tmpl::conditional_t<local_time_stepping,
-                          tmpl::list<Actions::RecordTimeStepperData<>,
-                                     Actions::MutateApply<boundary_scheme>>,
-                          tmpl::list<Actions::MutateApply<boundary_scheme>,
-                                     Actions::RecordTimeStepperData<>>>,
+      std::conditional_t<local_time_stepping,
+                         tmpl::list<Actions::RecordTimeStepperData<>,
+                                    Actions::MutateApply<boundary_scheme>>,
+                         tmpl::list<Actions::MutateApply<boundary_scheme>,
+                                    Actions::RecordTimeStepperData<>>>,
       tmpl::conditional_t<
           send_to_cce,
           tmpl::list<Cce::Actions::SendNextTimeToCce<CceWorldtubeTarget>,
                      intrp::Actions::InterpolateToTarget<CceWorldtubeTarget>>,
           tmpl::list<>>,
-      Actions::UpdateU<>>>;
+      Actions::UpdateU<>>;
 
   // initialization actions are the same as the default, with the single
   // addition of initializing the interpolation points. Assumes that the last
   // action is `RemoveOptionsAndTerminatePhase` so that the new initialization
   // occurs before termination.
   using initialization_actions = tmpl::list<
+      ::Actions::SetupDataBox,
       Initialization::Actions::TimeAndTimeStep<EvolutionMetavars>,
       evolution::dg::Initialization::Domain<volume_dim>,
-      Initialization::Actions::NonconservativeSystem,
+      Initialization::Actions::NonconservativeSystem<EvolutionMetavars>,
       std::conditional_t<
           evolution::is_numeric_initial_data_v<initial_data>, tmpl::list<>,
           evolution::Initialization::Actions::SetVariables<
@@ -222,14 +216,14 @@ struct EvolutionMetavars
           dg::Initialization::slice_tags_to_face<
               typename system::variables_tag,
               gr::Tags::SpatialMetric<volume_dim, frame, DataVector>,
-              gr::Tags::DetAndInverseSpatialMetricCompute<volume_dim, frame,
-                                                          DataVector>,
+              typename gr::Tags::DetAndInverseSpatialMetricCompute<
+                  volume_dim, frame, DataVector>::base,
               gr::Tags::Shift<volume_dim, frame, DataVector>,
               gr::Tags::Lapse<DataVector>>,
           dg::Initialization::slice_tags_to_exterior<
               gr::Tags::SpatialMetric<volume_dim, frame, DataVector>,
-              gr::Tags::DetAndInverseSpatialMetricCompute<volume_dim, frame,
-                                                          DataVector>,
+              typename gr::Tags::DetAndInverseSpatialMetricCompute<
+                  volume_dim, frame, DataVector>::base,
               gr::Tags::Shift<volume_dim, frame, DataVector>,
               gr::Tags::Lapse<DataVector>>,
           dg::Initialization::face_compute_tags<
@@ -257,7 +251,7 @@ struct EvolutionMetavars
               volume_dim, analytic_solution_tag, analytic_solution_fields>>>,
       dg::Actions::InitializeMortars<boundary_scheme, true>,
       Initialization::Actions::DiscontinuousGalerkin<EvolutionMetavars>,
-      intrp::Actions::ElementInitInterpPoints,
+      intrp::Actions::ElementInitInterpPoints<EvolutionMetavars>,
       Initialization::Actions::RemoveOptionsAndTerminatePhase>;
 
   using gh_dg_element_array = DgElementArray<
@@ -265,12 +259,23 @@ struct EvolutionMetavars
       tmpl::flatten<tmpl::list<
           Parallel::PhaseActions<Phase, Phase::Initialization,
                                  initialization_actions>,
-          std::conditional_t<
+          tmpl::conditional_t<
               evolution::is_numeric_initial_data_v<initial_data>,
-              Parallel::PhaseActions<
-                  Phase, Phase::RegisterWithVolumeDataReader,
-                  tmpl::list<importers::Actions::RegisterWithVolumeDataReader,
-                             Parallel::Actions::TerminatePhase>>,
+              tmpl::list<
+                  Parallel::PhaseActions<
+                      Phase, Phase::RegisterWithElementDataReader,
+                      tmpl::list<
+                          importers::Actions::RegisterWithElementDataReader,
+                          Parallel::Actions::TerminatePhase>>,
+                  Parallel::PhaseActions<
+                      Phase, Phase::ImportInitialData,
+                      tmpl::list<importers::Actions::ReadVolumeData<
+                                     evolution::OptionTags::NumericInitialData,
+                                     typename system::variables_tag::tags_list>,
+                                 importers::Actions::ReceiveVolumeData<
+                                     evolution::OptionTags::NumericInitialData,
+                                     typename system::variables_tag::tags_list>,
+                                 Parallel::Actions::TerminatePhase>>>,
               tmpl::list<>>,
           Parallel::PhaseActions<
               Phase, Phase::InitializeInitialDataDependentQuantities,
@@ -280,21 +285,23 @@ struct EvolutionMetavars
               SelfStart::self_start_procedure<step_actions<false>>>,
           Parallel::PhaseActions<
               Phase, Phase::Register,
-              tmpl::flatten<
-                  tmpl::list<intrp::Actions::RegisterElementWithInterpolator,
-                             observers::Actions::RegisterWithObservers<
-                                 observers::RegisterObservers<
-                                     Tags::Time, element_observation_type>>,
-                             Parallel::Actions::TerminatePhase>>>,
+              tmpl::list<intrp::Actions::RegisterElementWithInterpolator,
+                         observers::Actions::RegisterEventsWithObservers,
+                         Parallel::Actions::TerminatePhase>>,
           Parallel::PhaseActions<
               Phase, Phase::Evolve,
               tmpl::list<Actions::RunEventsAndTriggers, Actions::ChangeSlabSize,
-                         step_actions<true>, Actions::AdvanceTime>>>>,
-      std::conditional_t<evolution::is_numeric_initial_data_v<initial_data>,
-                         ImportNumericInitialData<
-                             Phase, Phase::ImportInitialData, initial_data>,
-                         ImportNoInitialData>>;
-
+                         step_actions<true>, Actions::AdvanceTime>>>>>;
+  struct UnityCompute : Unity, db::ComputeTag {
+    using base = Unity;
+    using return_type = Scalar<DataVector>;
+    static void function(const gsl::not_null<return_type*> result,
+                         const Scalar<DataVector>& used_for_size) noexcept {
+      *result = make_with_value<Scalar<DataVector>>(used_for_size, 1.0);
+    }
+    using argument_tags =
+        tmpl::list<StrahlkorperGr::Tags::AreaElement<Frame::Inertial>>;
+  };
   struct Horizon {
     using tags_to_observe =
         tmpl::list<StrahlkorperGr::Tags::SurfaceIntegralCompute<Unity, frame>>;
@@ -308,13 +315,14 @@ struct EvolutionMetavars
                    gr::Tags::InverseSpatialMetric<volume_dim, frame>,
                    gr::Tags::ExtrinsicCurvature<volume_dim, frame>,
                    gr::Tags::SpatialChristoffelSecondKind<volume_dim, frame>>;
-    using compute_items_on_target = tmpl::append<
-        tmpl::list<StrahlkorperGr::Tags::AreaElementCompute<frame>, Unity>,
-        tags_to_observe>;
+    using compute_items_on_target =
+        tmpl::append<tmpl::list<StrahlkorperGr::Tags::AreaElementCompute<frame>,
+                                UnityCompute>,
+                     tags_to_observe>;
     using compute_target_points =
         intrp::TargetPoints::ApparentHorizon<Horizon, ::Frame::Inertial>;
     using post_interpolation_callback =
-        intrp::callbacks::FindApparentHorizon<Horizon>;
+        intrp::callbacks::FindApparentHorizon<Horizon, ::Frame::Inertial>;
     using post_horizon_find_callback =
         intrp::callbacks::ObserveTimeSeriesOnSurface<tags_to_observe, Horizon,
                                                      Horizon>;
@@ -350,7 +358,7 @@ struct EvolutionMetavars
       observers::Observer<EvolutionMetavars>,
       observers::ObserverWriter<EvolutionMetavars>,
       std::conditional_t<evolution::is_numeric_initial_data_v<initial_data>,
-                         importers::VolumeDataReader<EvolutionMetavars>,
+                         importers::ElementDataReader<EvolutionMetavars>,
                          tmpl::list<>>,
       intrp::Interpolator<EvolutionMetavars>,
       intrp::InterpolationTarget<EvolutionMetavars, Horizon>,
@@ -358,7 +366,7 @@ struct EvolutionMetavars
       cce_boundary_component, Cce::CharacteristicEvolution<EvolutionMetavars>,
       gh_dg_element_array>>;
 
-  static constexpr OptionString help{
+  static constexpr Options::String help{
       "Evolve a generalized harmonic system\n"
       "with a coupled CCE evolution for asymptotic wave data output"};
 };

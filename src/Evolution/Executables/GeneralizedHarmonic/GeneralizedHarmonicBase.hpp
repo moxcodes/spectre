@@ -21,6 +21,7 @@
 #include "Evolution/Actions/AddMeshVelocityNonconservative.hpp"
 #include "Evolution/Actions/ComputeTimeDerivative.hpp"
 #include "Evolution/ComputeTags.hpp"
+#include "Evolution/DiscontinuousGalerkin/Actions/ComputeTimeDerivative.hpp"
 #include "Evolution/DiscontinuousGalerkin/DgElementArray.hpp"
 #include "Evolution/Initialization/DgDomain.hpp"
 #include "Evolution/Initialization/DiscontinuousGalerkin.hpp"
@@ -35,12 +36,14 @@
 #include "Evolution/Systems/GeneralizedHarmonic/Tags.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/UpwindPenaltyCorrection.hpp"
 #include "Evolution/TypeTraits.hpp"
-#include "IO/Importers/ElementActions.hpp"
-#include "IO/Importers/VolumeDataReader.hpp"
-#include "IO/Observer/Actions.hpp"
+#include "IO/Importers/Actions/ReadVolumeData.hpp"
+#include "IO/Importers/Actions/ReceiveVolumeData.hpp"
+#include "IO/Importers/Actions/RegisterWithElementDataReader.hpp"
+#include "IO/Importers/ElementDataReader.hpp"
+#include "IO/Observer/Actions/ObserverRegistration.hpp"
+#include "IO/Observer/Actions/RegisterEvents.hpp"
 #include "IO/Observer/Helpers.hpp"
 #include "IO/Observer/ObserverComponent.hpp"
-#include "IO/Observer/RegisterObservers.hpp"
 #include "IO/Observer/Tags.hpp"
 #include "Informer/Tags.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/Actions/ComputeNonconservativeBoundaryFluxes.hpp"
@@ -127,6 +130,8 @@ struct GeneralizedHarmonicDefaults {
   static constexpr int volume_dim = 3;
   using frame = Frame::Inertial;
   using system = GeneralizedHarmonic::System<volume_dim>;
+  static constexpr dg::Formulation dg_formulation =
+      dg::Formulation::StrongInertial;
   static constexpr bool use_damped_harmonic_rollon = true;
   using temporal_id = Tags::TimeStepId;
   static constexpr bool local_time_stepping = false;
@@ -157,11 +162,13 @@ struct GeneralizedHarmonicDefaults {
   using boundary_scheme = std::conditional_t<
       local_time_stepping,
       dg::FirstOrderScheme::FirstOrderSchemeLts<
-          volume_dim, typename system::variables_tag, normal_dot_numerical_flux,
-          Tags::TimeStepId, time_stepper_tag>,
+          volume_dim, typename system::variables_tag,
+          db::add_tag_prefix<::Tags::dt, typename system::variables_tag>,
+          normal_dot_numerical_flux, Tags::TimeStepId, time_stepper_tag>,
       dg::FirstOrderScheme::FirstOrderScheme<
-          volume_dim, typename system::variables_tag, normal_dot_numerical_flux,
-          Tags::TimeStepId>>;
+          volume_dim, typename system::variables_tag,
+          db::add_tag_prefix<::Tags::dt, typename system::variables_tag>,
+          normal_dot_numerical_flux, Tags::TimeStepId>>;
 
   using analytic_solution_fields = typename system::variables_tag::tags_list;
 
@@ -197,7 +204,7 @@ struct GeneralizedHarmonicDefaults {
     using compute_target_points =
         intrp::TargetPoints::ApparentHorizon<AhA, ::Frame::Inertial>;
     using post_interpolation_callback =
-        intrp::callbacks::FindApparentHorizon<AhA>;
+        intrp::callbacks::FindApparentHorizon<AhA, ::Frame::Inertial>;
     using post_horizon_find_callback =
         intrp::callbacks::ObserveTimeSeriesOnSurface<tags_to_observe, AhA,
                                                      AhA>;
@@ -216,7 +223,7 @@ struct GeneralizedHarmonicDefaults {
 
   enum class Phase {
     Initialization,
-    RegisterWithVolumeDataReader,
+    RegisterWithElementDataReader,
     ImportInitialData,
     InitializeInitialDataDependentQuantities,
     InitializeTimeStepperHistory,
@@ -226,6 +233,7 @@ struct GeneralizedHarmonicDefaults {
   };
 
   using initialize_initial_data_dependent_quantities_actions = tmpl::list<
+      ::Actions::SetupDataBox,
       GeneralizedHarmonic::gauges::Actions::InitializeDampedHarmonic<
           volume_dim, use_damped_harmonic_rollon>,
       GeneralizedHarmonic::Actions::InitializeConstraints<volume_dim>,
@@ -293,9 +301,9 @@ struct GeneralizedHarmonicTemplateBase<
     switch (current_phase) {
       case Phase::Initialization:
         return evolution::is_numeric_initial_data_v<initial_data>
-                   ? Phase::RegisterWithVolumeDataReader
+                   ? Phase::RegisterWithElementDataReader
                    : Phase::InitializeInitialDataDependentQuantities;
-      case Phase::RegisterWithVolumeDataReader:
+      case Phase::RegisterWithElementDataReader:
         return Phase::ImportInitialData;
       case Phase::ImportInitialData:
         return Phase::InitializeInitialDataDependentQuantities;
@@ -319,14 +327,8 @@ struct GeneralizedHarmonicTemplateBase<
   }
 
   using step_actions = tmpl::list<
-      dg::Actions::ComputeNonconservativeBoundaryFluxes<
-          domain::Tags::InternalDirections<volume_dim>>,
-      dg::Actions::CollectDataForFluxes<
-          boundary_scheme, domain::Tags::InternalDirections<volume_dim>>,
+      evolution::dg::Actions::ComputeTimeDerivative<derived_metavars>,
       dg::Actions::SendDataForFluxes<boundary_scheme>,
-      Actions::ComputeTimeDerivative<
-          GeneralizedHarmonic::ComputeDuDt<volume_dim>>,
-      evolution::Actions::AddMeshVelocityNonconservative,
       dg::Actions::ComputeNonconservativeBoundaryFluxes<
           domain::Tags::BoundaryDirectionsInterior<volume_dim>>,
       dg::Actions::ImposeDirichletBoundaryConditions<derived_metavars>,
@@ -399,12 +401,23 @@ struct GeneralizedHarmonicTemplateBase<
       tmpl::flatten<tmpl::list<
           Parallel::PhaseActions<Phase, Phase::Initialization,
                                  initialization_actions>,
-          std::conditional_t<
+          tmpl::conditional_t<
               evolution::is_numeric_initial_data_v<initial_data>,
-              Parallel::PhaseActions<
-                  Phase, Phase::RegisterWithVolumeDataReader,
-                  tmpl::list<importers::Actions::RegisterWithVolumeDataReader,
-                             Parallel::Actions::TerminatePhase>>,
+              tmpl::list<
+                  Parallel::PhaseActions<
+                      Phase, Phase::RegisterWithElementDataReader,
+                      tmpl::list<
+                          importers::Actions::RegisterWithElementDataReader,
+                          Parallel::Actions::TerminatePhase>>,
+                  Parallel::PhaseActions<
+                      Phase, Phase::ImportInitialData,
+                      tmpl::list<importers::Actions::ReadVolumeData<
+                                     evolution::OptionTags::NumericInitialData,
+                                     typename system::variables_tag::tags_list>,
+                                 importers::Actions::ReceiveVolumeData<
+                                     evolution::OptionTags::NumericInitialData,
+                                     typename system::variables_tag::tags_list>,
+                                 Parallel::Actions::TerminatePhase>>>,
               tmpl::list<>>,
           Parallel::PhaseActions<
               Phase, Phase::InitializeInitialDataDependentQuantities,
@@ -414,25 +427,19 @@ struct GeneralizedHarmonicTemplateBase<
           Parallel::PhaseActions<
               Phase, Phase::Register,
               tmpl::list<intrp::Actions::RegisterElementWithInterpolator,
-                         observers::Actions::RegisterWithObservers<
-                             observers::RegisterObservers<
-                                 Tags::Time, element_observation_type>>,
+                         observers::Actions::RegisterEventsWithObservers,
                          Parallel::Actions::TerminatePhase>>,
           Parallel::PhaseActions<
               Phase, Phase::Evolve,
               tmpl::list<Actions::RunEventsAndTriggers, Actions::ChangeSlabSize,
-                         step_actions, Actions::AdvanceTime>>>>,
-      std::conditional_t<evolution::is_numeric_initial_data_v<initial_data>,
-                         ImportNumericInitialData<
-                             Phase, Phase::ImportInitialData, initial_data>,
-                         ImportNoInitialData>>;
+                         step_actions, Actions::AdvanceTime>>>>>;
   using component_list = tmpl::flatten<tmpl::list<
       observers::Observer<derived_metavars>,
       observers::ObserverWriter<derived_metavars>,
       intrp::Interpolator<derived_metavars>,
       intrp::InterpolationTarget<derived_metavars, AhA>,
       std::conditional_t<evolution::is_numeric_initial_data_v<initial_data>,
-                         importers::VolumeDataReader<derived_metavars>,
+                         importers::ElementDataReader<derived_metavars>,
                          tmpl::list<>>,
       gh_dg_element_array>>;
 };

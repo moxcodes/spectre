@@ -78,7 +78,7 @@ target_link_libraries(
   )
 add_generalized_harmonic_cce_executable(
   KerrSchildNumericInitialData
-  evolution::NumericInitialData<GeneralizedHarmonic::System<3>>
+  evolution::NumericInitialData
   GeneralizedHarmonic::Solutions::WrappedGr<gr::Solutions::KerrSchild>
 )
 target_link_libraries(
