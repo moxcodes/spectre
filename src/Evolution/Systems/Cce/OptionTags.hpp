@@ -375,8 +375,9 @@ struct SpecifiedStartTime : Tags::StartTime, db::SimpleTag {
   using option_tags = tmpl::list<OptionTags::StartTime>;
 
   static constexpr bool pass_metavariables = false;
-  static double create_from_options(const double start_time) noexcept {
-    return start_time;
+  static double create_from_options(
+      const std::optional<double> start_time) noexcept {
+    return *start_time;
   }
 };
 
