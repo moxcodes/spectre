@@ -373,9 +373,13 @@ struct EvolutionMetavars
 
 static const std::vector<void (*)()> charm_init_node_funcs{
     &setup_error_handling,
+    &domain::creators::time_dependence::register_derived_with_charm,
+    &domain::FunctionsOfTime::register_derived_with_charm,
     &domain::creators::register_derived_with_charm,
     &Parallel::register_derived_classes_with_charm<
         Cce::InitializeJ::InitializeJ>,
+    &Parallel::register_derived_classes_with_charm<TimeSequence<double>>,
+    &Parallel::register_derived_classes_with_charm<TimeSequence<std::uint64_t>>,
     &Parallel::register_derived_classes_with_charm<
         Cce::InterfaceManagers::GhInterfaceManager>,
     &Parallel::register_derived_classes_with_charm<Cce::WorldtubeDataManager>,
