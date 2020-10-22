@@ -17,9 +17,12 @@
 #include "Options/Options.hpp"
 #include "Parallel/GlobalCache.hpp"
 #include "PointwiseFunctions/AnalyticSolutions/GeneralRelativity/KerrHorizon.hpp"
+#include "Utilities/PrettyType.hpp"
 #include "Utilities/Requires.hpp"
 #include "Utilities/TMPL.hpp"
 #include "Utilities/TaggedTuple.hpp"
+
+#include "Parallel/Printf.hpp"
 
 /// \cond
 class DataVector;
@@ -212,8 +215,8 @@ struct KerrHorizon {
   template <typename Metavariables, typename DbTags>
   static tnsr::I<DataVector, 3, ::Frame::Inertial> points(
       const db::DataBox<DbTags>& box,
-      const tmpl::type_<Metavariables>& /*meta*/) noexcept {
-    return db::get<StrahlkorperTags::CartesianCoords<::Frame::Inertial>>(box);
+      const tmpl::type_<Metavariables>& meta) noexcept {
+    return points(box, meta, typename Metavariables::temporal_id{});
   }
 };
 
