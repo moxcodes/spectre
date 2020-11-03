@@ -157,20 +157,22 @@ struct EvolutionMetavars
                  ::Tags::dt<GeneralizedHarmonic::Tags::Phi<volume_dim, frame>>>;
 
   using observation_events = typename GeneralizedHarmonicTemplateBase<
-      EvolutionMetavars<InitialData, BoundaryConditions>>::observation_events;
+      EvolutionMetavars<InitialData, BoundaryConditions,
+                        BjorhusExternalBoundary>>::observation_events;
   using events = tmpl::push_back<observation_events,
                                  intrp::Events::Registrars::Interpolate<
                                      3, Horizon, interpolator_source_vars>>;
 
-  using analytic_solution_tag =
-      typename GeneralizedHarmonicTemplateBase<EvolutionMetavars<
-          InitialData, BoundaryConditions>>::analytic_solution_tag;
+  using analytic_solution_tag = typename GeneralizedHarmonicTemplateBase<
+      EvolutionMetavars<InitialData, BoundaryConditions,
+                        BjorhusExternalBoundary>>::analytic_solution_tag;
   using const_global_cache_tags =
       tmpl::list<analytic_solution_tag, normal_dot_numerical_flux,
                  time_stepper_tag, Tags::EventsAndTriggers<events, triggers>>;
 
   using initial_data = typename GeneralizedHarmonicTemplateBase<
-      EvolutionMetavars<InitialData, BoundaryConditions>>::initial_data;
+      EvolutionMetavars<InitialData, BoundaryConditions,
+                        BjorhusExternalBoundary>>::initial_data;
 
   // use the default same step actions except for sending the next time and
   // interpolating to the CCE target. Assumes that the last action is `UpdateU`,
