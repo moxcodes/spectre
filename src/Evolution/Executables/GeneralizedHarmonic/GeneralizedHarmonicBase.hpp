@@ -145,7 +145,7 @@ struct GeneralizedHarmonicDefaults {
   static constexpr bool local_time_stepping = false;
 
   using normal_dot_numerical_flux = Tags::NumericalFlux<
-    GeneralizedHarmonic::UpwindPenaltyCorrection<volume_dim>>;
+      GeneralizedHarmonic::UpwindPenaltyCorrection<volume_dim>>;
 
   using step_choosers_common = tmpl::list<
       StepChoosers::Registrars::Cfl<volume_dim, Frame::Inertial, system>,
@@ -200,8 +200,7 @@ struct GeneralizedHarmonicDefaults {
     using post_interpolation_callback =
         intrp::callbacks::FindApparentHorizon<AhA, ::Frame::Inertial>;
     using post_horizon_find_callback =
-        intrp::callbacks::ObserveTimeSeriesOnSurface<tags_to_observe, AhA,
-                                                     AhA>;
+        intrp::callbacks::ObserveTimeSeriesOnSurface<tags_to_observe, AhA, AhA>;
   };
 
   using interpolation_target_tags = tmpl::list<AhA>;
@@ -236,21 +235,28 @@ struct GeneralizedHarmonicDefaults {
 template <typename EvolutionMetavarsDerived>
 struct GeneralizedHarmonicTemplateBase;
 
-template <template <typename, typename> class EvolutionMetavarsDerived,
+template <template <typename, typename, bool> class EvolutionMetavarsDerived,
           typename InitialData, typename BoundaryConditions,
-          bool BjorhusExternalBoundary = false>
+          bool BjorhusExternalBoundary>
 struct GeneralizedHarmonicTemplateBase<EvolutionMetavarsDerived<
     InitialData, BoundaryConditions, BjorhusExternalBoundary>>
     : public virtual GeneralizedHarmonicDefaults {
   using derived_metavars =
-      EvolutionMetavarsDerived<InitialData, BoundaryConditions>;
+      EvolutionMetavarsDerived<InitialData, BoundaryConditions,
+                               BjorhusExternalBoundary>;
 
   using initial_data = InitialData;
   using boundary_conditions = BoundaryConditions;
   // Only Dirichlet boundary conditions imposed by an analytic solution are
   // supported right now.
-  using analytic_solution = boundary_conditions;
-  using analytic_solution_tag = Tags::AnalyticSolution<boundary_conditions>;
+  using analytic_solution = tmpl::conditional_t<
+      evolution::is_analytic_solution_v<initial_data>, initial_data,
+      tmpl::conditional_t<
+          evolution::is_analytic_solution_v<boundary_conditions>,
+          boundary_conditions,
+          GeneralizedHarmonic::Solutions::WrappedGr<
+              gr::Solutions::KerrSchild>>>;
+  using analytic_solution_tag = Tags::AnalyticSolution<analytic_solution>;
   using boundary_condition_tag = analytic_solution_tag;
 
   using observe_fields = tmpl::append<
@@ -275,9 +281,9 @@ struct GeneralizedHarmonicTemplateBase<EvolutionMetavarsDerived<
       Events::Registrars::ChangeSlabSize<slab_choosers>>;
 
   // Events include the observation events and finding the horizon
-  using events = tmpl::push_back<observation_events,
-                                 intrp::Events::Registrars::Interpolate<
-                                   3, AhA, interpolator_source_vars>>;
+  using events = tmpl::push_back<
+      observation_events,
+      intrp::Events::Registrars::Interpolate<3, AhA, interpolator_source_vars>>;
 
   // A tmpl::list of tags to be added to the GlobalCache by the
   // metavariables
@@ -301,8 +307,8 @@ struct GeneralizedHarmonicTemplateBase<EvolutionMetavarsDerived<
                      DampingFunctionGamma2<volume_dim, frame>>>;
 
   using observed_reduction_data_tags = observers::collect_reduction_data_tags<
-    tmpl::push_back<typename Event<observation_events>::creatable_classes,
-                    typename AhA::post_horizon_find_callback>>;
+      tmpl::push_back<typename Event<observation_events>::creatable_classes,
+                      typename AhA::post_horizon_find_callback>>;
 
   template <typename... Tags>
   static Phase determine_next_phase(
@@ -355,7 +361,7 @@ struct GeneralizedHarmonicTemplateBase<EvolutionMetavarsDerived<
       tmpl::conditional_t<
           BjorhusExternalBoundary, tmpl::list<>,
           tmpl::list<
-              dg::Actions::ImposeDirichletBoundaryConditions<EvolutionMetavars>,
+              dg::Actions::ImposeDirichletBoundaryConditions<derived_metavars>,
               dg::Actions::CollectDataForFluxes<
                   boundary_scheme,
                   domain::Tags::BoundaryDirectionsInterior<volume_dim>>>>,

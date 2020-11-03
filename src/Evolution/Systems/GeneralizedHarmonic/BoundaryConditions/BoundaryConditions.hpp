@@ -21,6 +21,7 @@ enum class VMinusBcMethod {
 };
 
 struct Freezing {
+  using options = tmpl::list<>;
   static const VSpacetimeMetricBcMethod v_spacetime_bc_method =
       VSpacetimeMetricBcMethod::Freezing;
   static const VZeroBcMethod v_zero_bc_method = VZeroBcMethod::Freezing;
@@ -29,6 +30,7 @@ struct Freezing {
 };
 
 struct ConstraintPreserving {
+  using options = tmpl::list<>;
   static const VSpacetimeMetricBcMethod v_spacetime_bc_method =
       VSpacetimeMetricBcMethod::ConstraintPreserving;
   static const VZeroBcMethod v_zero_bc_method =
@@ -40,6 +42,7 @@ struct ConstraintPreserving {
 };
 
 struct ConstraintPreservingPhysical {
+  using options = tmpl::list<>;
   static const VSpacetimeMetricBcMethod v_spacetime_bc_method =
       VSpacetimeMetricBcMethod::ConstraintPreserving;
   static const VZeroBcMethod v_zero_bc_method =
