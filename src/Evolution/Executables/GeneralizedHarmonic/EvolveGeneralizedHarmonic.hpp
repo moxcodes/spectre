@@ -36,21 +36,22 @@ struct EvolutionMetavars
     : public GeneralizedHarmonicTemplateBase<EvolutionMetavars<
           InitialData, BoundaryConditions, BjorhusExternalBoundary>>,
       public virtual GeneralizedHarmonicDefaults {
-  using events = typename GeneralizedHarmonicTemplateBase<
-      EvolutionMetavars<InitialData, BoundaryConditions>>::events;
+  using events = typename GeneralizedHarmonicTemplateBase<EvolutionMetavars<
+      InitialData, BoundaryConditions, BjorhusExternalBoundary>>::events;
 
   // A tmpl::list of tags to be added to the GlobalCache by the
   // metavariables
-  using const_global_cache_tags =
-      typename GeneralizedHarmonicTemplateBase<EvolutionMetavars<
-          InitialData, BoundaryConditions>>::const_global_cache_tags;
+  using const_global_cache_tags = typename GeneralizedHarmonicTemplateBase<
+      EvolutionMetavars<InitialData, BoundaryConditions,
+                        BjorhusExternalBoundary>>::const_global_cache_tags;
 
-  using observed_reduction_data_tags =
-      typename GeneralizedHarmonicTemplateBase<EvolutionMetavars<
-          InitialData, BoundaryConditions>>::observed_reduction_data_tags;
+  using observed_reduction_data_tags = typename GeneralizedHarmonicTemplateBase<
+      EvolutionMetavars<InitialData, BoundaryConditions,
+                        BjorhusExternalBoundary>>::observed_reduction_data_tags;
 
   using component_list = typename GeneralizedHarmonicTemplateBase<
-      EvolutionMetavars<InitialData, BoundaryConditions>>::component_list;
+      EvolutionMetavars<InitialData, BoundaryConditions,
+                        BjorhusExternalBoundary>>::component_list;
 
   static constexpr Options::String help{
       "Evolve a generalized harmonic system.\n"};

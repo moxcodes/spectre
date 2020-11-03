@@ -26,6 +26,7 @@ endfunction(add_generalized_harmonic_cce_executable)
 
 set(LIBS_TO_LINK
   ApparentHorizons
+  Cce
   CoordinateMaps
   DiscontinuousGalerkin
   Domain
