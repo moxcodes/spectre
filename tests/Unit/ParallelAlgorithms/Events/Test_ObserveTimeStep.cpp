@@ -52,10 +52,10 @@ static_assert(
 
 template <typename Metavariables>
 struct MockContributeReductionData {
-  using ReductionData =
-      tmpl::wrap<tmpl::front<typename Events::ObserveTimeStep<
-                     Metavariables>::observed_reduction_data_tags>,
-                 Parallel::ReductionData>;
+  using ReductionData = tmpl::wrap<
+      tmpl::front<typename Events::ObserveTimeStep<
+          typename Metavariables::system>::observed_reduction_data_tags>,
+      Parallel::ReductionData>;
   struct Results {
     observers::ObservationId observation_id;
     std::string subfile_name;
@@ -232,11 +232,11 @@ void test_observe(const Observer& observer,
 
 SPECTRE_TEST_CASE("Unit.Evolution.ObserveTimeStep", "[Unit][Evolution]") {
   using EventType =
-      Event<tmpl::list<Events::Registrars::ObserveTimeStep<Metavariables>>>;
+      Event<tmpl::list<Events::Registrars::ObserveTimeStep<System>>>;
   Parallel::register_derived_classes_with_charm<EventType>();
 
   for (const bool print_to_terminal : {true, false}) {
-    const Events::ObserveTimeStep<Metavariables> observer("time_step_subfile",
+    const Events::ObserveTimeStep<System> observer("time_step_subfile",
                                                           print_to_terminal);
     CHECK(not observer.needs_evolved_variables());
     test_observe(observer, false);

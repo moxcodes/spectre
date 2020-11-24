@@ -222,7 +222,7 @@ struct EvolutionMetavars {
                        typename system::primitive_variables_tag::tags_list>,
           tmpl::conditional_t<evolution::is_analytic_solution_v<initial_data>,
                               analytic_variables_tags, tmpl::list<>>>,
-      Events::Registrars::ObserveTimeStep<EvolutionMetavars>,
+      Events::Registrars::ObserveTimeStep<system>,
       Events::Registrars::ChangeSlabSize<slab_choosers>>>;
   using interpolation_events =
       tmpl::list<intrp::Events::Registrars::Interpolate<

@@ -154,7 +154,7 @@ struct EvolutionMetavars {
                           tmpl::list<>>,
       dg::Events::Registrars::ObserveFields<1, Tags::Time, observe_fields,
                                             analytic_solution_fields>,
-      Events::Registrars::ObserveTimeStep<EvolutionMetavars>,
+      Events::Registrars::ObserveTimeStep<system>,
       Events::Registrars::ChangeSlabSize<slab_choosers>>>;
   using triggers = Triggers::time_triggers;
 

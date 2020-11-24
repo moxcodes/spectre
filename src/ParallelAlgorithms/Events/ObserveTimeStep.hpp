@@ -42,14 +42,14 @@ struct TimeStep;
 
 namespace Events {
 /// \cond
-template <typename Metavariables, typename EventRegistrars>
+template <typename System, typename EventRegistrars>
 class ObserveTimeStep;
 /// \endcond
 
 namespace Registrars {
-template <typename Metavariables>
+template <typename System>
 using ObserveTimeStep =
-    ::Registration::Registrar<Events::ObserveTimeStep, Metavariables>;
+    ::Registration::Registrar<Events::ObserveTimeStep, System>;
 }  // namespace Registrars
 
 namespace detail {
@@ -106,9 +106,9 @@ struct FormatTimeOutput
  * All values are reported as positive numbers, even for backwards
  * evolutions.
  */
-template <typename Metavariables,
+template <typename System,
           typename EventRegistrars =
-              tmpl::list<Registrars::ObserveTimeStep<Metavariables>>>
+              tmpl::list<Registrars::ObserveTimeStep<System>>>
 class ObserveTimeStep : public Event<EventRegistrars> {
  private:
   using ReductionData = Events::detail::ObserveTimeStepReductionData;
@@ -163,15 +163,15 @@ class ObserveTimeStep : public Event<EventRegistrars> {
   // so that this observer is not DG-specific.
   using argument_tags =
       tmpl::list<Tags::Time, Tags::TimeStep,
-                 typename Metavariables::system::variables_tag>;
+                 typename System::variables_tag>;
 
-  template <typename ArrayIndex, typename ParallelComponent>
-  void operator()(
-      const double& time, const TimeDelta& time_step,
-      const typename Metavariables::system::variables_tag::type& variables,
-      Parallel::GlobalCache<Metavariables>& cache,
-      const ArrayIndex& array_index,
-      const ParallelComponent* const /*meta*/) const noexcept {
+  template <typename Metavariables, typename ArrayIndex,
+            typename ParallelComponent>
+  void operator()(const double& time, const TimeDelta& time_step,
+                  const typename System::variables_tag::type& variables,
+                  Parallel::GlobalCache<Metavariables>& cache,
+                  const ArrayIndex& array_index,
+                  const ParallelComponent* const /*meta*/) const noexcept {
     const size_t number_of_grid_points = variables.number_of_grid_points();
     const double slab_size = time_step.slab().duration().value();
     const double step_size = abs(time_step.value());
@@ -218,14 +218,14 @@ class ObserveTimeStep : public Event<EventRegistrars> {
   bool output_time_;
 };
 
-template <typename Metavariables, typename EventRegistrars>
-ObserveTimeStep<Metavariables, EventRegistrars>::ObserveTimeStep(
+template <typename System, typename EventRegistrars>
+ObserveTimeStep<System, EventRegistrars>::ObserveTimeStep(
     const std::string& subfile_name, const bool output_time) noexcept
     : subfile_path_("/" + subfile_name), output_time_(output_time) {}
 
 /// \cond
-template <typename Metavariables, typename EventRegistrars>
-PUP::able::PUP_ID ObserveTimeStep<Metavariables, EventRegistrars>::my_PUP_ID =
+template <typename System, typename EventRegistrars>
+PUP::able::PUP_ID ObserveTimeStep<System, EventRegistrars>::my_PUP_ID =
     0;  // NOLINT
 /// \endcond
 }  // namespace Events
