@@ -21,6 +21,7 @@
 #include "AlgorithmNodegroup.hpp"
 #include "AlgorithmSingleton.hpp"
 #include "ErrorHandling/FloatingPointExceptions.hpp"
+#include "Framework/TestHelpers.hpp"
 #include "Parallel/CharmPupable.hpp"
 #include "Parallel/Exit.hpp"
 #include "Parallel/GlobalCache.hpp"
@@ -234,6 +235,18 @@ void TestArrayChare<Metavariables>::run_test_one() noexcept {
       local_cache.get_self_proxy().ckLocalBranch();
   SPECTRE_PARALLEL_REQUIRE(local_cache_from_self_proxy ==
                            global_cache_proxy_.ckLocalBranch());
+
+  auto& serialized_and_deserialized_local_cache =
+      *serialize_and_deserialize(global_cache_proxy_.ckLocalBranch());
+  SPECTRE_PARALLEL_REQUIRE(
+      "Nobody" == Parallel::get<name>(serialized_and_deserialized_local_cache));
+  SPECTRE_PARALLEL_REQUIRE(
+      178 == Parallel::get<age>(serialized_and_deserialized_local_cache));
+  SPECTRE_PARALLEL_REQUIRE(
+      2.2 == Parallel::get<height>(serialized_and_deserialized_local_cache));
+  SPECTRE_PARALLEL_REQUIRE(4 == Parallel::get<shape_of_nametag>(
+                                    serialized_and_deserialized_local_cache)
+                                    .number_of_sides());
 
   // Mutate the weight to 150.
   Parallel::mutate<weight, modify_value<double>>(global_cache_proxy_, 150.0);
