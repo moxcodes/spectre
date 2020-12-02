@@ -26,7 +26,6 @@ endfunction(add_generalized_harmonic_cce_executable)
 
 set(LIBS_TO_LINK
   ApparentHorizons
-  Cce
   CoordinateMaps
   DiscontinuousGalerkin
   Domain
@@ -68,23 +67,15 @@ add_generalized_harmonic_executable(
   GeneralizedHarmonic::Solutions::WrappedGr<gr::Solutions::KerrSchild>
   GeneralizedHarmonic::BoundaryConditions::Bjorhus::ConstraintPreserving
   true
+  "${LIBS_TO_LINK};GeneralRelativitySolutions"
 )
-target_link_libraries(
-  EvolveGhKerrSchildCPBjorhus
-  PRIVATE
-  GeneralRelativitySolutions
-  )
 add_generalized_harmonic_cce_executable(
   KerrSchildCPBjorhus
   GeneralizedHarmonic::Solutions::WrappedGr<gr::Solutions::KerrSchild>
   GeneralizedHarmonic::BoundaryConditions::Bjorhus::ConstraintPreserving
   true
+  "${LIBS_TO_LINK};Cce;GeneralRelativitySolutions"
 )
-target_link_libraries(
-  EvolveGhKerrSchildCPBjorhusWithCce
-  PRIVATE
-  GeneralRelativitySolutions
-  )
 
 
 add_generalized_harmonic_executable(
@@ -92,24 +83,15 @@ add_generalized_harmonic_executable(
   GeneralizedHarmonic::Solutions::WrappedGr<gr::Solutions::KerrSchild>
   GeneralizedHarmonic::BoundaryConditions::Bjorhus::ConstraintPreservingPhysical
   true
+  "${LIBS_TO_LINK};GeneralRelativitySolutions"
 )
-target_link_libraries(
-  EvolveGhKerrSchildCPPBjorhus
-  PRIVATE
-  GeneralRelativitySolutions
-  )
 add_generalized_harmonic_cce_executable(
   KerrSchildCPPBjorhus
   GeneralizedHarmonic::Solutions::WrappedGr<gr::Solutions::KerrSchild>
   GeneralizedHarmonic::BoundaryConditions::Bjorhus::ConstraintPreservingPhysical
   true
+  "${LIBS_TO_LINK};Cce;GeneralRelativitySolutions"
 )
-target_link_libraries(
-  EvolveGhKerrSchildCPPBjorhusWithCce
-  PRIVATE
-  GeneralRelativitySolutions
-  )
-
 
 add_generalized_harmonic_executable(
   KerrSchildNumericInitialData

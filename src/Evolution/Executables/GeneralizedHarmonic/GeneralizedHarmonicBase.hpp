@@ -6,7 +6,6 @@
 #include <cstddef>
 #include <vector>
 
-#include "AlgorithmSingleton.hpp"
 #include "ApparentHorizons/ComputeItems.hpp"
 #include "ApparentHorizons/Tags.hpp"
 #include "DataStructures/DataBox/PrefixHelpers.hpp"
@@ -124,6 +123,8 @@
 #include "Utilities/Functional.hpp"
 #include "Utilities/ProtocolHelpers.hpp"
 #include "Utilities/TMPL.hpp"
+
+#include "Utilities/TmplDebugging.hpp"
 
 /// \cond
 namespace Frame {
@@ -273,7 +274,8 @@ struct GeneralizedHarmonicTemplateBase<EvolutionMetavarsDerived<
   using derived_metavars =
       EvolutionMetavarsDerived<InitialData, BoundaryConditions,
                                BjorhusExternalBoundary>;
-
+  using GeneralizedHarmonicDefaults::step_choosers;
+  using GeneralizedHarmonicDefaults::slab_choosers;
   using initial_data = InitialData;
   using boundary_conditions = BoundaryConditions;
   // Only Dirichlet boundary conditions imposed by an analytic solution are
@@ -423,7 +425,7 @@ struct GeneralizedHarmonicTemplateBase<EvolutionMetavarsDerived<
       tmpl::conditional_t<
           BjorhusExternalBoundary,
           tmpl::list<GeneralizedHarmonic::Actions::
-                         ImposeBjorhusBoundaryConditions<EvolutionMetavars>>,
+                         ImposeBjorhusBoundaryConditions<derived_metavars>>,
           tmpl::list<>>,
       Actions::RecordTimeStepperData<>, Actions::UpdateU<>>;
 
@@ -493,11 +495,9 @@ struct GeneralizedHarmonicTemplateBase<EvolutionMetavarsDerived<
                                   analytic_solution_fields>>>,
                           tmpl::list<>>,
       dg::Actions::InitializeMortars<boundary_scheme, !BjorhusExternalBoundary>,
-      Initialization::Actions::AddComputeTags<tmpl::push_back<
+      Initialization::Actions::AddComputeTags<
           StepChoosers::step_chooser_compute_tags<
-              GeneralizedHarmonicTemplateBase>,
-          evolution::Tags::AnalyticCompute<volume_dim, analytic_solution_tag,
-                                           analytic_solution_fields>>>,
+              GeneralizedHarmonicTemplateBase>>,
       Initialization::Actions::DiscontinuousGalerkin<derived_metavars>,
       Initialization::Actions::RemoveOptionsAndTerminatePhase>;
 
