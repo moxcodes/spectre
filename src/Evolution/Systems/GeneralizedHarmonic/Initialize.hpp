@@ -110,12 +110,12 @@ struct InitializeGhAnd3Plus1Variables {
       gr::Tags::SpacetimeNormalVectorCompute<Dim, frame, DataVector>,
       gr::Tags::InverseSpacetimeMetricCompute<Dim, frame, DataVector>,
       GeneralizedHarmonic::Tags::ThreeIndexConstraintCompute<Dim, frame>,
+      GeneralizedHarmonic::Tags::ExtrinsicCurvatureCompute<Dim, frame>,
       ConstraintDamping::Tags::ConstraintGamma0Compute<Dim, frame>,
       ConstraintDamping::Tags::ConstraintGamma1Compute<Dim, frame>,
       ConstraintDamping::Tags::ConstraintGamma2Compute<Dim, frame>>;
 
   using const_global_cache_tags = tmpl::list<
-      GeneralizedHarmonic::Tags::ExtrinsicCurvatureCompute<Dim, frame>,
       GeneralizedHarmonic::ConstraintDamping::Tags::DampingFunctionGamma0<
           Dim, frame>,
       GeneralizedHarmonic::ConstraintDamping::Tags::DampingFunctionGamma1<

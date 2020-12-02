@@ -127,7 +127,8 @@ class BjorhusIntermediatesComputer {
       Tags::VSpacetimeMetric<VolumeDim, Frame::Inertial>,
       Tags::VZero<VolumeDim, Frame::Inertial>,
       Tags::VPlus<VolumeDim, Frame::Inertial>,
-      Tags::VMinus<VolumeDim, Frame::Inertial>, Tags::ConstraintGamma2,
+      Tags::VMinus<VolumeDim, Frame::Inertial>,
+      ConstraintDamping::Tags::ConstraintGamma2,
       internal_tags::bc_dt_u_psi<VolumeDim, DataVector>,
       internal_tags::bc_dt_u_zero<VolumeDim, DataVector>,
       internal_tags::bc_dt_u_plus<VolumeDim, DataVector>,
@@ -202,7 +203,7 @@ class BjorhusIntermediatesComputer {
                       tmpl::size_t<VolumeDim>, Frame::Inertial>,
         ::Tags::deriv<Tags::Phi<VolumeDim, Frame::Inertial>,
                       tmpl::size_t<VolumeDim>, Frame::Inertial>,
-        Tags::ConstraintGamma2,
+        ConstraintDamping::Tags::ConstraintGamma2,
         Tags::TwoIndexConstraint<VolumeDim, Frame::Inertial>,
         Tags::ThreeIndexConstraint<VolumeDim, Frame::Inertial>,
         Tags::FourIndexConstraint<VolumeDim, Frame::Inertial>,
@@ -232,7 +233,8 @@ class BjorhusIntermediatesComputer {
         get<gr::Tags::InverseSpacetimeMetric<VolumeDim, Frame::Inertial,
                                              DataVector>>(vars_on_this_slice);
 
-    const auto& gamma2 = get<Tags::ConstraintGamma2>(vars_on_this_slice);
+    const auto& gamma2 =
+        get<ConstraintDamping::Tags::ConstraintGamma2>(vars_on_this_slice);
     const auto& two_index_constraint =
         get<Tags::TwoIndexConstraint<VolumeDim, Frame::Inertial>>(
             vars_on_this_slice);
@@ -357,8 +359,8 @@ class BjorhusIntermediatesComputer {
                           tmpl::size_t<VolumeDim>, Frame::Inertial>>(
             vars_on_this_slice);
     // Constraint damping parameters
-    get<Tags::ConstraintGamma2>(buffer_) =
-        get<Tags::ConstraintGamma2>(vars_on_this_slice);
+    get<ConstraintDamping::Tags::ConstraintGamma2>(buffer_) =
+        get<ConstraintDamping::Tags::ConstraintGamma2>(vars_on_this_slice);
 
     // Coordinates
     get<domain::Tags::Coordinates<VolumeDim, Frame::Inertial>>(buffer_) =

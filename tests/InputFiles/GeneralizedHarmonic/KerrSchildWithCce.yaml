@@ -107,6 +107,7 @@ EvolutionSystem:
 SpatialDiscretization:
   DiscontinuousGalerkin:
     Formulation: StrongInertial
+    Quadrature: GaussLobatto
 
 NumericalFlux:
   UpwindPenalty:
@@ -131,6 +132,7 @@ EventsAndTriggers:
           - PointwiseL2Norm(GaugeConstraint)
           - PointwiseL2Norm(ThreeIndexConstraint)
           - PointwiseL2Norm(FourIndexConstraint)
+        InterpolateToMesh: None
   ? Slabs:
       Specified:
         Values: [3]
