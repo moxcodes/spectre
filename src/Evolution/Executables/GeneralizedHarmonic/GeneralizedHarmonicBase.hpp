@@ -6,7 +6,6 @@
 #include <cstddef>
 #include <vector>
 
-#include "AlgorithmSingleton.hpp"
 #include "ApparentHorizons/ComputeItems.hpp"
 #include "ApparentHorizons/Tags.hpp"
 #include "DataStructures/DataBox/PrefixHelpers.hpp"
@@ -16,8 +15,6 @@
 #include "Domain/FunctionsOfTime/RegisterDerivedWithCharm.hpp"
 #include "Domain/Tags.hpp"
 #include "Domain/TagsCharacteresticSpeeds.hpp"
-#include "ErrorHandling/Error.hpp"
-#include "ErrorHandling/FloatingPointExceptions.hpp"
 #include "Evolution/Actions/AddMeshVelocityNonconservative.hpp"
 #include "Evolution/Actions/ComputeTimeDerivative.hpp"
 #include "Evolution/ComputeTags.hpp"
@@ -116,8 +113,12 @@
 #include "Time/Tags.hpp"
 #include "Time/TimeSteppers/TimeStepper.hpp"
 #include "Time/Triggers/TimeTriggers.hpp"
+#include "Utilities/ErrorHandling/Error.hpp"
+#include "Utilities/ErrorHandling/FloatingPointExceptions.hpp"
 #include "Utilities/Functional.hpp"
 #include "Utilities/TMPL.hpp"
+
+#include "Utilities/TmplDebugging.hpp"
 
 /// \cond
 namespace Frame {
@@ -244,7 +245,8 @@ struct GeneralizedHarmonicTemplateBase<EvolutionMetavarsDerived<
   using derived_metavars =
       EvolutionMetavarsDerived<InitialData, BoundaryConditions,
                                BjorhusExternalBoundary>;
-
+  using GeneralizedHarmonicDefaults::step_choosers;
+  using GeneralizedHarmonicDefaults::slab_choosers;
   using initial_data = InitialData;
   using boundary_conditions = BoundaryConditions;
   // Only Dirichlet boundary conditions imposed by an analytic solution are
@@ -370,7 +372,7 @@ struct GeneralizedHarmonicTemplateBase<EvolutionMetavarsDerived<
       tmpl::conditional_t<
           BjorhusExternalBoundary,
           tmpl::list<GeneralizedHarmonic::Actions::
-                         ImposeBjorhusBoundaryConditions<EvolutionMetavars>>,
+                         ImposeBjorhusBoundaryConditions<derived_metavars>>,
           tmpl::list<>>,
       Actions::RecordTimeStepperData<>, Actions::UpdateU<>>;
 
@@ -441,7 +443,8 @@ struct GeneralizedHarmonicTemplateBase<EvolutionMetavarsDerived<
                           tmpl::list<>>,
       dg::Actions::InitializeMortars<boundary_scheme, !BjorhusExternalBoundary>,
       Initialization::Actions::AddComputeTags<tmpl::push_back<
-          StepChoosers::step_chooser_compute_tags<EvolutionMetavars>,
+          StepChoosers::step_chooser_compute_tags<
+              GeneralizedHarmonicTemplateBase>,
           evolution::Tags::AnalyticCompute<volume_dim, analytic_solution_tag,
                                            analytic_solution_fields>>>,
       Initialization::Actions::DiscontinuousGalerkin<derived_metavars>,

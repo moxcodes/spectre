@@ -90,7 +90,7 @@ void test_constraint_preserving_bjorhus_u_psi<
   auto& buffer = intermediate_vars.get_buffer();
   // Also create local variables and their time derivatives, both of which we
   // will populate as needed
-  db::item_type<GeneralizedHarmonic::System<VolumeDim>::variables_tag>
+  typename GeneralizedHarmonic::System<VolumeDim>::variables_tag::type
       local_vars(slice_grid_points, 0.);
   Variables<db::wrap_tags_in<
       ::Tags::dt, GeneralizedHarmonic::System<VolumeDim>::gradients_tags>>
@@ -292,7 +292,7 @@ void test_constraint_preserving_bjorhus_u_zero<
   auto& buffer = intermediate_vars.get_buffer();
   // Also create local variables and their time derivatives, both of which we
   // will populate as needed
-  db::item_type<GeneralizedHarmonic::System<VolumeDim>::variables_tag>
+  typename GeneralizedHarmonic::System<VolumeDim>::variables_tag::type
       local_vars(slice_grid_points, 0.);
   Variables<db::wrap_tags_in<
       ::Tags::dt, GeneralizedHarmonic::System<VolumeDim>::gradients_tags>>
@@ -568,7 +568,7 @@ void test_constraint_preserving_bjorhus_u_minus<
   auto& buffer = intermediate_vars.get_buffer();
   // Also create local variables and their time derivatives, both of which we
   // will populate as needed
-  db::item_type<GeneralizedHarmonic::System<VolumeDim>::variables_tag>
+  typename GeneralizedHarmonic::System<VolumeDim>::variables_tag::type
       local_vars(slice_grid_points, 0.);
   Variables<db::wrap_tags_in<
       ::Tags::dt, GeneralizedHarmonic::System<VolumeDim>::gradients_tags>>
@@ -582,7 +582,8 @@ void test_constraint_preserving_bjorhus_u_minus<
     auto& local_inertial_coords =
         get<domain::Tags::Coordinates<VolumeDim, Frame::Inertial>>(buffer);
     auto& local_constraint_gamma2 =
-        get<GeneralizedHarmonic::Tags::ConstraintGamma2>(buffer);
+        get<GeneralizedHarmonic::ConstraintDamping::Tags::ConstraintGamma2>(
+            buffer);
     // timelike and spacelike SPACETIME vectors, l^a and k^a
     auto& local_outgoing_null_one_form =
         get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
@@ -953,7 +954,7 @@ void test_constraint_preserving_bjorhus_u_minus<
   auto& buffer = intermediate_vars.get_buffer();
   // Also create local variables and their time derivatives, both of which we
   // will populate as needed
-  db::item_type<GeneralizedHarmonic::System<VolumeDim>::variables_tag>
+  typename GeneralizedHarmonic::System<VolumeDim>::variables_tag::type
       local_vars(slice_grid_points, 0.);
   Variables<db::wrap_tags_in<
       ::Tags::dt, GeneralizedHarmonic::System<VolumeDim>::gradients_tags>>
@@ -967,7 +968,8 @@ void test_constraint_preserving_bjorhus_u_minus<
     auto& local_inertial_coords =
         get<domain::Tags::Coordinates<VolumeDim, Frame::Inertial>>(buffer);
     auto& local_constraint_gamma2 =
-        get<GeneralizedHarmonic::Tags::ConstraintGamma2>(buffer);
+        get<GeneralizedHarmonic::ConstraintDamping::Tags::ConstraintGamma2>(
+            buffer);
     // timelike and spacelike SPACETIME vectors, l^a and k^a
     auto& local_outgoing_null_one_form =
         get<GeneralizedHarmonic::Actions::BoundaryConditions_detail::
@@ -1487,7 +1489,7 @@ void test_constraint_preserving_bjorhus_u_minus<
   auto& buffer = intermediate_vars.get_buffer();
   // Also create local variables and their time derivatives, both of which we
   // will populate as needed
-  db::item_type<GeneralizedHarmonic::System<VolumeDim>::variables_tag>
+  typename GeneralizedHarmonic::System<VolumeDim>::variables_tag::type
       local_vars(slice_grid_points, 0.);
   Variables<db::wrap_tags_in<
       ::Tags::dt, GeneralizedHarmonic::System<VolumeDim>::gradients_tags>>
@@ -1501,7 +1503,8 @@ void test_constraint_preserving_bjorhus_u_minus<
     auto& local_inertial_coords =
         get<domain::Tags::Coordinates<VolumeDim, Frame::Inertial>>(buffer);
     auto& local_constraint_gamma2 =
-        get<GeneralizedHarmonic::Tags::ConstraintGamma2>(buffer);
+        get<GeneralizedHarmonic::ConstraintDamping::Tags::ConstraintGamma2>(
+            buffer);
     auto& local_three_index_constraint =
         get<GeneralizedHarmonic::Tags::ThreeIndexConstraint<VolumeDim,
                                                             Frame::Inertial>>(
