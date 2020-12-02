@@ -6,9 +6,10 @@
 
 #pragma once
 
+#include <pup.h>
 #include <vector>
 
-#include <pup.h>
+#include "Utilities/Gsl.hpp"
 
 /*!
  * \ingroup ParallelGroup
@@ -53,4 +54,21 @@ T deserialize(const void* const data) noexcept {  // NOLINT
   T result{};
   reader | result;
   return result;
+}
+
+/*!
+ * \ingroup ParallelGroup
+ * \brief Deserialize an object using PUP.
+ *
+ * \tparam T the type to deserialize to. The type to deserialize as must be
+ * explicitly specified.
+ */
+template <typename T, typename U>
+void deserialize(const gsl::not_null<U*> result,
+            const void* const data) noexcept {  // NOLINT
+  static_assert(std::is_same_v<T, U>,
+                "Explicit type for serialization differs from deduced type");
+  // clang-tidy: no const in forward decl (this is a definition)
+  PUP::fromMem reader(data);
+  reader | *result;
 }
