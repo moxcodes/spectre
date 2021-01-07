@@ -80,6 +80,7 @@
 #include "ParallelAlgorithms/DiscontinuousGalerkin/InitializeMortars.hpp"
 #include "ParallelAlgorithms/Events/ObserveErrorNorms.hpp"
 #include "ParallelAlgorithms/Events/ObserveFields.hpp"
+#include "ParallelAlgorithms/Events/ObserveTensorNorms.hpp"
 #include "ParallelAlgorithms/Events/ObserveTimeStep.hpp"
 #include "ParallelAlgorithms/Events/ObserveVolumeIntegrals.hpp"
 #include "ParallelAlgorithms/EventsAndTriggers/Actions/RunEventsAndTriggers.hpp"
@@ -262,7 +263,7 @@ struct GeneralizedHarmonicTemplateBase<EvolutionMetavarsDerived<
 
   using observe_fields = tmpl::append<
       tmpl::push_back<
-          analytic_solution_fields,
+          analytic_solution_fields, gr::Tags::Lapse<DataVector>,
           ::Tags::PointwiseL2Norm<
               GeneralizedHarmonic::Tags::GaugeConstraint<volume_dim, frame>>,
           ::Tags::PointwiseL2Norm<GeneralizedHarmonic::Tags::
@@ -274,8 +275,7 @@ struct GeneralizedHarmonicTemplateBase<EvolutionMetavarsDerived<
                          tmpl::list<>>>;
 
   using observation_events = tmpl::list<
-      dg::Events::Registrars::ObserveErrorNorms<Tags::Time,
-                                                analytic_solution_fields>,
+      dg::Events::Registrars::ObserveTensorNorms<Tags::Time, observe_fields>,
       dg::Events::Registrars::ObserveFields<
           volume_dim, Tags::Time, observe_fields, analytic_solution_fields>,
       Events::Registrars::ObserveTimeStep<system>,
