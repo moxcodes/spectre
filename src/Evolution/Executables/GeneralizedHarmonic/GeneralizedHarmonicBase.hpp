@@ -49,21 +49,6 @@
 #include "NumericalAlgorithms/DiscontinuousGalerkin/BoundarySchemes/FirstOrder/FirstOrderScheme.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/BoundarySchemes/FirstOrder/FirstOrderSchemeLts.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/Tags.hpp"
-#include "NumericalAlgorithms/Interpolation/AddTemporalIdsToInterpolationTarget.hpp"
-#include "NumericalAlgorithms/Interpolation/Callbacks/FindApparentHorizon.hpp"
-#include "NumericalAlgorithms/Interpolation/Callbacks/ObserveTimeSeriesOnSurface.hpp"
-#include "NumericalAlgorithms/Interpolation/CleanUpInterpolator.hpp"
-#include "NumericalAlgorithms/Interpolation/InitializeInterpolationTarget.hpp"
-#include "NumericalAlgorithms/Interpolation/Interpolate.hpp"
-#include "NumericalAlgorithms/Interpolation/InterpolationTarget.hpp"
-#include "NumericalAlgorithms/Interpolation/InterpolationTargetApparentHorizon.hpp"
-#include "NumericalAlgorithms/Interpolation/InterpolationTargetReceiveVars.hpp"
-#include "NumericalAlgorithms/Interpolation/Interpolator.hpp"
-#include "NumericalAlgorithms/Interpolation/InterpolatorReceivePoints.hpp"
-#include "NumericalAlgorithms/Interpolation/InterpolatorReceiveVolumeData.hpp"
-#include "NumericalAlgorithms/Interpolation/InterpolatorRegisterElement.hpp"
-#include "NumericalAlgorithms/Interpolation/Tags.hpp"
-#include "NumericalAlgorithms/Interpolation/TryToInterpolate.hpp"
 #include "Options/Options.hpp"
 #include "Parallel/Actions/SetupDataBox.hpp"
 #include "Parallel/Actions/TerminatePhase.hpp"
@@ -136,7 +121,7 @@ struct GeneralizedHarmonicDefaults {
   using system = GeneralizedHarmonic::System<volume_dim>;
   static constexpr dg::Formulation dg_formulation =
       dg::Formulation::StrongInertial;
-  static constexpr bool use_damped_harmonic_rollon = true;
+  static constexpr bool use_damped_harmonic_rollon = false;
   // Set override_cubic_functions_of_time to true to override the cubic
   // piecewise polynomial functions of time using
   // `read_spec_third_order_piecewise_polynomial()`
@@ -179,36 +164,6 @@ struct GeneralizedHarmonicDefaults {
           normal_dot_numerical_flux, Tags::TimeStepId>>;
 
   using analytic_solution_fields = typename system::variables_tag::tags_list;
-
-  struct AhA {
-    using tags_to_observe =
-        tmpl::list<StrahlkorperGr::Tags::AreaCompute<frame>>;
-    using compute_items_on_source = tmpl::list<
-        gr::Tags::SpatialMetricCompute<volume_dim, frame, DataVector>,
-        ah::Tags::InverseSpatialMetricCompute<volume_dim, frame>,
-        ah::Tags::ExtrinsicCurvatureCompute<volume_dim, frame>,
-        ah::Tags::SpatialChristoffelSecondKindCompute<volume_dim, frame>>;
-    using vars_to_interpolate_to_target =
-        tmpl::list<gr::Tags::SpatialMetric<volume_dim, frame, DataVector>,
-                   gr::Tags::InverseSpatialMetric<volume_dim, frame>,
-                   gr::Tags::ExtrinsicCurvature<volume_dim, frame>,
-                   gr::Tags::SpatialChristoffelSecondKind<volume_dim, frame>>;
-    using compute_items_on_target = tmpl::append<
-        tmpl::list<StrahlkorperGr::Tags::AreaElementCompute<frame>>,
-        tags_to_observe>;
-    using compute_target_points =
-        intrp::TargetPoints::ApparentHorizon<AhA, ::Frame::Inertial>;
-    using post_interpolation_callback =
-        intrp::callbacks::FindApparentHorizon<AhA, ::Frame::Inertial>;
-    using post_horizon_find_callback =
-        intrp::callbacks::ObserveTimeSeriesOnSurface<tags_to_observe, AhA, AhA>;
-  };
-
-  using interpolation_target_tags = tmpl::list<AhA>;
-  using interpolator_source_vars =
-      tmpl::list<gr::Tags::SpacetimeMetric<volume_dim, frame>,
-                 GeneralizedHarmonic::Tags::Pi<volume_dim, frame>,
-                 GeneralizedHarmonic::Tags::Phi<volume_dim, frame>>;
 
   using triggers = Triggers::time_triggers;
 
@@ -282,9 +237,7 @@ struct GeneralizedHarmonicTemplateBase<EvolutionMetavarsDerived<
       Events::Registrars::ChangeSlabSize<slab_choosers>>;
 
   // Events include the observation events and finding the horizon
-  using events = tmpl::push_back<
-      observation_events,
-      intrp::Events::Registrars::Interpolate<3, AhA, interpolator_source_vars>>;
+  using events = observation_events;
 
   // A tmpl::list of tags to be added to the GlobalCache by the
   // metavariables
@@ -308,8 +261,7 @@ struct GeneralizedHarmonicTemplateBase<EvolutionMetavarsDerived<
                      DampingFunctionGamma2<volume_dim, frame>>>;
 
   using observed_reduction_data_tags = observers::collect_reduction_data_tags<
-      tmpl::push_back<typename Event<observation_events>::creatable_classes,
-                      typename AhA::post_horizon_find_callback>>;
+      typename Event<observation_events>::creatable_classes>;
 
   static Phase determine_next_phase(
       const Phase& current_phase,
@@ -445,7 +397,7 @@ struct GeneralizedHarmonicTemplateBase<EvolutionMetavarsDerived<
           tmpl::list<evolution::Tags::AnalyticCompute<
               volume_dim, analytic_solution_tag, analytic_solution_fields>>>,
       Initialization::Actions::DiscontinuousGalerkin<derived_metavars>,
-      Initialization::Actions::RemoveOptionsAndTerminatePhase>;
+      Parallel::Actions::TerminatePhase>;
 
   using gh_dg_element_array = DgElementArray<
       derived_metavars,
@@ -477,8 +429,7 @@ struct GeneralizedHarmonicTemplateBase<EvolutionMetavarsDerived<
                                  SelfStart::self_start_procedure<step_actions>>,
           Parallel::PhaseActions<
               Phase, Phase::Register,
-              tmpl::list<intrp::Actions::RegisterElementWithInterpolator,
-                         observers::Actions::RegisterEventsWithObservers,
+              tmpl::list<observers::Actions::RegisterEventsWithObservers,
                          Parallel::Actions::TerminatePhase>>,
           Parallel::PhaseActions<
               Phase, Phase::Evolve,
@@ -487,8 +438,6 @@ struct GeneralizedHarmonicTemplateBase<EvolutionMetavarsDerived<
   using component_list = tmpl::flatten<tmpl::list<
       observers::Observer<derived_metavars>,
       observers::ObserverWriter<derived_metavars>,
-      intrp::Interpolator<derived_metavars>,
-      intrp::InterpolationTarget<derived_metavars, AhA>,
       std::conditional_t<evolution::is_numeric_initial_data_v<initial_data>,
                          importers::ElementDataReader<derived_metavars>,
                          tmpl::list<>>,
