@@ -125,7 +125,7 @@ struct GeneralizedHarmonicDefaults {
   // Set override_cubic_functions_of_time to true to override the cubic
   // piecewise polynomial functions of time using
   // `read_spec_third_order_piecewise_polynomial()`
-  static constexpr bool override_cubic_functions_of_time = false;
+  static constexpr bool override_cubic_functions_of_time = true;
   using temporal_id = Tags::TimeStepId;
   static constexpr bool local_time_stepping = false;
 
