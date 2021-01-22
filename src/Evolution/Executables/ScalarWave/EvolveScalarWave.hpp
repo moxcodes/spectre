@@ -173,6 +173,7 @@ struct EvolutionMetavars {
   // wave system, the user should determine whether this filter can be removed.
   static constexpr bool use_filtering = (2 == volume_dim);
 
+  template <bool self_starting>
   using step_actions = tmpl::flatten<tmpl::list<
       evolution::dg::Actions::ComputeTimeDerivative<EvolutionMetavars>,
       dg::Actions::ComputeNonconservativeBoundaryFluxes<
@@ -182,12 +183,16 @@ struct EvolutionMetavars {
           boundary_scheme,
           domain::Tags::BoundaryDirectionsInterior<volume_dim>>,
       dg::Actions::ReceiveDataForFluxes<boundary_scheme>,
-      tmpl::conditional_t<local_time_stepping,
-                          tmpl::list<Actions::RecordTimeStepperData<>,
-                                     Actions::MutateApply<boundary_scheme>>,
-                          tmpl::list<Actions::MutateApply<boundary_scheme>,
-                                     Actions::RecordTimeStepperData<>>>,
-      Actions::UpdateU<>,
+      tmpl::conditional_t<
+          local_time_stepping,
+          tmpl::conditional_t<
+              self_starting,
+              tmpl::list<Actions::RecordTimeStepperData<>,
+                         Actions::MutateApply<boundary_scheme>,
+                         Actions::UpdateU<>>,
+                  tmpl::list<Actions::MutateApply<boundary_scheme>>>,
+          tmpl::list<Actions::MutateApply<boundary_scheme>,
+                     Actions::RecordTimeStepperData<>, Actions::UpdateU<>>>,
       tmpl::conditional_t<
           use_filtering,
           dg::Actions::Filter<Filters::Exponential<0>,
@@ -242,7 +247,7 @@ struct EvolutionMetavars {
 
               Parallel::PhaseActions<
                   Phase, Phase::InitializeTimeStepperHistory,
-                  SelfStart::self_start_procedure<step_actions, system>>,
+                  SelfStart::self_start_procedure<step_actions<true>, system>>,
 
               Parallel::PhaseActions<
                   Phase, Phase::RegisterWithObserver,
@@ -251,13 +256,9 @@ struct EvolutionMetavars {
 
               Parallel::PhaseActions<
                   Phase, Phase::Evolve,
-                  tmpl::list<
-                      Actions::RunEventsAndTriggers, Actions::ChangeSlabSize,
-                      step_actions,
-                      tmpl::conditional_t<
-                          local_time_stepping,
-                          Actions::ChangeStepSize<step_choosers>, tmpl::list<>>,
-                      Actions::AdvanceTime>>>>>;
+                  tmpl::list<Actions::RunEventsAndTriggers,
+                             Actions::ChangeSlabSize, step_actions<false>,
+                             Actions::AdvanceTime>>>>>;
 
   static constexpr Options::String help{
       "Evolve a Scalar Wave in Dim spatial dimension.\n\n"

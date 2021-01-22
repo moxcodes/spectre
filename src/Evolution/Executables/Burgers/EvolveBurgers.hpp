@@ -170,6 +170,7 @@ struct EvolutionMetavars {
   using observed_reduction_data_tags = observers::collect_reduction_data_tags<
       typename Event<events>::creatable_classes>;
 
+  template <bool self_starting>
   using step_actions = tmpl::flatten<tmpl::list<
       evolution::dg::Actions::ComputeTimeDerivative<EvolutionMetavars>,
       tmpl::conditional_t<
@@ -180,12 +181,17 @@ struct EvolutionMetavars {
           boundary_scheme,
           domain::Tags::BoundaryDirectionsInterior<volume_dim>>,
       dg::Actions::ReceiveDataForFluxes<boundary_scheme>,
-      tmpl::conditional_t<local_time_stepping,
-                          tmpl::list<Actions::RecordTimeStepperData<>,
-                                     Actions::MutateApply<boundary_scheme>>,
-                          tmpl::list<Actions::MutateApply<boundary_scheme>,
-                                     Actions::RecordTimeStepperData<>>>,
-      Actions::UpdateU<>, Limiters::Actions::SendData<EvolutionMetavars>,
+      tmpl::conditional_t<
+          local_time_stepping,
+          tmpl::conditional_t<
+              self_starting,
+              tmpl::list<Actions::RecordTimeStepperData<>,
+                         Actions::MutateApply<boundary_scheme>,
+                         Actions::UpdateU<>>,
+              tmpl::list<Actions::MutateApply<boundary_scheme>>>,
+          tmpl::list<Actions::MutateApply<boundary_scheme>,
+                     Actions::RecordTimeStepperData<>, Actions::UpdateU<>>>,
+      Limiters::Actions::SendData<EvolutionMetavars>,
       Limiters::Actions::Limit<EvolutionMetavars>>>;
 
   enum class Phase {
@@ -238,17 +244,13 @@ struct EvolutionMetavars {
 
               Parallel::PhaseActions<
                   Phase, Phase::InitializeTimeStepperHistory,
-                  SelfStart::self_start_procedure<step_actions, system>>,
+                  SelfStart::self_start_procedure<step_actions<true>, system>>,
 
               Parallel::PhaseActions<
                   Phase, Phase::Evolve,
-                  tmpl::list<
-                      Actions::RunEventsAndTriggers, Actions::ChangeSlabSize,
-                      step_actions,
-                      tmpl::conditional_t<
-                          local_time_stepping,
-                          Actions::ChangeStepSize<step_choosers>, tmpl::list<>>,
-                      Actions::AdvanceTime>>>>>;
+                  tmpl::list<Actions::RunEventsAndTriggers,
+                             Actions::ChangeSlabSize, step_actions<false>,
+                             Actions::AdvanceTime>>>>>;
 
   static constexpr Options::String help{
       "Evolve the Burgers equation.\n\n"

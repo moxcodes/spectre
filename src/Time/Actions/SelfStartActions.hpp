@@ -486,4 +486,10 @@ struct self_start_procedure_impl {
 template <typename StepActions, typename System>
 using self_start_procedure =
     typename detail::self_start_procedure_impl<StepActions, System>::type;
+
+/// \ingroup TimeGroup
+/// Determine based on the time step id whether the evolution system is
+/// currently in the self-start procedure.
+bool in_self_start(const TimeStepId& time_step_id) noexcept;
+
 }  // namespace SelfStart

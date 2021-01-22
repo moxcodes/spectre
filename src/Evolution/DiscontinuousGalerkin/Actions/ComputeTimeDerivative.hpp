@@ -42,6 +42,9 @@
 #include "NumericalAlgorithms/Spectral/Projection.hpp"
 #include "Parallel/GlobalCache.hpp"
 #include "ParallelAlgorithms/DiscontinuousGalerkin/FluxCommunication.hpp"
+#include "Time/Actions/SelfStartActions.hpp"
+#include "Time/Tags.hpp"
+#include "Time/TakeStep.hpp"
 #include "Utilities/Gsl.hpp"
 #include "Utilities/TMPL.hpp"
 
@@ -288,13 +291,20 @@ struct ComputeTimeDerivative {
  public:
   using inbox_tags = tmpl::append<
       typename GetFluxInboxTag<Metavariables>::type,
-      tmpl::list<evolution::dg::Tags::BoundaryCorrectionAndGhostCellsInbox<
-          Metavariables::volume_dim>>>;
-  using const_global_cache_tags = tmpl::conditional_t<
-      detail::has_boundary_correction_v<typename Metavariables::system>,
-      tmpl::list<::dg::Tags::Formulation, evolution::Tags::BoundaryCorrection<
-                                              typename Metavariables::system>>,
-      tmpl::list<::dg::Tags::Formulation>>;
+    tmpl::list<evolution::dg::Tags::BoundaryCorrectionAndGhostCellsInbox<
+                 Metavariables::volume_dim>>>;
+  using const_global_cache_tags = tmpl::append<
+      tmpl::conditional_t<
+          detail::has_boundary_correction_v<typename Metavariables::system>,
+          tmpl::list<::dg::Tags::Formulation,
+                     evolution::Tags::BoundaryCorrection<
+                         typename Metavariables::system>>,
+          tmpl::list<::dg::Tags::Formulation>>,
+      tmpl::conditional_t<Metavariables::local_time_stepping,
+                          tmpl::list<::Tags::StepChoosers<
+                                         typename Metavariables::step_choosers>,
+                                     ::Tags::StepController>,
+                          tmpl::list<>>>;
 
   template <typename DbTagsList, typename... InboxTags, typename ArrayIndex,
             typename ActionList, typename ParallelComponent>
@@ -468,6 +478,13 @@ ComputeTimeDerivative<Metavariables>::apply(
     fill_mortar_data_for_internal_boundaries<
         volume_dim, typename Metavariables::boundary_scheme>(
         make_not_null(&box));
+  }
+
+  if constexpr (Metavariables::local_time_stepping) {
+    if (not SelfStart::in_self_start(db::get<::Tags::TimeStepId>(box))) {
+      take_step<typename Metavariables::step_choosers>(make_not_null(&box),
+                                                       cache);
+    }
   }
 
   send_data_for_fluxes<ParallelComponent>(make_not_null(&cache), box);

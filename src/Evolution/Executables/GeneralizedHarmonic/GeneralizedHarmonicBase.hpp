@@ -133,10 +133,9 @@ struct GeneralizedHarmonicDefaults {
   using normal_dot_numerical_flux = Tags::NumericalFlux<
       GeneralizedHarmonic::UpwindPenaltyCorrection<volume_dim>>;
 
-  using step_choosers_common =
-      tmpl::list<StepChoosers::Registrars::Cfl<volume_dim, Frame::Inertial>,
-                 StepChoosers::Registrars::Constant,
-                 StepChoosers::Registrars::Increase>;
+  using step_choosers_common = tmpl::list<
+      StepChoosers::Registrars::Cfl<volume_dim, Frame::Inertial, system>,
+      StepChoosers::Registrars::Constant, StepChoosers::Registrars::Increase>;
   using step_choosers_for_step_only =
       tmpl::list<StepChoosers::Registrars::PreventRapidIncrease>;
   using step_choosers_for_slab_only =
@@ -295,6 +294,7 @@ struct GeneralizedHarmonicTemplateBase<EvolutionMetavarsDerived<
     }
   }
 
+  template <bool self_starting>
   using step_actions = tmpl::list<
       evolution::dg::Actions::ComputeTimeDerivative<derived_metavars>,
       dg::Actions::ComputeNonconservativeBoundaryFluxes<
@@ -315,8 +315,12 @@ struct GeneralizedHarmonicTemplateBase<EvolutionMetavarsDerived<
                                         ImposeBjorhusBoundaryConditions<
                                             derived_metavars>>,
                          tmpl::list<>>,
-                     Actions::RecordTimeStepperData<>,
-                     Actions::MutateApply<boundary_scheme>>,
+                     tmpl::conditional_t<
+                         self_starting,
+                         tmpl::list<Actions::RecordTimeStepperData<>,
+                                    Actions::MutateApply<boundary_scheme>,
+                                    Actions::UpdateU<>>,
+                         tmpl::list<Actions::MutateApply<boundary_scheme>>>>,
           tmpl::list<Actions::MutateApply<boundary_scheme>,
                      tmpl::conditional_t<
                          BjorhusExternalBoundary,
@@ -324,8 +328,7 @@ struct GeneralizedHarmonicTemplateBase<EvolutionMetavarsDerived<
                                         ImposeBjorhusBoundaryConditions<
                                             derived_metavars>>,
                          tmpl::list<>>,
-                     Actions::RecordTimeStepperData<>>>,
-      Actions::UpdateU<>>;
+                     Actions::RecordTimeStepperData<>, Actions::UpdateU<>>>>;
 
   using initialization_actions = tmpl::list<
       Actions::SetupDataBox,
@@ -393,9 +396,11 @@ struct GeneralizedHarmonicTemplateBase<EvolutionMetavarsDerived<
                                   analytic_solution_fields>>>,
                           tmpl::list<>>,
       dg::Actions::InitializeMortars<boundary_scheme, !BjorhusExternalBoundary>,
-      Initialization::Actions::AddComputeTags<
-          tmpl::list<evolution::Tags::AnalyticCompute<
-              volume_dim, analytic_solution_tag, analytic_solution_fields>>>,
+
+      Initialization::Actions::AddComputeTags<tmpl::push_back<
+          StepChoosers::step_chooser_compute_tags<EvolutionMetavars>,
+          evolution::Tags::AnalyticCompute<volume_dim, analytic_solution_tag,
+                                           analytic_solution_fields>>>,
       Initialization::Actions::DiscontinuousGalerkin<derived_metavars>,
       Parallel::Actions::TerminatePhase>;
 
@@ -427,7 +432,7 @@ struct GeneralizedHarmonicTemplateBase<EvolutionMetavarsDerived<
               initialize_initial_data_dependent_quantities_actions>,
           Parallel::PhaseActions<
               Phase, Phase::InitializeTimeStepperHistory,
-              SelfStart::self_start_procedure<step_actions, system>>,
+              SelfStart::self_start_procedure<step_actions<true>, system>>,
           Parallel::PhaseActions<
               Phase, Phase::Register,
               tmpl::list<observers::Actions::RegisterEventsWithObservers,
@@ -435,7 +440,7 @@ struct GeneralizedHarmonicTemplateBase<EvolutionMetavarsDerived<
           Parallel::PhaseActions<
               Phase, Phase::Evolve,
               tmpl::list<Actions::RunEventsAndTriggers, Actions::ChangeSlabSize,
-                         step_actions, Actions::AdvanceTime>>>>>;
+                         step_actions<false>, Actions::AdvanceTime>>>>>;
   using component_list = tmpl::flatten<tmpl::list<
       observers::Observer<derived_metavars>,
       observers::ObserverWriter<derived_metavars>,

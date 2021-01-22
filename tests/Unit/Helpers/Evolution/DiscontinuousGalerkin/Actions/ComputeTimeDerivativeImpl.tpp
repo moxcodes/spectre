@@ -818,6 +818,7 @@ struct Metavariables {
       Tags::NumericalFlux<BoundaryTerms<Dim, HasPrimitiveVariables>>;
   using const_global_cache_tags =
       tmpl::list<domain::Tags::InitialExtents<Dim>, normal_dot_numerical_flux>;
+  using step_choosers = tmpl::list<>;
 
   using component_list = tmpl::list<component<Metavariables>>;
   enum class Phase { Initialization, Testing, Exit };
