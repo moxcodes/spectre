@@ -7,6 +7,8 @@
 
 #include "DataStructures/Tensor/EagerMath/Magnitude.hpp"
 #include "DataStructures/VariablesTag.hpp"
+#include "Evolution/Systems/Burgers/BoundaryConditions/BoundaryCondition.hpp"
+#include "Evolution/Systems/Burgers/BoundaryCorrections/BoundaryCorrection.hpp"
 #include "Evolution/Systems/Burgers/Characteristics.hpp"
 #include "Evolution/Systems/Burgers/Fluxes.hpp"
 #include "Evolution/Systems/Burgers/Tags.hpp"  // IWYU pragma: keep
@@ -24,6 +26,10 @@ struct System {
   static constexpr bool is_in_flux_conservative_form = true;
   static constexpr bool has_primitive_and_conservative_vars = false;
   static constexpr size_t volume_dim = 1;
+
+  using boundary_conditions_base = BoundaryConditions::BoundaryCondition;
+
+  using boundary_correction = BoundaryCorrections::BoundaryCorrection;
 
   using variables_tag = ::Tags::Variables<tmpl::list<Tags::U>>;
   using flux_variables = tmpl::list<Tags::U>;
