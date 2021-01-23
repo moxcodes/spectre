@@ -278,7 +278,7 @@ struct EvolutionMetavars
               initialize_initial_data_dependent_quantities_actions>,
           Parallel::PhaseActions<
               Phase, Phase::InitializeTimeStepperHistory,
-              SelfStart::self_start_procedure<step_actions<false>>>,
+              SelfStart::self_start_procedure<step_actions<false>, system>>,
           Parallel::PhaseActions<
               Phase, Phase::Register,
               tmpl::list<intrp::Actions::RegisterElementWithInterpolator,
