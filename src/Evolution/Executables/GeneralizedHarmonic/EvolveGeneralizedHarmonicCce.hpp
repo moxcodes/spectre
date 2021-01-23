@@ -12,8 +12,8 @@
 #include "Domain/Creators/TimeDependence/RegisterDerivedWithCharm.hpp"
 #include "Domain/FunctionsOfTime/RegisterDerivedWithCharm.hpp"
 #include "Domain/Tags.hpp"
-#include "ErrorHandling/Error.hpp"
-#include "ErrorHandling/FloatingPointExceptions.hpp"
+#include "Utilities/ErrorHandling/Error.hpp"
+#include "Utilities/ErrorHandling/FloatingPointExceptions.hpp"
 #include "Evolution/ComputeTags.hpp"
 #include "Evolution/Executables/GeneralizedHarmonic/GeneralizedHarmonicBase.hpp"
 #include "Evolution/Systems/Cce/Actions/SendNextTimeToCce.hpp"
@@ -278,7 +278,7 @@ struct EvolutionMetavars
               initialize_initial_data_dependent_quantities_actions>,
           Parallel::PhaseActions<
               Phase, Phase::InitializeTimeStepperHistory,
-              SelfStart::self_start_procedure<step_actions<false>>>,
+              SelfStart::self_start_procedure<step_actions<false>, system>>,
           Parallel::PhaseActions<
               Phase, Phase::Register,
               tmpl::list<intrp::Actions::RegisterElementWithInterpolator,
