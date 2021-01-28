@@ -12,7 +12,6 @@
 
 #include "Domain/CoordinateMaps/CoordinateMap.hpp"
 #include "Domain/Creators/DomainCreator.hpp"
-#include "Domain/Creators/TimeDependence/TimeDependence.hpp"
 #include "Domain/Domain.hpp"
 #include "Options/Options.hpp"
 #include "Utilities/ErrorHandling/Assert.hpp"
@@ -263,13 +262,6 @@ class BinaryCompactObject : public DomainCreator<3> {
         "Object B, beyond the refinement level set by InitialRefinement."};
   };
 
-  struct TimeDependence {
-    using type =
-        std::unique_ptr<domain::creators::time_dependence::TimeDependence<3>>;
-    static constexpr Options::String help = {
-        "The time dependence of the moving mesh domain."};
-  };
-
   using options = tmpl::list<
       InnerRadiusObjectA, OuterRadiusObjectA, XCoordObjectA, ExciseInteriorA,
       InnerRadiusObjectB, OuterRadiusObjectB, XCoordObjectB, ExciseInteriorB,
@@ -277,7 +269,7 @@ class BinaryCompactObject : public DomainCreator<3> {
       UseEquiangularMap, UseProjectiveMap, UseLogarithmicMapOuterSphericalShell,
       AdditionToOuterLayerRadialRefinementLevel, UseLogarithmicMapObjectA,
       AdditionToObjectARadialRefinementLevel, UseLogarithmicMapObjectB,
-      AdditionToObjectBRadialRefinementLevel, TimeDependence>;
+      AdditionToObjectBRadialRefinementLevel>;
 
   static constexpr Options::String help{
       "The BinaryCompactObject domain is a general domain for two compact "
@@ -333,8 +325,6 @@ class BinaryCompactObject : public DomainCreator<3> {
           false,
       typename AdditionToObjectBRadialRefinementLevel::type
           addition_to_object_B_radial_refinement_level = 0,
-      std::unique_ptr<domain::creators::time_dependence::TimeDependence<3>>
-          time_dependence = nullptr,
       const Options::Context& context = {});
 
   BinaryCompactObject() = default;
@@ -385,8 +375,6 @@ class BinaryCompactObject : public DomainCreator<3> {
   double length_inner_cube_{};
   double length_outer_cube_{};
   size_t number_of_blocks_{};
-  std::unique_ptr<domain::creators::time_dependence::TimeDependence<3>>
-      time_dependence_;
 };
 }  // namespace creators
 }  // namespace domain
