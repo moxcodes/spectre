@@ -15,7 +15,6 @@
 #include "Domain/BoundaryConditions/GetBoundaryConditionsBase.hpp"
 #include "Domain/CoordinateMaps/CoordinateMap.hpp"
 #include "Domain/Creators/DomainCreator.hpp"
-#include "Domain/Creators/TimeDependence/TimeDependence.hpp"
 #include "Domain/Domain.hpp"
 #include "Options/Auto.hpp"
 #include "Options/Options.hpp"
@@ -341,35 +340,42 @@ class BinaryCompactObject : public DomainCreator<3> {
         "level set by InitialRefinement."};
   };
 
-  struct TimeDependence {
-    using type =
-        std::unique_ptr<domain::creators::time_dependence::TimeDependence<3>>;
+  struct UseLogarithmicMapObjectA {
+    using type = bool;
     static constexpr Options::String help = {
-        "The time dependence of the moving mesh domain."};
+        "Use a logarithmically spaced radial grid in the part of Layer 1 "
+        "enveloping Object A (requires ExciseInteriorA == true)"};
   };
 
-  template <typename BoundaryConditionsBase>
-  struct OuterBoundaryCondition {
-    using group = OuterSphere;
-    static std::string name() noexcept { return "BoundaryCondition"; }
-    static constexpr Options::String help =
-        "Options for the outer boundary conditions.";
-    using type = std::unique_ptr<BoundaryConditionsBase>;
+  struct AdditionToObjectARadialRefinementLevel {
+    using type = size_t;
+    static constexpr Options::String help = {
+        "Addition to radial refinement level in the part of Layer 1 enveloping "
+        "Object A, beyond the refinement level set by InitialRefinement."};
   };
 
-  template <typename Metavariables>
-  using options = tmpl::append<
-      tmpl::list<ObjectA, ObjectB, RadiusEnvelopingCube, RadiusOuterSphere,
-                 InitialRefinement, InitialGridPoints, UseProjectiveMap,
-                 UseLogarithmicMapOuterSphericalShell,
-                 AdditionToOuterLayerRadialRefinementLevel, TimeDependence>,
-      tmpl::conditional_t<
-          domain::BoundaryConditions::has_boundary_conditions_base_v<
-              typename Metavariables::system>,
-          tmpl::list<OuterBoundaryCondition<
-              domain::BoundaryConditions::get_boundary_conditions_base<
-                  typename Metavariables::system>>>,
-          tmpl::list<>>>;
+  struct UseLogarithmicMapObjectB {
+    using type = bool;
+    static constexpr Options::String help = {
+        "Use a logarithmically spaced radial grid in the part of Layer 1 "
+        "enveloping Object B (requires ExciseInteriorB == true)"};
+  };
+
+  struct AdditionToObjectBRadialRefinementLevel {
+    using type = size_t;
+    static constexpr Options::String help = {
+        "Addition to radial refinement level in the part of Layer 1 enveloping "
+        "Object B, beyond the refinement level set by InitialRefinement."};
+  };
+
+  using options = tmpl::list<
+      InnerRadiusObjectA, OuterRadiusObjectA, XCoordObjectA, ExciseInteriorA,
+      InnerRadiusObjectB, OuterRadiusObjectB, XCoordObjectB, ExciseInteriorB,
+      RadiusOuterCube, RadiusOuterSphere, InitialRefinement, InitialGridPoints,
+      UseEquiangularMap, UseProjectiveMap, UseLogarithmicMapOuterSphericalShell,
+      AdditionToOuterLayerRadialRefinementLevel, UseLogarithmicMapObjectA,
+      AdditionToObjectARadialRefinementLevel, UseLogarithmicMapObjectB,
+      AdditionToObjectBRadialRefinementLevel>;
 
   static constexpr Options::String help{
       "The BinaryCompactObject domain is a general domain for two compact "
@@ -399,15 +405,32 @@ class BinaryCompactObject : public DomainCreator<3> {
       "(InitialRefinement + OuterSphere.AdditionToRadialRefinementLevel)."};
 
   BinaryCompactObject(
-      Object object_A, Object object_B, double radius_enveloping_cube,
-      double radius_enveloping_sphere, size_t initial_refinement,
-      size_t initial_grid_points_per_dim, bool use_projective_map = true,
-      bool use_logarithmic_map_outer_spherical_shell = false,
-      size_t addition_to_outer_layer_radial_refinement_level = 0,
-      std::unique_ptr<domain::creators::time_dependence::TimeDependence<3>>
-          time_dependence = nullptr,
-      std::unique_ptr<domain::BoundaryConditions::BoundaryCondition>
-          outer_boundary_condition = nullptr,
+      typename InnerRadiusObjectA::type inner_radius_object_A,
+      typename OuterRadiusObjectA::type outer_radius_object_A,
+      typename XCoordObjectA::type xcoord_object_A,
+      typename ExciseInteriorA::type excise_interior_A,
+      typename InnerRadiusObjectB::type inner_radius_object_B,
+      typename OuterRadiusObjectB::type outer_radius_object_B,
+      typename XCoordObjectB::type xcoord_object_B,
+      typename ExciseInteriorB::type excise_interior_B,
+      typename RadiusOuterCube::type radius_enveloping_cube,
+      typename RadiusOuterSphere::type radius_enveloping_sphere,
+      typename InitialRefinement::type initial_refinement,
+      typename InitialGridPoints::type initial_grid_points_per_dim,
+      typename UseEquiangularMap::type use_equiangular_map,
+      typename UseProjectiveMap::type use_projective_map = true,
+      typename UseLogarithmicMapOuterSphericalShell::type
+          use_logarithmic_map_outer_spherical_shell = false,
+      typename AdditionToOuterLayerRadialRefinementLevel::type
+          addition_to_outer_layer_radial_refinement_level = 0,
+      typename UseLogarithmicMapObjectA::type use_logarithmic_map_object_A =
+          false,
+      typename AdditionToObjectARadialRefinementLevel::type
+          addition_to_object_A_radial_refinement_level = 0,
+      typename UseLogarithmicMapObjectB::type use_logarithmic_map_object_B =
+          false,
+      typename AdditionToObjectBRadialRefinementLevel::type
+          addition_to_object_B_radial_refinement_level = 0,
       const Options::Context& context = {});
 
   BinaryCompactObject() = default;
@@ -445,10 +468,6 @@ class BinaryCompactObject : public DomainCreator<3> {
   double length_inner_cube_{};
   double length_outer_cube_{};
   size_t number_of_blocks_{};
-  std::unique_ptr<domain::creators::time_dependence::TimeDependence<3>>
-      time_dependence_;
-  std::unique_ptr<domain::BoundaryConditions::BoundaryCondition>
-      outer_boundary_condition_;
 };
 }  // namespace creators
 }  // namespace domain
