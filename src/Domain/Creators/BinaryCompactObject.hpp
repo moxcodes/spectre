@@ -5,6 +5,7 @@
 
 #include <array>
 #include <cstddef>
+#include <limits>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -13,9 +14,12 @@
 #include "Domain/CoordinateMaps/CoordinateMap.hpp"
 #include "Domain/Creators/DomainCreator.hpp"
 #include "Domain/Domain.hpp"
+#include "Options/Auto.hpp"
 #include "Options/Options.hpp"
 #include "Utilities/ErrorHandling/Assert.hpp"
+#include "Utilities/NoSuchType.hpp"
 #include "Utilities/TMPL.hpp"
+#include "Utilities/TypeTraits/CreateHasStaticMemberVariable.hpp"
 
 /// \cond
 namespace domain {
@@ -50,6 +54,19 @@ struct Logical;
 
 namespace domain {
 namespace creators {
+namespace detail {
+CREATE_HAS_STATIC_MEMBER_VARIABLE(enable_time_dependence)
+CREATE_HAS_STATIC_MEMBER_VARIABLE_V(enable_time_dependence)
+
+template <typename Metavariables>
+constexpr bool is_time_dependence_enabled(Metavariables /*meta*/) noexcept {
+  if constexpr (has_enable_time_dependence_v<Metavariables>) {
+    return Metavariables::enable_time_dependence;
+  } else {
+    return false;
+  }
+}
+}  // namespace detail
 
 /*!
  * \ingroup ComputationalDomainGroup
@@ -262,7 +279,67 @@ class BinaryCompactObject : public DomainCreator<3> {
         "Object B, beyond the refinement level set by InitialRefinement."};
   };
 
-  using options = tmpl::list<
+  // The following options are for optional time dependent maps
+  /// \brief The initial time of the functions of time.
+  struct InitialTime {
+    using type = double;
+    static constexpr Options::String help = {
+        "The initial time of the functions of time"};
+  };
+  /// \brief The initial time interval for updates of the functions of time.
+  struct InitialExpirationDeltaT {
+    using type = Options::Auto<double>;
+    static constexpr Options::String help = {
+        "The initial time interval for updates of the functions of time. If "
+        "Auto, then the functions of time do not expire, nor can they be "
+        "updated."};
+  };
+
+  struct ExpansionMap {
+    static constexpr Options::String help = {
+        "Options for a time-dependent expansion map (specifically, a "
+        "CubicScale map)"};
+  };
+
+  /// \brief The outer boundary or pivot point of the
+  /// `domain::CoordinateMaps::TimeDependent::CubicScale` map
+  struct ExpansionMapOuterBoundary {
+    using type = double;
+    static constexpr Options::String help = {
+        "Outer boundary or pivot point of the map"};
+    using group = ExpansionMap;
+  };
+  /// \brief The initial values of the expansion factors.
+  struct InitialExpansion {
+    using type = std::array<double, 2>;
+    static constexpr Options::String help = {
+        "Expansion values at initial time."};
+    using group = ExpansionMap;
+  };
+  /// \brief The velocity of the expansion factors.
+  struct InitialExpansionVelocity {
+    using type = std::array<double, 2>;
+    static constexpr Options::String help = {"The rate of expansion."};
+    using group = ExpansionMap;
+  };
+  /// \brief The acceleration of the expansion factors.
+  struct InitialExpansionAcceleration {
+    using type = std::array<double, 2>;
+    static constexpr Options::String help = {"The acceleration of expansion."};
+    using group = ExpansionMap;
+  };
+  /// \brief The names of the functions of times to be added to the added to the
+  /// DataBox.
+  ///
+  /// If the two names are same then a linear radial scaling is used instead of
+  /// a cubic scaling.
+  struct ExpansionFunctionOfTimeNames {
+    using type = std::array<std::string, 2>;
+    static constexpr Options::String help = {"Names of the functions of time."};
+    using group = ExpansionMap;
+  };
+
+  using time_independent_options = tmpl::list<
       InnerRadiusObjectA, OuterRadiusObjectA, XCoordObjectA, ExciseInteriorA,
       InnerRadiusObjectB, OuterRadiusObjectB, XCoordObjectB, ExciseInteriorB,
       RadiusOuterCube, RadiusOuterSphere, InitialRefinement, InitialGridPoints,
@@ -270,6 +347,17 @@ class BinaryCompactObject : public DomainCreator<3> {
       AdditionToOuterLayerRadialRefinementLevel, UseLogarithmicMapObjectA,
       AdditionToObjectARadialRefinementLevel, UseLogarithmicMapObjectB,
       AdditionToObjectBRadialRefinementLevel>;
+  using time_dependent_options =
+      tmpl::list<InitialTime, InitialExpirationDeltaT,
+                 ExpansionMapOuterBoundary, InitialExpansion,
+                 InitialExpansionVelocity, InitialExpansionAcceleration,
+                 ExpansionFunctionOfTimeNames>;
+
+  template <typename Metavariables>
+  using options = tmpl::conditional_t<
+      detail::is_time_dependence_enabled(Metavariables{}),
+      tmpl::append<time_dependent_options, time_independent_options>,
+      time_independent_options>;
 
   static constexpr Options::String help{
       "The BinaryCompactObject domain is a general domain for two compact "
@@ -327,6 +415,44 @@ class BinaryCompactObject : public DomainCreator<3> {
           addition_to_object_B_radial_refinement_level = 0,
       const Options::Context& context = {});
 
+  BinaryCompactObject(
+      typename InitialTime::type initial_time,
+      std::optional<double> initial_expiration_delta_t,
+      typename ExpansionMapOuterBoundary::type expansion_map_outer_boundary,
+      typename InitialExpansion::type initial_expansion,
+      typename InitialExpansionVelocity::type initial_expansion_velocity,
+      typename InitialExpansionAcceleration::type
+          initial_expansion_acceleration,
+      typename ExpansionFunctionOfTimeNames::type
+          expansion_function_of_time_names,
+      typename InnerRadiusObjectA::type inner_radius_object_A,
+      typename OuterRadiusObjectA::type outer_radius_object_A,
+      typename XCoordObjectA::type xcoord_object_A,
+      typename ExciseInteriorA::type excise_interior_A,
+      typename InnerRadiusObjectB::type inner_radius_object_B,
+      typename OuterRadiusObjectB::type outer_radius_object_B,
+      typename XCoordObjectB::type xcoord_object_B,
+      typename ExciseInteriorB::type excise_interior_B,
+      typename RadiusOuterCube::type radius_enveloping_cube,
+      typename RadiusOuterSphere::type radius_enveloping_sphere,
+      typename InitialRefinement::type initial_refinement,
+      typename InitialGridPoints::type initial_grid_points_per_dim,
+      typename UseEquiangularMap::type use_equiangular_map,
+      typename UseProjectiveMap::type use_projective_map = true,
+      typename UseLogarithmicMapOuterSphericalShell::type
+          use_logarithmic_map_outer_spherical_shell = false,
+      typename AdditionToOuterLayerRadialRefinementLevel::type
+          addition_to_outer_layer_radial_refinement_level = 0,
+      typename UseLogarithmicMapObjectA::type use_logarithmic_map_object_A =
+          false,
+      typename AdditionToObjectARadialRefinementLevel::type
+          addition_to_object_A_radial_refinement_level = 0,
+      typename UseLogarithmicMapObjectB::type use_logarithmic_map_object_B =
+          false,
+      typename AdditionToObjectBRadialRefinementLevel::type
+          addition_to_object_B_radial_refinement_level = 0,
+      const Options::Context& context = {});
+
   BinaryCompactObject() = default;
   BinaryCompactObject(const BinaryCompactObject&) = delete;
   BinaryCompactObject(BinaryCompactObject&&) noexcept = default;
@@ -346,6 +472,9 @@ class BinaryCompactObject : public DomainCreator<3> {
       std::unique_ptr<domain::FunctionsOfTime::FunctionOfTime>> override;
 
  private:
+  void check_for_parse_errors(const Options::Context& context) const;
+  void initialize_calculated_member_variables() noexcept;
+
   typename InnerRadiusObjectA::type inner_radius_object_A_{};
   typename OuterRadiusObjectA::type outer_radius_object_A_{};
   typename XCoordObjectA::type xcoord_object_A_{};
@@ -375,6 +504,16 @@ class BinaryCompactObject : public DomainCreator<3> {
   double length_inner_cube_{};
   double length_outer_cube_{};
   size_t number_of_blocks_{};
+
+  // Variables for FunctionsOfTime options
+  bool enable_time_dependence_;
+  typename InitialTime::type initial_time_;
+  std::optional<double> initial_expiration_delta_t_;
+  typename ExpansionMapOuterBoundary::type expansion_map_outer_boundary_;
+  typename InitialExpansion::type initial_expansion_;
+  typename InitialExpansionVelocity::type initial_expansion_velocity_;
+  typename InitialExpansionAcceleration::type initial_expansion_acceleration_;
+  typename ExpansionFunctionOfTimeNames::type expansion_function_of_time_names_;
 };
 }  // namespace creators
 }  // namespace domain
