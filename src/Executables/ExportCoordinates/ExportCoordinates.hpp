@@ -149,8 +149,7 @@ struct SingletonParallelComponent {
 
 struct FindGlobalMinimumGridSpacing {
   template <typename DbTagsList, typename... InboxTags, typename Metavariables,
-            size_t Dim, typename ActionList,
-            typename ParallelComponent>
+            size_t Dim, typename ActionList, typename ParallelComponent>
   static std::tuple<db::DataBox<DbTagsList>&&> apply(
       db::DataBox<DbTagsList>& box,
       const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
@@ -176,12 +175,13 @@ struct FindGlobalMinimumGridSpacing {
   }
 };
 
-template <size_t Dim>
+template <size_t Dim, bool EnableTimeDependence>
 struct Metavariables {
   static constexpr size_t volume_dim = Dim;
   static constexpr bool local_time_stepping = false;
   // A placeholder system for the domain creators
   struct system {};
+  static constexpr bool enable_time_dependence = EnableTimeDependence;
 
   using triggers = Triggers::time_triggers;
   using events = tmpl::list<>;
@@ -255,7 +255,8 @@ struct Metavariables {
 };
 
 static const std::vector<void (*)()> charm_init_node_funcs{
-    &setup_error_handling, &disable_openblas_multithreading,
+    &setup_error_handling,
+    &disable_openblas_multithreading,
     &domain::creators::register_derived_with_charm,
     &domain::creators::time_dependence::register_derived_with_charm,
     &domain::FunctionsOfTime::register_derived_with_charm,
