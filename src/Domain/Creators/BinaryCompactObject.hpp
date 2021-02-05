@@ -329,7 +329,7 @@ class BinaryCompactObject : public DomainCreator<3> {
     using group = ExpansionMap;
   };
   /// \brief The names of the functions of times to be added to the added to the
-  /// DataBox.
+  /// DataBox for the ExpansionMap.
   ///
   /// If the two names are same then a linear radial scaling is used instead of
   /// a cubic scaling.
@@ -337,6 +337,41 @@ class BinaryCompactObject : public DomainCreator<3> {
     using type = std::array<std::string, 2>;
     static constexpr Options::String help = {"Names of the functions of time."};
     using group = ExpansionMap;
+  };
+
+  struct SizeMap {
+    static constexpr Options::String help = {
+        "Options for a time-dependent size maps."};
+  };
+
+  /// \brief Initial size map A.
+  struct InitialSizeMapValues {
+    using type = std::array<double, 2>;
+    static constexpr Options::String help = {
+        "SizeMapA, SizeMapB values at initial time."};
+    using group = SizeMap;
+  };
+  /// \brief The velocity of the expansion factors.
+  struct InitialSizeMapVelocities {
+    using type = std::array<double, 2>;
+    static constexpr Options::String help = {
+        "SizeMapA, SizeMapB initial velocities."};
+    using group = SizeMap;
+  };
+  /// \brief The acceleration of the expansion factors.
+  struct InitialSizeMapAccelerations {
+    using type = std::array<double, 2>;
+    static constexpr Options::String help = {
+        "SizeMapA, SizeMapB initial accelerations."};
+    using group = SizeMap;
+  };
+  /// \brief The names of the functions of times to be added to the added to the
+  /// DataBox for the SizeMap.
+  struct SizeMapFunctionOfTimeNames {
+    using type = std::array<std::string, 2>;
+    static constexpr Options::String help = {
+        "Names of SizeMapA, SizeMapB functions of time."};
+    using group = SizeMap;
   };
 
   using time_independent_options = tmpl::list<
@@ -351,7 +386,9 @@ class BinaryCompactObject : public DomainCreator<3> {
       tmpl::list<InitialTime, InitialExpirationDeltaT,
                  ExpansionMapOuterBoundary, InitialExpansion,
                  InitialExpansionVelocity, InitialExpansionAcceleration,
-                 ExpansionFunctionOfTimeNames>;
+                 ExpansionFunctionOfTimeNames, InitialSizeMapValues,
+                 InitialSizeMapVelocities, InitialSizeMapAccelerations,
+                 SizeMapFunctionOfTimeNames>;
 
   template <typename Metavariables>
   using options = tmpl::conditional_t<
@@ -425,6 +462,10 @@ class BinaryCompactObject : public DomainCreator<3> {
           initial_expansion_acceleration,
       typename ExpansionFunctionOfTimeNames::type
           expansion_function_of_time_names,
+      typename InitialSizeMapValues::type initial_size_map_values,
+      typename InitialSizeMapVelocities::type initial_size_map_velocities,
+      typename InitialSizeMapAccelerations::type initial_size_map_accelerations,
+      typename SizeMapFunctionOfTimeNames::type size_map_function_of_time_names,
       typename InnerRadiusObjectA::type inner_radius_object_A,
       typename OuterRadiusObjectA::type outer_radius_object_A,
       typename XCoordObjectA::type xcoord_object_A,
@@ -514,6 +555,10 @@ class BinaryCompactObject : public DomainCreator<3> {
   typename InitialExpansionVelocity::type initial_expansion_velocity_;
   typename InitialExpansionAcceleration::type initial_expansion_acceleration_;
   typename ExpansionFunctionOfTimeNames::type expansion_function_of_time_names_;
+  typename InitialSizeMapValues::type initial_size_map_values_;
+  typename InitialSizeMapVelocities::type initial_size_map_velocities_;
+  typename InitialSizeMapAccelerations::type initial_size_map_accelerations_;
+  typename SizeMapFunctionOfTimeNames::type size_map_function_of_time_names_;
 };
 }  // namespace creators
 }  // namespace domain

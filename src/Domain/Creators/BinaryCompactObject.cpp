@@ -22,6 +22,8 @@
 #include "Domain/CoordinateMaps/Identity.hpp"
 #include "Domain/CoordinateMaps/ProductMaps.hpp"
 #include "Domain/CoordinateMaps/ProductMaps.tpp"
+#include "Domain/CoordinateMaps/TimeDependent/CubicScale.hpp"
+#include "Domain/CoordinateMaps/TimeDependent/SphericalCompression.hpp"
 #include "Domain/Creators/DomainCreator.hpp"  // IWYU pragma: keep
 #include "Domain/Domain.hpp"
 #include "Domain/DomainHelpers.hpp"
@@ -184,6 +186,10 @@ BinaryCompactObject::BinaryCompactObject(
     typename InitialExpansionAcceleration::type initial_expansion_acceleration,
     typename ExpansionFunctionOfTimeNames::type
         expansion_function_of_time_names,
+    typename InitialSizeMapValues::type initial_size_map_values,
+    typename InitialSizeMapVelocities::type initial_size_map_velocities,
+    typename InitialSizeMapAccelerations::type initial_size_map_accelerations,
+    typename SizeMapFunctionOfTimeNames::type size_map_function_of_time_names,
     typename InnerRadiusObjectA::type inner_radius_object_A,
     typename OuterRadiusObjectA::type outer_radius_object_A,
     typename XCoordObjectA::type xcoord_object_A,
@@ -246,7 +252,13 @@ BinaryCompactObject::BinaryCompactObject(
       initial_expansion_velocity_(initial_expansion_velocity),
       initial_expansion_acceleration_(initial_expansion_acceleration),
       expansion_function_of_time_names_(
-          std::move(expansion_function_of_time_names)) {
+          std::move(expansion_function_of_time_names)),
+      initial_size_map_values_(std::move(initial_size_map_values)),
+      initial_size_map_velocities_(std::move(initial_size_map_velocities)),
+      initial_size_map_accelerations_(
+          std::move(initial_size_map_accelerations)),
+      size_map_function_of_time_names_(
+          std::move(size_map_function_of_time_names)) {
   initialize_calculated_member_variables();
   check_for_parse_errors(context);
 }
@@ -388,19 +400,84 @@ Domain<3> BinaryCompactObject::create_domain() const noexcept {
 
   // Inject the hard-coded time-dependence
   if (enable_time_dependence_) {
+    // Note on frames: Because the relevant maps will all be composed before
+    // they are used, all maps here go from Frame::Grid (the frame after the
+    // final time-independent map is applied) to Frame::Inertial
+    // (the frame after the fianl time-dependent map is applied).
     using CubicScaleMap = domain::CoordinateMaps::TimeDependent::CubicScale<3>;
     using CubicScaleMapForComposition =
         domain::CoordinateMap<Frame::Grid, Frame::Inertial, CubicScaleMap>;
+
+    using SizeMap =
+        domain::CoordinateMaps::TimeDependent::SphericalCompression<false>;
+    using SizeMapForComposition =
+        domain::CoordinateMap<Frame::Grid, Frame::Inertial, SizeMap>;
+    using SizeAndCubicScaleMapForComposition =
+        domain::CoordinateMap<Frame::Grid, Frame::Inertial, SizeMap,
+                              CubicScaleMap>;
+
     std::vector<std::unique_ptr<
         domain::CoordinateMapBase<Frame::Grid, Frame::Inertial, 3>>>
         block_maps{number_of_blocks_};
-    block_maps[0] = std::make_unique<CubicScaleMapForComposition>(
-        CubicScaleMapForComposition{CubicScaleMap{
-            expansion_map_outer_boundary_, expansion_function_of_time_names_[0],
-            expansion_function_of_time_names_[1]}});
-    for (size_t i = 1; i < number_of_blocks_; ++i) {
-      block_maps[i] = block_maps[0]->get_clone();
+
+    // All blocks except possibly blocks 0-5 and 12-17 get the same map, so
+    // initialize the final block with the "base" map (here an expansion map).
+    block_maps[number_of_blocks_ - 1] =
+        std::make_unique<CubicScaleMapForComposition>(
+            CubicScaleMapForComposition{
+                CubicScaleMap{expansion_map_outer_boundary_,
+                              expansion_function_of_time_names_[0],
+                              expansion_function_of_time_names_[1]}});
+
+    // Initialize the first block of the layer 1 blocks for each object
+    // (specifically, initialize block 0 and block 12). If excising interior
+    // A or B, the block maps for the coresponding layer 1 blocks (blocks 0-5
+    // for object A, blocks 12-17 for object B) should also include a size map.
+    // If not excising interior A or B, the layer 1 blocks for that object
+    // will have the same map as the final block.
+    if (excise_interior_A_) {
+      block_maps[0] = std::make_unique<SizeAndCubicScaleMapForComposition>(
+          domain::push_back(
+              SizeMapForComposition{SizeMap{size_map_function_of_time_names_[0],
+                                            inner_radius_object_A_,
+                                            outer_radius_object_A_,
+                                            {{xcoord_object_A_, 0.0, 0.0}}}},
+              CubicScaleMapForComposition{
+                  CubicScaleMap{expansion_map_outer_boundary_,
+                                expansion_function_of_time_names_[0],
+                                expansion_function_of_time_names_[1]}}));
+    } else {
+      block_maps[0] = block_maps[number_of_blocks_ - 1]->get_clone();
     }
+    if (excise_interior_B_) {
+      block_maps[12] = std::make_unique<SizeAndCubicScaleMapForComposition>(
+          domain::push_back(
+              SizeMapForComposition{SizeMap{size_map_function_of_time_names_[1],
+                                            inner_radius_object_B_,
+                                            outer_radius_object_B_,
+                                            {{xcoord_object_B_, 0.0, 0.0}}}},
+              CubicScaleMapForComposition{
+                  CubicScaleMap{expansion_map_outer_boundary_,
+                                expansion_function_of_time_names_[0],
+                                expansion_function_of_time_names_[1]}}));
+    } else {
+      block_maps[12] = block_maps[number_of_blocks_ - 1]->get_clone();
+    }
+
+    // Fill in the rest of the block maps by cloning the relevant maps
+    for (size_t block = 1; block < number_of_blocks_ - 1; ++block) {
+      if (block < 6) {
+        block_maps[block] = block_maps[0]->get_clone();
+      } else if (block == 12) {
+        continue;  // block 12 already initialized
+      } else if (block > 12 and block < 18) {
+        block_maps[block] = block_maps[12]->get_clone();
+      } else {
+        block_maps[block] = block_maps[number_of_blocks_ - 1]->get_clone();
+      }
+    }
+
+    // Finally, inject the time dependent maps into the corresponding blocks
     for (size_t block = 0; block < number_of_blocks_; ++block) {
       domain.inject_time_dependent_map_for_block(block,
                                                  std::move(block_maps[block]));
@@ -474,6 +551,25 @@ BinaryCompactObject::functions_of_time() const noexcept {
       initial_expiration_delta_t_ ? initial_time_ + *initial_expiration_delta_t_
                                   : std::numeric_limits<double>::max();
 
+  // SizeMap FunctionsOfTime
+  result[size_map_function_of_time_names_[0]] =
+      std::make_unique<FunctionsOfTime::PiecewisePolynomial<3>>(
+          initial_time_,
+          std::array<DataVector, 4>{{{initial_size_map_values_[0]},
+                                     {initial_size_map_velocities_[0]},
+                                     {initial_size_map_accelerations_[0]},
+                                     {0.0}}},
+          initial_expiration_time);
+  result[size_map_function_of_time_names_[1]] =
+      std::make_unique<FunctionsOfTime::PiecewisePolynomial<3>>(
+          initial_time_,
+          std::array<DataVector, 4>{{{initial_size_map_values_[1]},
+                                     {initial_size_map_velocities_[1]},
+                                     {initial_size_map_accelerations_[1]},
+                                     {0.0}}},
+          initial_expiration_time);
+
+  // ExpansionMap FunctionsOfTime
   // Use a 3rd deriv function of time so that it can be used with a control
   // system.
   result[expansion_function_of_time_names_[0]] =
