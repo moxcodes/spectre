@@ -36,6 +36,12 @@ class Wedge3D;
 template <size_t VolumeDim>
 class DiscreteRotation;
 class Frustum;
+namespace TimeDependent {
+template <bool InteriorMap>
+class SphericalCompression;
+template <size_t VolumeDim>
+class CubicScale;
+}  // namespace TimeDependent
 }  // namespace CoordinateMaps
 
 template <typename SourceFrame, typename TargetFrame, typename... Maps>
@@ -136,11 +142,11 @@ class BinaryCompactObject : public DomainCreator<3> {
                             CoordinateMaps::ProductOf3Maps<
                                 CoordinateMaps::Affine, CoordinateMaps::Affine,
                                 CoordinateMaps::Affine>>,
-      domain::CoordinateMap<Frame::Logical, Frame::Inertial,
-                            CoordinateMaps::ProductOf3Maps<
-                                CoordinateMaps::Equiangular,
-                                CoordinateMaps::Equiangular,
-                                CoordinateMaps::Equiangular>>,
+      domain::CoordinateMap<
+          Frame::Logical, Frame::Inertial,
+          CoordinateMaps::ProductOf3Maps<CoordinateMaps::Equiangular,
+                                         CoordinateMaps::Equiangular,
+                                         CoordinateMaps::Equiangular>>,
       domain::CoordinateMap<
           Frame::Logical, Frame::Inertial,
           CoordinateMaps::ProductOf3Maps<CoordinateMaps::Equiangular,
@@ -151,7 +157,14 @@ class BinaryCompactObject : public DomainCreator<3> {
       domain::CoordinateMap<Frame::Logical, Frame::Inertial,
                             CoordinateMaps::Frustum>,
       domain::CoordinateMap<Frame::Logical, Frame::Inertial,
-                            CoordinateMaps::Wedge3D>>;
+                            CoordinateMaps::Wedge3D>,
+      domain::CoordinateMap<
+          Frame::Grid, Frame::Inertial,
+          domain::CoordinateMaps::TimeDependent::CubicScale<3>>,
+      domain::CoordinateMap<
+          Frame::Grid, Frame::Inertial,
+          domain::CoordinateMaps::TimeDependent::SphericalCompression<false>,
+          domain::CoordinateMaps::TimeDependent::CubicScale<3>>>;
 
   struct InnerRadiusObjectA {
     using type = double;
