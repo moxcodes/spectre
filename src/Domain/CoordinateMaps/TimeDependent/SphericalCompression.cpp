@@ -116,31 +116,25 @@ void jacobian_component(gsl::not_null<ResultType<T>*> input,
 template <bool InteriorMap, typename T>
 void check_source_radius(const T& radius, const double min_radius,
                          const double max_radius) {
-  auto radius_in_expected_range = [](const T& source_radius,
-                                     const double min_rad,
-                                     const double max_rad) {
-    if constexpr (std::is_floating_point<ResultType<T>>::value) {
-      if constexpr (InteriorMap) {
-        return source_radius <=
-               min_rad + std::numeric_limits<double>::epsilon();
-      } else {
-        return source_radius >=
-                   min_rad - std::numeric_limits<double>::epsilon() and
-               source_radius <=
-                   max_rad + std::numeric_limits<double>::epsilon();
-      }
-    } else {
-      if constexpr (InteriorMap) {
-        return max(source_radius) <=
-               min_rad + std::numeric_limits<double>::epsilon();
-      } else {
-        return min(source_radius) >=
-                   min_rad - std::numeric_limits<double>::epsilon() and
-               max(source_radius) <=
-                   max_rad + std::numeric_limits<double>::epsilon();
-      }
-    }
-  };
+  auto radius_in_expected_range =
+      [](const T& source_radius, const double min_rad, const double max_rad) {
+        constexpr double eps = 100 * std::numeric_limits<double>::epsilon();
+        if constexpr (std::is_floating_point<ResultType<T>>::value) {
+          if constexpr (InteriorMap) {
+            return source_radius <= min_rad + eps;
+          } else {
+            return source_radius >= min_rad - eps and
+                   source_radius <= max_rad + eps;
+          }
+        } else {
+          if constexpr (InteriorMap) {
+            return max(source_radius) <= min_rad + eps;
+          } else {
+            return min(source_radius) >= min_rad - eps and
+                   max(source_radius) <= max_rad + eps;
+          }
+        }
+      };
   if (!radius_in_expected_range(radius, min_radius, max_radius)) {
     ERROR("Source radius " << std::setprecision(20) << radius
                            << " not in expected range. min_radius == "
