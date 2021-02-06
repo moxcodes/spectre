@@ -240,7 +240,8 @@ std::array<ResultType<T>, 3> SphericalCompression<InteriorMap>::frame_velocity(
       radial_position(source_coords, center_)};
   const ResultType<T> source_radius{magnitude(source_rad_position)};
   check_source_radius<InteriorMap>(source_radius, min_radius_, max_radius_);
-  std::array<ResultType<T>, 3> result{};
+  auto result =
+      make_with_value<std::array<ResultType<T>, 3>>(source_radius, 0.0);
   for (size_t i = 0; i < 3; ++i) {
     gsl::at(result, i) = 0.0;
     correct_mapped_coordinate_or_frame_velocity<InteriorMap>(
