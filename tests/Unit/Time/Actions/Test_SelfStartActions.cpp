@@ -131,7 +131,7 @@ struct Component {
       db::add_tag_prefix<Tags::dt,
                          typename metavariables::system::variables_tag>,
       history_tag, Tags::TimeStepId, Tags::Next<Tags::TimeStepId>,
-      Tags::TimeStep, Tags::Time>>;
+      Tags::TimeStep, Tags::Next<Tags::TimeStep>, Tags::Time>>;
   using compute_tags = db::AddComputeTags<Tags::SubstepTimeCompute>;
 
   static constexpr bool has_primitives = Metavariables::has_primitives;
@@ -166,23 +166,24 @@ template <bool HasPrimitives = false>
 void emplace_component_and_initialize(
     const gsl::not_null<MockRuntimeSystem<HasPrimitives>*> runner,
     const bool forward_in_time, const Time& initial_time,
-    const TimeDelta& initial_time_step, const size_t order,
-    const double initial_value) noexcept {
+    const TimeDelta& initial_time_step, const TimeDelta& initial_next_time_step,
+    const size_t order, const double initial_value) noexcept {
   ActionTesting::emplace_component_and_initialize<
       Component<Metavariables<HasPrimitives>>>(
       runner, 0,
       {initial_value, 0., typename history_tag::type{}, TimeStepId{},
        TimeStepId(forward_in_time, 1 - static_cast<int64_t>(order),
                   initial_time),
-       initial_time_step, std::numeric_limits<double>::signaling_NaN()});
+       initial_time_step, initial_next_time_step,
+       std::numeric_limits<double>::signaling_NaN()});
 }
 
 template <>
 void emplace_component_and_initialize<true>(
     const gsl::not_null<MockRuntimeSystem<true>*> runner,
     const bool forward_in_time, const Time& initial_time,
-    const TimeDelta& initial_time_step, const size_t order,
-    const double initial_value) noexcept {
+    const TimeDelta& initial_time_step, const TimeDelta& initial_next_time_step,
+    const size_t order, const double initial_value) noexcept {
   ActionTesting::emplace_component_and_initialize<
       Component<Metavariables<true>>>(
       runner, 0,
@@ -190,7 +191,8 @@ void emplace_component_and_initialize<true>(
        TimeStepId{},
        TimeStepId(forward_in_time, 1 - static_cast<int64_t>(order),
                   initial_time),
-       initial_time_step, std::numeric_limits<double>::signaling_NaN()});
+       initial_time_step, initial_next_time_step,
+       std::numeric_limits<double>::signaling_NaN()});
 }
 
 using not_self_start_action = std::negation<std::disjunction<
@@ -245,8 +247,8 @@ void test_actions(const size_t order, const int step_denominator) noexcept {
   MockRuntimeSystem<> runner{
       {std::make_unique<TimeSteppers::AdamsBashforthN>(order)}};
   emplace_component_and_initialize(make_not_null(&runner), forward_in_time,
-                                   initial_time, initial_time_step, order,
-                                   initial_value);
+                                   initial_time, initial_time_step,
+                                   initial_time_step, order, initial_value);
   ActionTesting::next_action<Component<Metavariables<>>>(make_not_null(&runner),
                                                          0);
 
@@ -373,7 +375,7 @@ double error_in_step(const size_t order, const double step) noexcept {
       {std::make_unique<TimeSteppers::AdamsBashforthN>(order)}};
   emplace_component_and_initialize<TestPrimitives>(
       make_not_null(&runner), forward_in_time, initial_time, initial_time_step,
-      order, initial_value);
+      initial_time_step, order, initial_value);
   ActionTesting::next_action<Component<Metavariables<TestPrimitives>>>(
       make_not_null(&runner), 0);
 

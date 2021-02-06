@@ -54,8 +54,8 @@ void change_step_size(
   const auto& current_step = db::get<Tags::TimeStep>(*box);
 
   const double last_step_size =
-      history.size() > 0 ? abs(time_id.step_time() -
-                               (history.end() - 1).time_step_id().step_time())
+      history.size() > 1 ? abs(time_id.step_time() -
+                               (history.end() - 2).time_step_id().step_time())
                                .value()
                          : std::numeric_limits<double>::infinity();
 
@@ -72,17 +72,12 @@ void change_step_size(
     desired_step = -desired_step;
   }
 
-  const auto new_step =
-      step_controller.choose_step(time_id.step_time(), desired_step);
+  const auto new_step = step_controller.choose_step(
+      db::get<Tags::Next<Tags::TimeStepId>>(*box).step_time(), desired_step);
   if (new_step != current_step) {
-    const auto new_next_time_id = time_stepper.next_time_id(time_id, new_step);
-
-    db::mutate<Tags::Next<Tags::TimeStepId>, Tags::TimeStep>(
-        box, [&new_next_time_id, &new_step](
-                 const gsl::not_null<TimeStepId*> next_time_id,
-                 const gsl::not_null<TimeDelta*> time_step) noexcept {
-          *next_time_id = new_next_time_id;
-          *time_step = new_step;
+    db::mutate<Tags::Next<Tags::TimeStep>>(
+        box, [&new_step](const gsl::not_null<TimeDelta*> next_step) noexcept {
+          *next_step = new_step;
         });
   }
 }

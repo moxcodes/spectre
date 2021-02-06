@@ -140,7 +140,6 @@ void check_substep_properties(const TimeStepper& stepper) noexcept {
   id = stepper.next_time_id(id, slab.duration() / 2);
   if (id.substep() != 0) {
     history.insert(id, 0.0, 0.0);
-    CHECK(not stepper.can_change_step_size(id, history));
   }
 }
 

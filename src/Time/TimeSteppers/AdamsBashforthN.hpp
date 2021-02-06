@@ -270,7 +270,8 @@ class AdamsBashforthN : public LtsTimeStepper::Inherit {
   template <typename Vars, typename DerivVars>
   bool can_change_step_size(
       const TimeStepId& time_id,
-      const TimeSteppers::History<Vars, DerivVars>& history) const noexcept;
+      const TimeSteppers::History<Vars, DerivVars>& history,
+      const bool using_error_measure = false) const noexcept;
 
   WRAPPED_PUPable_decl_template(AdamsBashforthN);  // NOLINT
 
@@ -765,15 +766,17 @@ AdamsBashforthN::boundary_impl(
 template <typename Vars, typename DerivVars>
 bool AdamsBashforthN::can_change_step_size(
     const TimeStepId& time_id,
-    const TimeSteppers::History<Vars, DerivVars>& history) const noexcept {
+    const TimeSteppers::History<Vars, DerivVars>& history,
+    const bool /*using_error_measure*/) const noexcept {
   // We need to forbid local time-stepping before initialization is
   // complete.  The self-start procedure itself should never consider
   // changing the step size, but we need to wait during the main
   // evolution until the self-start history has been replaced with
   // "real" values.
   const evolution_less<Time> less{time_id.time_runs_forward()};
+  const evolution_less_equal<Time> less_equal{time_id.time_runs_forward()};
   return history.size() == 0 or
-         (less(history.back(), time_id.step_time()) and
+         (less_equal(history.back(), time_id.step_time()) and
           std::is_sorted(history.begin(), history.end(), less));
 }
 

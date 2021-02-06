@@ -183,8 +183,9 @@ struct Initialize {
   };
 
  public:
-  using simple_tags = typename StoreInitialValues<tmpl::push_back<
-      detail::vars_to_save<System>, ::Tags::TimeStep>>::simple_tags;
+  using simple_tags = typename StoreInitialValues<
+      tmpl::push_back<detail::vars_to_save<System>, ::Tags::TimeStep,
+                      ::Tags::Next<::Tags::TimeStep>>>::simple_tags;
 
   template <typename DbTags, typename... InboxTags, typename Metavariables,
             typename ArrayIndex, typename ActionList,
@@ -212,14 +213,16 @@ struct Initialize {
       self_start_step /= (values_needed + 1);
     }
 
-    StoreInitialValues<tmpl::push_back<detail::vars_to_save<System>,
-                                       ::Tags::TimeStep>>::apply(box);
-
-    db::mutate<::Tags::TimeStep>(
+    StoreInitialValues<
+        tmpl::push_back<detail::vars_to_save<System>, ::Tags::TimeStep,
+                        ::Tags::Next<::Tags::TimeStep>>>::apply(box);
+    db::mutate<::Tags::TimeStep, ::Tags::Next<::Tags::TimeStep>>(
         make_not_null(&box),
         [&self_start_step](
-            const gsl::not_null<::TimeDelta*> time_step) noexcept {
+            const gsl::not_null<::TimeDelta*> time_step,
+            const gsl::not_null<::TimeDelta*> next_time_step) noexcept {
           *time_step = self_start_step;
+          *next_time_step = self_start_step;
         });
 
     return std::make_tuple(std::move(box));
@@ -413,13 +416,17 @@ struct Cleanup {
                     const ParallelComponent* const /*meta*/) noexcept {
     // Reset the time step to the value requested by the user.  The
     // variables were reset in StartNextOrderIfReady.
-    db::mutate<::Tags::TimeStep>(
+    db::mutate<::Tags::TimeStep, ::Tags::Next<::Tags::TimeStep>>(
         make_not_null(&box),
         [](const gsl::not_null<::TimeDelta*> time_step,
-           const std::tuple<::TimeDelta>& initial_step) noexcept {
+           const gsl::not_null<::TimeDelta*> next_time_step,
+           const std::tuple<::TimeDelta>& initial_step,
+           const std::tuple<::TimeDelta>& initial_next_step) noexcept {
           *time_step = get<0>(initial_step);
+          *next_time_step = get<0>(initial_next_step);
         },
-        db::get<initial_step_tag>(box));
+        db::get<initial_step_tag>(box),
+        db::get<Tags::InitialValue<::Tags::Next<::Tags::TimeStep>>>(box));
     using remove_tags = tmpl::filter<DbTags, is_a_initial_value<tmpl::_1>>;
     // reset each tag to default constructed values to reduce memory usage (Data
     // structures like `DataVector`s and `Tensor`s have negligible memory usage
