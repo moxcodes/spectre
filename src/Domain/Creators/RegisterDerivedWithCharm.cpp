@@ -16,6 +16,8 @@
 #include "Domain/CoordinateMaps/Identity.hpp"
 #include "Domain/CoordinateMaps/ProductMaps.hpp"
 #include "Domain/CoordinateMaps/ProductMaps.tpp"
+#include "Domain/CoordinateMaps/TimeDependent/CubicScale.hpp"
+#include "Domain/CoordinateMaps/TimeDependent/SphericalCompression.hpp"
 #include "Domain/CoordinateMaps/Wedge2D.hpp"
 #include "Domain/CoordinateMaps/Wedge3D.hpp"
 #include "Domain/Creators/AlignedLattice.hpp"
