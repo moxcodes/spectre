@@ -403,7 +403,7 @@ Domain<3> BinaryCompactObject::create_domain() const noexcept {
     // Note on frames: Because the relevant maps will all be composed before
     // they are used, all maps here go from Frame::Grid (the frame after the
     // final time-independent map is applied) to Frame::Inertial
-    // (the frame after the fianl time-dependent map is applied).
+    // (the frame after the final time-dependent map is applied).
     using CubicScaleMap = domain::CoordinateMaps::TimeDependent::CubicScale<3>;
     using CubicScaleMapForComposition =
         domain::CoordinateMap<Frame::Grid, Frame::Inertial, CubicScaleMap>;
