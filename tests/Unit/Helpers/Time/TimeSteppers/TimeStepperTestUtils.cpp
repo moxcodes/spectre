@@ -71,31 +71,6 @@ void take_step_and_check_error(
   *time = time_id.substep_time();
 }
 
-template <typename F1, typename F2>
-void initialize_history(
-    Time time,
-    const gsl::not_null<TimeSteppers::History<double, double>*> history,
-    F1&& analytic,
-    F2&& rhs,
-    TimeDelta step_size,
-    const size_t number_of_past_steps) noexcept {
-  int64_t slab_number = -1;
-  for (size_t j = 0; j < number_of_past_steps; ++j) {
-    ASSERT(time.slab() == step_size.slab(), "Slab mismatch");
-    if ((step_size.is_positive() and time.is_at_slab_start()) or
-        (not step_size.is_positive() and time.is_at_slab_end())) {
-      const Slab new_slab = time.slab().advance_towards(-step_size);
-      time = time.with_slab(new_slab);
-      step_size = step_size.with_slab(new_slab);
-      --slab_number;
-    }
-    time -= step_size;
-    history->insert_initial(
-        TimeStepId(step_size.is_positive(), slab_number, time),
-        analytic(time.value()), rhs(analytic(time.value()), time.value()));
-  }
-}
-
 template <typename F>
 double convergence_rate(const int32_t large_steps, const int32_t small_steps,
                         F&& error) noexcept {
@@ -164,7 +139,7 @@ void integrate_test(const TimeStepper& stepper,
   double y = analytic(time.value());
   TimeSteppers::History<double, double> history;
 
-  initialize_history(time, &history, analytic, rhs, step_size,
+  initialize_history(time, make_not_null(&history), analytic, rhs, step_size,
                      number_of_past_steps);
 
   for (uint64_t i = 0; i < num_steps; ++i) {
@@ -198,11 +173,11 @@ void integrate_test_explicit_time_dependence(const TimeStepper& stepper,
   double y = analytic(time.value());
   TimeSteppers::History<double, double> history;
 
-  initialize_history(time, &history, analytic, rhs, step_size,
+  initialize_history(time, make_not_null(&history), analytic, rhs, step_size,
                      number_of_past_steps);
 
   for (uint64_t i = 0; i < num_steps; ++i) {
-    take_step(&time, &y, &history, stepper, rhs, step_size);
+    take_step(&time, &y, make_not_null(&history), stepper, rhs, step_size);
     // This check needs a looser tolerance for lower-order time steppers.
     CHECK(y == approx(analytic(time.value())).epsilon(epsilon));
   }
@@ -280,16 +255,17 @@ void integrate_variable_test(const TimeStepper& stepper,
   Time time = slab.end();
   double y = analytic(time.value());
 
-  TimeSteppers::History<double, double> history;
-  initialize_history(time, &history, analytic, rhs, slab.duration(),
-                     number_of_past_steps);
+  TimeSteppers::History<double, double> history{order};
+  initialize_history(time, make_not_null(&history), analytic, rhs,
+                     slab.duration(), number_of_past_steps);
 
   for (uint64_t i = 0; i < num_steps; ++i) {
     slab = slab.advance().with_duration_from_start(
         (1. + 0.5 * sin(i)) * average_step);
     time = time.with_slab(slab);
 
-    take_step(&time, &y, &history, stepper, rhs, slab.duration());
+    take_step(&time, &y, make_not_null(&history), stepper, rhs,
+              slab.duration());
     // This check needs a looser tolerance for lower-order time steppers.
     CHECK(y == approx(analytic(time.value())).epsilon(epsilon));
   }
@@ -315,11 +291,12 @@ void stability_test(const TimeStepper& stepper) noexcept {
       return -2. * v;
     };
     initialize_history(
-        time, &history, [](const double t) noexcept { return exp(-2. * t); },
-        rhs, step_size, stepper.number_of_past_steps());
+        time, make_not_null(&history),
+        [](const double t) noexcept { return exp(-2. * t); }, rhs, step_size,
+        stepper.number_of_past_steps());
 
     for (uint64_t i = 0; i < num_steps; ++i) {
-      take_step(&time, &y, &history, stepper, rhs, step_size);
+      take_step(&time, &y, make_not_null(&history), stepper, rhs, step_size);
       CHECK(std::abs(y) < 10.);
     }
   }
@@ -337,11 +314,12 @@ void stability_test(const TimeStepper& stepper) noexcept {
       return -2. * v;
     };
     initialize_history(
-        time, &history, [](const double t) noexcept { return exp(-2. * t); },
-        rhs, step_size, stepper.number_of_past_steps());
+        time, make_not_null(&history),
+        [](const double t) noexcept { return exp(-2. * t); }, rhs, step_size,
+        stepper.number_of_past_steps());
 
     for (uint64_t i = 0; i < num_steps; ++i) {
-      take_step(&time, &y, &history, stepper, rhs, step_size);
+      take_step(&time, &y, make_not_null(&history), stepper, rhs, step_size);
       if (std::abs(y) > 10.) {
         return;
       }
@@ -437,8 +415,9 @@ void check_convergence_order(const TimeStepper& stepper,
       return v;
     };
     initialize_history(
-        time, &history, [](const double t) noexcept { return exp(t); }, rhs,
-        step_size, stepper.number_of_past_steps());
+        time, make_not_null(&history),
+        [](const double t) noexcept { return exp(t); }, rhs, step_size,
+        stepper.number_of_past_steps());
     while (time < slab.end()) {
       take_step(&time, &y, &history, stepper, rhs, step_size);
     }
@@ -462,7 +441,7 @@ void check_dense_output(const TimeStepper& stepper,
     double y = 1.;
     TimeSteppers::History<double, double> history;
     initialize_history(
-        time_id.substep_time(), &history,
+        time_id.substep_time(), make_not_null(&history),
         [](const double t) noexcept { return exp(t); },
         [](const double v, const double /*t*/) noexcept { return v; },
         step_size, stepper.number_of_past_steps());
@@ -494,8 +473,9 @@ void check_dense_output(const TimeStepper& stepper,
         return v;
       };
       initialize_history(
-          time, &history, [](const double t) noexcept { return exp(t); }, rhs,
-          time_step, stepper.number_of_past_steps());
+          time, make_not_null(&history),
+          [](const double t) noexcept { return exp(t); }, rhs, time_step,
+          stepper.number_of_past_steps());
       take_step(&time, &y, &history, stepper, rhs, time_step);
 
       // Some time steppers special-case the endpoints of the
