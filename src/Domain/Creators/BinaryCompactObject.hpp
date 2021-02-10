@@ -335,12 +335,6 @@ class BinaryCompactObject : public DomainCreator<3> {
     static constexpr Options::String help = {"The rate of expansion."};
     using group = ExpansionMap;
   };
-  /// \brief The acceleration of the expansion factors.
-  struct InitialExpansionAcceleration {
-    using type = std::array<double, 2>;
-    static constexpr Options::String help = {"The acceleration of expansion."};
-    using group = ExpansionMap;
-  };
   /// \brief The names of the functions of times to be added to the added to the
   /// DataBox for the ExpansionMap.
   ///
@@ -398,10 +392,9 @@ class BinaryCompactObject : public DomainCreator<3> {
   using time_dependent_options =
       tmpl::list<InitialTime, InitialExpirationDeltaT,
                  ExpansionMapOuterBoundary, InitialExpansion,
-                 InitialExpansionVelocity, InitialExpansionAcceleration,
-                 ExpansionFunctionOfTimeNames, InitialSizeMapValues,
-                 InitialSizeMapVelocities, InitialSizeMapAccelerations,
-                 SizeMapFunctionOfTimeNames>;
+                 InitialExpansionVelocity, ExpansionFunctionOfTimeNames,
+                 InitialSizeMapValues, InitialSizeMapVelocities,
+                 InitialSizeMapAccelerations, SizeMapFunctionOfTimeNames>;
 
   template <typename Metavariables>
   using options = tmpl::conditional_t<
@@ -471,8 +464,6 @@ class BinaryCompactObject : public DomainCreator<3> {
       typename ExpansionMapOuterBoundary::type expansion_map_outer_boundary,
       typename InitialExpansion::type initial_expansion,
       typename InitialExpansionVelocity::type initial_expansion_velocity,
-      typename InitialExpansionAcceleration::type
-          initial_expansion_acceleration,
       typename ExpansionFunctionOfTimeNames::type
           expansion_function_of_time_names,
       typename InitialSizeMapValues::type initial_size_map_values,
@@ -566,7 +557,6 @@ class BinaryCompactObject : public DomainCreator<3> {
   typename ExpansionMapOuterBoundary::type expansion_map_outer_boundary_;
   typename InitialExpansion::type initial_expansion_;
   typename InitialExpansionVelocity::type initial_expansion_velocity_;
-  typename InitialExpansionAcceleration::type initial_expansion_acceleration_;
   typename ExpansionFunctionOfTimeNames::type expansion_function_of_time_names_;
   typename InitialSizeMapValues::type initial_size_map_values_;
   typename InitialSizeMapVelocities::type initial_size_map_velocities_;

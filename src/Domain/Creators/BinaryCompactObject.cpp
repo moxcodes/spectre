@@ -171,7 +171,6 @@ BinaryCompactObject::BinaryCompactObject(
           std::numeric_limits<double>::signaling_NaN()),
       initial_expansion_({}),
       initial_expansion_velocity_({}),
-      initial_expansion_acceleration_({}),
       expansion_function_of_time_names_({}) {
   initialize_calculated_member_variables();
   check_for_parse_errors(context);
@@ -183,7 +182,6 @@ BinaryCompactObject::BinaryCompactObject(
     typename ExpansionMapOuterBoundary::type expansion_map_outer_boundary,
     typename InitialExpansion::type initial_expansion,
     typename InitialExpansionVelocity::type initial_expansion_velocity,
-    typename InitialExpansionAcceleration::type initial_expansion_acceleration,
     typename ExpansionFunctionOfTimeNames::type
         expansion_function_of_time_names,
     typename InitialSizeMapValues::type initial_size_map_values,
@@ -250,7 +248,6 @@ BinaryCompactObject::BinaryCompactObject(
       expansion_map_outer_boundary_(expansion_map_outer_boundary),
       initial_expansion_(initial_expansion),
       initial_expansion_velocity_(initial_expansion_velocity),
-      initial_expansion_acceleration_(initial_expansion_acceleration),
       expansion_function_of_time_names_(
           std::move(expansion_function_of_time_names)),
       initial_size_map_values_(std::move(initial_size_map_values)),
@@ -573,19 +570,17 @@ BinaryCompactObject::functions_of_time() const noexcept {
   // Use a 3rd deriv function of time so that it can be used with a control
   // system.
   result[expansion_function_of_time_names_[0]] =
-      std::make_unique<FunctionsOfTime::PiecewisePolynomial<3>>(
+      std::make_unique<FunctionsOfTime::PiecewisePolynomial<2>>(
           initial_time_,
-          std::array<DataVector, 4>{{{initial_expansion_[0]},
+          std::array<DataVector, 3>{{{initial_expansion_[0]},
                                      {initial_expansion_velocity_[0]},
-                                     {initial_expansion_acceleration_[0]},
                                      {0.0}}},
           initial_expiration_time);
   result[expansion_function_of_time_names_[1]] =
-      std::make_unique<FunctionsOfTime::PiecewisePolynomial<3>>(
+      std::make_unique<FunctionsOfTime::PiecewisePolynomial<2>>(
           initial_time_,
-          std::array<DataVector, 4>{{{initial_expansion_[1]},
+          std::array<DataVector, 3>{{{initial_expansion_[1]},
                                      {initial_expansion_velocity_[1]},
-                                     {initial_expansion_acceleration_[1]},
                                      {0.0}}},
           initial_expiration_time);
   return result;
