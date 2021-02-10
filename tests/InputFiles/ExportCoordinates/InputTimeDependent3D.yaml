@@ -33,7 +33,6 @@ DomainCreator:
     ExpansionMap:
       InitialExpansion: [1.0, 1.0]
       InitialExpansionVelocity: [-0.1, 0.0]
-      InitialExpansionAcceleration: [0.00, 0.0]
       ExpansionMapOuterBoundary: 599.999963185763
       ExpansionFunctionOfTimeNames: ["ExpansionFactor", "Unity"]
     SizeMap:
