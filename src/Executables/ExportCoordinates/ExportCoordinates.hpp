@@ -182,6 +182,7 @@ struct Metavariables {
   // A placeholder system for the domain creators
   struct system {};
   static constexpr bool enable_time_dependence = EnableTimeDependence;
+  static constexpr bool override_cubic_functions_of_time = true;
 
   using triggers = Triggers::time_triggers;
   using events = tmpl::list<>;
@@ -209,7 +210,8 @@ struct Metavariables {
                   tmpl::list<
                       Actions::SetupDataBox,
                       Initialization::Actions::TimeAndTimeStep<Metavariables>,
-                      evolution::dg::Initialization::Domain<Dim>,
+                      evolution::dg::Initialization::Domain<
+                          Dim, override_cubic_functions_of_time>,
                       Initialization::Actions::AddComputeTags<
                           domain::Tags::MinimumGridSpacingCompute<
                               Dim, Frame::Inertial>>,
