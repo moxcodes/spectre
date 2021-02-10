@@ -55,7 +55,7 @@ namespace domain::Tags {
 /// metavariables, after obtaining the FunctionsOfTime from the DomainCreator,
 /// one or more of those FunctionsOfTime (which must be cubic piecewise
 /// polynomials) is overriden using data read from an HDF5 file via
-/// domain::Tags::read_spec_third_order_piecewise_polynomial()
+/// domain::Tags::read_spec_nth_order_piecewise_polynomial()
 struct FunctionsOfTime : db::SimpleTag {
   using type = std::unordered_map<
       std::string, std::unique_ptr<domain::FunctionsOfTime::FunctionOfTime>>;
@@ -83,7 +83,7 @@ struct FunctionsOfTime : db::SimpleTag {
       std::unordered_map<
           std::string, domain::FunctionsOfTime::PiecewisePolynomial<max_deriv>>
           spec_functions_of_time{};
-      domain::FunctionsOfTime::read_spec_third_order_piecewise_polynomial(
+      domain::FunctionsOfTime::read_spec_nth_order_piecewise_polynomial(
           make_not_null(&spec_functions_of_time), *function_of_time_file,
           *function_of_time_name_map);
 
