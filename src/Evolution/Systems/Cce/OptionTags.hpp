@@ -388,14 +388,11 @@ struct SpecifiedStartTime : Tags::StartTime, db::SimpleTag {
   static constexpr bool pass_metavariables = false;
   static double create_from_options(
       const std::optional<double> start_time) noexcept {
-<<<<<<< HEAD
     if (not start_time.has_value()) {
       ERROR(
           "The start time must be explicitly specified for the tag "
           "`SpecifiedStartTime`");
     }
-=======
->>>>>>> jordan/cce_gh_exe_and_bjorhus_bc
     return *start_time;
   }
 };
