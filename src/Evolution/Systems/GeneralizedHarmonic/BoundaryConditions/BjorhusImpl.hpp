@@ -13,7 +13,6 @@
 #include "DataStructures/Tensor/Tensor.hpp"
 #include "DataStructures/Tensor/TypeAliases.hpp"
 #include "Domain/Tags.hpp"
-#include "Utilities/ErrorHandling/Assert.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/BoundaryConditions/BjorhusHelpers.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/BoundaryConditions/BjorhusInternals.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/BoundaryConditions/BoundaryConditions.hpp"
@@ -24,6 +23,7 @@
 #include "PointwiseFunctions/GeneralRelativity/IndexManipulation.hpp"
 #include "PointwiseFunctions/GeneralRelativity/Tags.hpp"
 #include "Utilities/ContainerHelpers.hpp"
+#include "Utilities/ErrorHandling/Assert.hpp"
 #include "Utilities/Gsl.hpp"
 #include "Utilities/TMPL.hpp"
 #include "Utilities/TypeTraits.hpp"
@@ -737,8 +737,7 @@ ReturnType set_dt_v_minus<ReturnType, VolumeDim>::
         }
       }
       return tmp_metric;
-    }
-    ();
+    }();
     GeneralizedHarmonic::spatial_projection_tensor(
         make_not_null(&spatial_projection_ij), spatial_metric,
         unit_interface_normal_one_form);
