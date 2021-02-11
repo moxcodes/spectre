@@ -106,9 +106,8 @@ struct FormatTimeOutput
  * All values are reported as positive numbers, even for backwards
  * evolutions.
  */
-template <typename System,
-          typename EventRegistrars =
-              tmpl::list<Registrars::ObserveTimeStep<System>>>
+template <typename System, typename EventRegistrars =
+                               tmpl::list<Registrars::ObserveTimeStep<System>>>
 class ObserveTimeStep : public Event<EventRegistrars> {
  private:
   using ReductionData = Events::detail::ObserveTimeStepReductionData;
@@ -162,8 +161,7 @@ class ObserveTimeStep : public Event<EventRegistrars> {
   // We obtain the grid size from the variables, rather than the mesh,
   // so that this observer is not DG-specific.
   using argument_tags =
-      tmpl::list<Tags::Time, Tags::TimeStep,
-                 typename System::variables_tag>;
+      tmpl::list<Tags::Time, Tags::TimeStep, typename System::variables_tag>;
 
   template <typename Metavariables, typename ArrayIndex,
             typename ParallelComponent>
