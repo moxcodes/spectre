@@ -19,6 +19,8 @@
 #include "Options/Auto.hpp"
 #include "Options/Options.hpp"
 #include "Parallel/Printf.hpp"
+#include "Time/TimeSteppers/TimeStepper.hpp"
+#include "Utilities/ErrorHandling/Error.hpp"
 
 namespace Cce {
 namespace OptionTags {
@@ -86,10 +88,10 @@ struct StandaloneExtractionRadius {
   using type = Options::Auto<double>;
 
   static constexpr Options::String help{
-    "Extraction radius of the CCE system for a standalone run. This may be "
-    "set to \"Auto\" to infer the radius from the filename (often used for "
-    "SpEC worldtube data). This option is unused if `H5IsBondiData` is "
-    "`true`, and should be \"Auto\" for such runs."};
+      "Extraction radius of the CCE system for a standalone run. This may be "
+      "set to \"Auto\" to infer the radius from the filename (often used for "
+      "SpEC worldtube data). This option is unused if `H5IsBondiData` is "
+      "`true`, and should be \"Auto\" for such runs."};
   using group = Cce;
 };
 
@@ -386,11 +388,14 @@ struct SpecifiedStartTime : Tags::StartTime, db::SimpleTag {
   static constexpr bool pass_metavariables = false;
   static double create_from_options(
       const std::optional<double> start_time) noexcept {
+<<<<<<< HEAD
     if (not start_time.has_value()) {
       ERROR(
           "The start time must be explicitly specified for the tag "
           "`SpecifiedStartTime`");
     }
+=======
+>>>>>>> jordan/cce_gh_exe_and_bjorhus_bc
     return *start_time;
   }
 };
@@ -484,12 +489,23 @@ struct GhInterfaceManager : db::SimpleTag {
 /// provide data for CCE.
 struct InterfaceManagerInterpolationStrategy : db::SimpleTag {
   using type = InterfaceManagers::InterpolationStrategy;
-  using option_tags = tmpl::list<OptionTags::GhInterfaceManager>;
+  using option_tags = tmpl::list<OptionTags::GhInterfaceManager,
+                                 ::OptionTags::TimeStepper<TimeStepper>>;
 
   static constexpr bool pass_metavariables = false;
   static InterfaceManagers::InterpolationStrategy create_from_options(
       const std::unique_ptr<InterfaceManagers::GhInterfaceManager>&
-          interface_manager) noexcept {
+          interface_manager,
+      const std::unique_ptr<TimeStepper>& time_stepper) noexcept {
+    if (interface_manager->get_interpolation_strategy() ==
+            InterfaceManagers::InterpolationStrategy::EveryStep and
+        time_stepper->number_of_substeps() != 1) {
+      ERROR(
+          "The use of full-step interface managers (which perform "
+          "interpolation and extrapolation between the CCE and GH systems) "
+          "require a time stepper with monotonically increasing time values, "
+          "which is only guaranteed for steppers which do not have substeps.");
+    }
     return interface_manager->get_interpolation_strategy();
   }
 };
