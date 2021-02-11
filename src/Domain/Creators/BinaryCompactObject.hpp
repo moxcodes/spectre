@@ -503,7 +503,7 @@ class BinaryCompactObject : public DomainCreator<3> {
 
   template <typename Metavariables>
   using options = tmpl::conditional_t<
-      detail::is_time_dependence_enabled(Metavariables{}),
+      Metavariables::enable_time_dependence,
       tmpl::append<time_dependent_options, time_independent_options>,
       time_independent_options>;
 
