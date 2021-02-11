@@ -117,6 +117,7 @@ class CProxy_GlobalCache;
 
 struct GeneralizedHarmonicDefaults {
   static constexpr int volume_dim = 3;
+  static constexpr bool enable_time_dependence = true;
   using frame = Frame::Inertial;
   using system = GeneralizedHarmonic::System<volume_dim>;
   static constexpr dg::Formulation dg_formulation =
@@ -425,8 +426,9 @@ struct GeneralizedHarmonicTemplateBase<EvolutionMetavarsDerived<
           Parallel::PhaseActions<
               Phase, Phase::InitializeInitialDataDependentQuantities,
               initialize_initial_data_dependent_quantities_actions>,
-          Parallel::PhaseActions<Phase, Phase::InitializeTimeStepperHistory,
-                                 SelfStart::self_start_procedure<step_actions>>,
+          Parallel::PhaseActions<
+              Phase, Phase::InitializeTimeStepperHistory,
+              SelfStart::self_start_procedure<step_actions, system>>,
           Parallel::PhaseActions<
               Phase, Phase::Register,
               tmpl::list<observers::Actions::RegisterEventsWithObservers,
