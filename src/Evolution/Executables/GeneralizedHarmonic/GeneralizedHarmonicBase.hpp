@@ -248,19 +248,19 @@ struct GeneralizedHarmonicTemplateBase<EvolutionMetavarsDerived<
       tmpl::list<analytic_solution_tag, normal_dot_numerical_flux,
                  time_stepper_tag, Tags::EventsAndTriggers<events, triggers>,
                  GeneralizedHarmonic::ConstraintDamping::Tags::
-                     DampingFunctionGamma0<volume_dim, frame>,
+                     DampingFunctionGamma0<volume_dim, Frame::Grid>,
                  GeneralizedHarmonic::ConstraintDamping::Tags::
-                     DampingFunctionGamma1<volume_dim, frame>,
+                     DampingFunctionGamma1<volume_dim, Frame::Grid>,
                  GeneralizedHarmonic::ConstraintDamping::Tags::
-                     DampingFunctionGamma2<volume_dim, frame>>,
+                     DampingFunctionGamma2<volume_dim, Frame::Grid>>,
       tmpl::list<normal_dot_numerical_flux, time_stepper_tag,
                  Tags::EventsAndTriggers<events, triggers>,
                  GeneralizedHarmonic::ConstraintDamping::Tags::
-                     DampingFunctionGamma0<volume_dim, frame>,
+                     DampingFunctionGamma0<volume_dim, Frame::Grid>,
                  GeneralizedHarmonic::ConstraintDamping::Tags::
-                     DampingFunctionGamma1<volume_dim, frame>,
+                     DampingFunctionGamma1<volume_dim, Frame::Grid>,
                  GeneralizedHarmonic::ConstraintDamping::Tags::
-                     DampingFunctionGamma2<volume_dim, frame>>>;
+                     DampingFunctionGamma2<volume_dim, Frame::Grid>>>;
 
   using observed_reduction_data_tags = observers::collect_reduction_data_tags<
       typename Event<observation_events>::creatable_classes>;
