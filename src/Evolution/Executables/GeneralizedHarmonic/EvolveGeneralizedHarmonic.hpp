@@ -8,13 +8,13 @@
 #include "Domain/Creators/RegisterDerivedWithCharm.hpp"
 #include "Domain/Creators/TimeDependence/RegisterDerivedWithCharm.hpp"
 #include "Domain/FunctionsOfTime/RegisterDerivedWithCharm.hpp"
-#include "ErrorHandling/Error.hpp"
-#include "ErrorHandling/FloatingPointExceptions.hpp"
 #include "Evolution/Executables/GeneralizedHarmonic/GeneralizedHarmonicBase.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/ConstraintDamping/RegisterDerivedWithCharm.hpp"
 #include "Options/Options.hpp"
 #include "Time/StepControllers/StepController.hpp"
 #include "Time/TimeSteppers/TimeStepper.hpp"
+#include "Utilities/ErrorHandling/Error.hpp"
+#include "Utilities/ErrorHandling/FloatingPointExceptions.hpp"
 
 /// \cond
 namespace Frame {
