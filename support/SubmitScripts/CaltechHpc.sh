@@ -46,7 +46,7 @@ export SPECTRE_INPUT_FILE=${PWD}/KerrSchild.yaml
 
 # These commands load the relevant modules and cd into the run directory,
 # creating it if it doesn't exist
-source ${SPECTRE_HOME}/support/Environments/caltech_hpc.sh
+source ${SPECTRE_HOME}/support/Environments/caltech_hpc_gcc.sh
 spectre_load_modules
 module list
 
@@ -81,7 +81,7 @@ SPECTRE_COMMAND="${SPECTRE_EXECUTABLE} ++np ${SLURM_NNODES} \
 # spectre environment between the start of the remote session and starting the
 # spectre executable
 echo "#!/bin/sh
-source /home/moxon/spectre/support/Environments/ocean_clang.sh
+source /home/moxon/spectre/support/Environments/caltech_hpc_gcc.sh
 spectre_load_modules
 \$@
 " > runscript
