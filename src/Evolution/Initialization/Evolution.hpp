@@ -25,6 +25,7 @@
 #include "Time/TimeStepId.hpp"
 #include "Utilities/Requires.hpp"
 #include "Utilities/TMPL.hpp"
+#include "Utilities/TypeTraits/CreateGetTypeAliasOrDefault.hpp"
 
 /// \cond
 namespace Frame {
@@ -51,6 +52,20 @@ TimeDelta get_initial_time_step(
   const auto& step_controller = Parallel::get<Tags::StepController>(cache);
   return step_controller.choose_step(initial_time, initial_dt_value);
 }
+
+CREATE_GET_TYPE_ALIAS_OR_DEFAULT(slab_choosers);
+CREATE_GET_TYPE_ALIAS_OR_DEFAULT(step_choosers);
+CREATE_GET_TYPE_ALIAS_OR_DEFAULT(compute_tags);
+
+template <typename Metavariables>
+struct step_chooser_compute_tags {
+  using type = tmpl::remove_duplicates<tmpl::flatten<tmpl::transform<
+      typename StepChooser<tmpl::remove_duplicates<tmpl::append<
+          get_step_choosers_or_default_t<Metavariables, tmpl::list<>>,
+          get_slab_choosers_or_default_t<Metavariables, tmpl::list<>>>>>::
+          creatable_classes,
+      get_compute_tags_or_default<tmpl::_1, tmpl::list<>>>>>;
+};
 }  // namespace Evolution_detail
 
 namespace Initialization {
@@ -86,7 +101,9 @@ struct TimeAndTimeStep {
       tmpl::list<::Tags::TimeStepId, ::Tags::Next<::Tags::TimeStepId>,
                  ::Tags::Time, ::Tags::TimeStep,
                  ::Tags::Next<::Tags::TimeStep>>;
-  using compute_tags = tmpl::list<::Tags::SubstepTimeCompute>;
+  using compute_tags = tmpl::push_back<
+      typename Evolution_detail::step_chooser_compute_tags<Metavariables>::type,
+      ::Tags::SubstepTimeCompute>;
 
   template <
       typename DbTagsList, typename... InboxTags, typename ArrayIndex,
