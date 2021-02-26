@@ -57,7 +57,8 @@ class PreventRapidIncrease : public StepChooser<StepChooserRegistrars> {
       "instabilities."};
   using options = tmpl::list<>;
 
-  using argument_tags = tmpl::list<Tags::HistoryEvolvedVariables<>>;
+  using argument_tags = tmpl::list<::Tags::HistoryEvolvedVariables<>>;
+  using return_tags = tmpl::list<>;
 
   template <typename Metavariables, typename History>
   double operator()(const History& history, const double last_step_magnitude,

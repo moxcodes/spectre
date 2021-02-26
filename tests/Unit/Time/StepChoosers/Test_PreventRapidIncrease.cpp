@@ -102,14 +102,16 @@ void check_case(const Frac& expected_frac,
     }
 
     const auto check = [&cache, &expected, &relax, &relax_base](
-        const auto& box, const Time& current_time) noexcept {
+                           auto box, const Time& current_time) noexcept {
       const auto& history = db::get<history_tag>(box);
       const double current_step =
           history.size() > 0 ? abs(current_time - history.back()).value()
                              : std::numeric_limits<double>::infinity();
 
-      CHECK(relax(history, current_step, cache) == expected);
-      CHECK(relax_base->desired_step(current_step, box, cache) == expected);
+      CHECK(relax(history, current_step, cache) ==
+            std::make_pair(expected, true));
+      CHECK(relax_base->desired_step(make_not_null(&box), current_step,
+                                     cache) == std::make_pair(expected, true));
       CHECK(serialize_and_deserialize(relax)(history, current_step, cache) ==
             expected);
       CHECK(serialize_and_deserialize(relax_base)

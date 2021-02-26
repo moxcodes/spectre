@@ -66,7 +66,7 @@ void change_step_size(
   for (const auto& step_chooser : step_choosers) {
     desired_step =
         std::min(desired_step,
-                 step_chooser->desired_step(last_step_size, *box, cache).first);
+                 step_chooser->desired_step(box, last_step_size, cache).first);
   }
   if (not current_step.is_positive()) {
     desired_step = -desired_step;

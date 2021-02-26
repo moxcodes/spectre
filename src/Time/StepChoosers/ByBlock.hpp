@@ -68,6 +68,7 @@ class ByBlock : public StepChooser<StepChooserRegistrars> {
       : sizes_(std::move(sizes)) {}
 
   using argument_tags = tmpl::list<domain::Tags::Element<Dim>>;
+  using return_tags = tmpl::list<>;
 
   template <typename Metavariables>
   double operator()(

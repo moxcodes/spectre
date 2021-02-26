@@ -44,17 +44,19 @@ SPECTRE_TEST_CASE("Unit.Time.StepChoosers.ByBlock", "[Unit][Time]") {
   const Parallel::GlobalCache<Metavariables> cache{};
   for (size_t block = 0; block < 3; ++block) {
     const Element<volume_dim> element(ElementId<volume_dim>(block), {});
-    const auto box =
-        db::create<db::AddSimpleTags<domain::Tags::Element<volume_dim>>>(
-            element);
+    auto box = db::create<db::AddSimpleTags<domain::Tags::Element<volume_dim>>>(
+        element);
     const double expected = 0.5 * static_cast<double>(block + 5);
 
-    CHECK(by_block(element, current_step, cache) == expected);
-    CHECK(by_block_base->desired_step(current_step, box, cache) == expected);
+    CHECK(by_block(element, current_step, cache) ==
+          std::make_pair(expected, true));
+    CHECK(by_block_base->desired_step(make_not_null(&box), current_step,
+                                      cache) == std::make_pair(expected, true));
     CHECK(serialize_and_deserialize(by_block)(element, current_step, cache) ==
           expected);
     CHECK(serialize_and_deserialize(by_block_base)
-              ->desired_step(current_step, box, cache) == expected);
+              ->desired_step(make_not_null(&box), current_step, cache) ==
+          std::make_pair(expected, true));
   }
 
   TestHelpers::test_factory_creation<StepChooserType>(

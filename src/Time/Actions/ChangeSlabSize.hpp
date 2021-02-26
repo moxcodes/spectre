@@ -310,7 +310,7 @@ class ChangeSlabSize : public Event<EventRegistrars> {
     for (const auto& step_chooser : step_choosers_) {
       desired_slab_size =
           std::min(desired_slab_size,
-                   step_chooser->desired_step(
+                   step_chooser->desired_slab(
                        time_step_id.step_time().slab().duration().value(),
                        box_for_step_choosers, cache));
     }

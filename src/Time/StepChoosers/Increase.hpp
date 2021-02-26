@@ -52,6 +52,7 @@ class Increase : public StepChooser<StepChooserRegistrars> {
   explicit Increase(const double factor) noexcept : factor_(factor) {}
 
   using argument_tags = tmpl::list<>;
+  using return_tags = tmpl::list<>;
 
   template <typename Metavariables>
   double operator()(const double last_step_magnitude,

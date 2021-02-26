@@ -30,12 +30,6 @@
 // IWYU pragma: no_include <pup.h>
 
 namespace {
-constexpr size_t dim = 1;
-using frame = Frame::Grid;
-using StepChooserType =
-    StepChooser<tmpl::list<StepChoosers::Registrars::Cfl<dim, frame>>>;
-using Cfl = StepChoosers::Cfl<dim, frame>;
-
 struct CharacteristicSpeed : db::SimpleTag {
   using type = double;
 };
@@ -45,22 +39,42 @@ struct Metavariables {
   using const_global_cache_tags = tmpl::list<>;
   using time_stepper_tag = Tags::TimeStepper<TimeStepper>;
   struct system {
-    struct compute_largest_characteristic_speed {
+    struct largest_characteristic_speed : db::SimpleTag {
+      using type = double;
+    };
+    struct compute_largest_characteristic_speed : db::ComputeTag,
+                                                  largest_characteristic_speed {
+      using base = largest_characteristic_speed;
       using argument_tags = tmpl::list<CharacteristicSpeed>;
-      static double apply(const double speed) noexcept { return speed; }
+      using return_type = double;
+      static void function(const gsl::not_null<double*> return_speed,
+                           const double& speed) noexcept {
+        *return_speed = speed;
+        return;
+      }
     };
   };
 };
 
-double get_suggestion(const size_t stepper_order, const double safety_factor,
-                      const double characteristic_speed,
-                      const DataVector& coordinates) noexcept {
+
+constexpr size_t dim = 1;
+using frame = Frame::Grid;
+using StepChooserType = StepChooser<tmpl::list<
+    StepChoosers::Registrars::Cfl<dim, frame, typename Metavariables::system>>>;
+using Cfl = StepChoosers::Cfl<dim, frame, typename Metavariables::system>;
+
+std::pair<double, bool> get_suggestion(const size_t stepper_order,
+                                       const double safety_factor,
+                                       const double characteristic_speed,
+                                       const DataVector& coordinates) noexcept {
   const Parallel::GlobalCache<Metavariables> cache{};
-  const auto box = db::create<
+  auto box = db::create<
       db::AddSimpleTags<
           CharacteristicSpeed, domain::Tags::Coordinates<dim, frame>,
           domain::Tags::Mesh<dim>, Tags::TimeStepper<TimeStepper>>,
-      db::AddComputeTags<domain::Tags::MinimumGridSpacingCompute<dim, frame>>>(
+      db::AddComputeTags<domain::Tags::MinimumGridSpacingCompute<dim, frame>,
+                         typename Metavariables::system::
+                             compute_largest_characteristic_speed>>(
       characteristic_speed, tnsr::I<DataVector, dim, frame>{{{coordinates}}},
       Mesh<dim>(coordinates.size(), Spectral::Basis::Legendre,
                 Spectral::Quadrature::GaussLobatto),
@@ -69,19 +83,24 @@ double get_suggestion(const size_t stepper_order, const double safety_factor,
 
   const double grid_spacing =
       get<domain::Tags::MinimumGridSpacing<dim, frame>>(box);
+  const double speed =
+      get<typename Metavariables::system::compute_largest_characteristic_speed>(
+          box);
   const auto& time_stepper = get<Tags::TimeStepper<TimeStepper>>(box);
 
   const Cfl cfl{safety_factor};
   const std::unique_ptr<StepChooserType> cfl_base = std::make_unique<Cfl>(cfl);
 
   const double current_step = std::numeric_limits<double>::infinity();
-  const double result =
-      cfl(grid_spacing, box, time_stepper, current_step, cache);
-  CHECK(cfl_base->desired_step(current_step, box, cache) == result);
-  CHECK(serialize_and_deserialize(cfl)(grid_spacing, box, time_stepper,
+  const auto result =
+      cfl(grid_spacing, time_stepper, speed, current_step, cache);
+  CHECK(result.second);
+  CHECK(cfl_base->desired_step(make_not_null(&box), current_step, cache) ==
+        result);
+  CHECK(serialize_and_deserialize(cfl)(grid_spacing, time_stepper, speed,
                                        current_step, cache) == result);
-  CHECK(serialize_and_deserialize(cfl_base)->desired_step(current_step, box,
-                                                          cache) == result);
+  CHECK(serialize_and_deserialize(cfl_base)->desired_step(
+            make_not_null(&box), current_step, cache) == result);
   return result;
 }
 }  // namespace

@@ -72,7 +72,8 @@ class StepToTimes : public StepChooser<StepChooserRegistrars> {
   explicit StepToTimes(std::unique_ptr<TimeSequence<double>> times) noexcept
       : times_(std::move(times)) {}
 
-  using argument_tags = tmpl::list<Tags::TimeStepId>;
+  using argument_tags = tmpl::list<::Tags::TimeStepId>;
+  using return_tags = tmpl::list<>;
 
   template <typename Metavariables>
   double operator()(

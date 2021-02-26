@@ -31,18 +31,21 @@ SPECTRE_TEST_CASE("Unit.Time.StepChoosers.Constant", "[Unit][Time]") {
   Parallel::register_derived_classes_with_charm<StepChooserType>();
 
   const Parallel::GlobalCache<Metavariables> cache{};
-  const auto box = db::create<db::AddSimpleTags<>>();
+  auto box = db::create<db::AddSimpleTags<>>();
 
   const Constant constant{5.4};
   const std::unique_ptr<StepChooserType> constant_base =
       std::make_unique<Constant>(constant);
 
   const double current_step = std::numeric_limits<double>::infinity();
-  CHECK(constant(current_step, cache) == 5.4);
-  CHECK(constant_base->desired_step(current_step, box, cache) == 5.4);
-  CHECK(serialize_and_deserialize(constant)(current_step, cache) == 5.4);
+  CHECK(constant(current_step, cache) == std::make_pair(5.4, true));
+  CHECK(constant_base->desired_step(make_not_null(&box), current_step, cache) ==
+        std::make_pair(5.4, true));
+  CHECK(serialize_and_deserialize(constant)(current_step, cache) ==
+        std::make_pair(5.4, true));
   CHECK(serialize_and_deserialize(constant_base)
-            ->desired_step(current_step, box, cache) == 5.4);
+            ->desired_step(make_not_null(&box), current_step, cache) ==
+        std::make_pair(5.4, true));
 
   TestHelpers::test_factory_creation<StepChooserType>("Constant: 5.4");
 }

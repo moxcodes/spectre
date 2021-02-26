@@ -29,21 +29,22 @@ struct MinimumGridSpacing;
 /// \endcond
 
 namespace StepChoosers {
-template <size_t Dim, typename Frame, typename StepChooserRegistrars>
+template <size_t Dim, typename Frame, typename System,
+          typename StepChooserRegistrars>
 class Cfl;
 
 namespace Registrars {
-template <size_t Dim, typename Frame>
+template <size_t Dim, typename Frame, typename System>
 struct Cfl {
   template <typename StepChooserRegistrars>
-  using f = StepChoosers::Cfl<Dim, Frame, StepChooserRegistrars>;
+  using f = StepChoosers::Cfl<Dim, Frame, System, StepChooserRegistrars>;
 };
 }  // namespace Registrars
 
 /// Suggests a step size based on the CFL stability criterion.
-template <size_t Dim, typename Frame,
+template <size_t Dim, typename Frame, typename System,
           typename StepChooserRegistrars =
-              tmpl::list<Registrars::Cfl<Dim, Frame>>>
+              tmpl::list<Registrars::Cfl<Dim, Frame, System>>>
 class Cfl : public StepChooser<StepChooserRegistrars> {
  public:
   /// \cond
@@ -66,26 +67,27 @@ class Cfl : public StepChooser<StepChooserRegistrars> {
   explicit Cfl(const double safety_factor) noexcept
       : safety_factor_(safety_factor) {}
 
-  using argument_tags = tmpl::list<domain::Tags::MinimumGridSpacing<Dim, Frame>,
-                                   Tags::DataBox, Tags::TimeStepper<>>;
-  using compute_tags =
-      tmpl::list<domain::Tags::MinimumGridSpacingCompute<Dim, Frame>>;
+  using argument_tags =
+      tmpl::list<domain::Tags::MinimumGridSpacing<Dim, Frame>,
+                 ::Tags::TimeStepper<>,
+                 typename System::compute_largest_characteristic_speed>;
+  using return_tags = tmpl::list<>;
 
-  template <typename Metavariables, typename DbTags>
-  double operator()(
-      const double minimum_grid_spacing, const db::DataBox<DbTags>& box,
+  using compute_tags =
+      tmpl::list<domain::Tags::MinimumGridSpacingCompute<Dim, Frame>,
+                 typename System::compute_largest_characteristic_speed>;
+
+  template <typename Metavariables>
+  std::pair<double, bool> operator()(
+      const double minimum_grid_spacing,
       const typename Metavariables::time_stepper_tag::type::element_type&
           time_stepper,
-      const double /*last_step_magnitude*/,
-      const Parallel::GlobalCache<Metavariables>& /*cache*/) const
-      noexcept {
-    using compute_largest_characteristic_speed =
-        typename Metavariables::system::compute_largest_characteristic_speed;
-    const double speed = db::apply<compute_largest_characteristic_speed>(box);
+      const double speed, const double /*last_step_magnitude*/,
+      const Parallel::GlobalCache<Metavariables>& /*cache*/) const noexcept {
     const double time_stepper_stability_factor = time_stepper.stable_step();
-
-    return safety_factor_ * time_stepper_stability_factor *
-           minimum_grid_spacing / speed;
+    return std::make_pair(safety_factor_ * time_stepper_stability_factor *
+                              minimum_grid_spacing / speed,
+                          true);
   }
 
   // NOLINTNEXTLINE(google-runtime-references)
@@ -96,8 +98,9 @@ class Cfl : public StepChooser<StepChooserRegistrars> {
 };
 
 /// \cond
-template <size_t Dim, typename Frame, typename StepChooserRegistrars>
-PUP::able::PUP_ID Cfl<Dim, Frame, StepChooserRegistrars>::my_PUP_ID =
+template <size_t Dim, typename Frame, typename System,
+          typename StepChooserRegistrars>
+PUP::able::PUP_ID Cfl<Dim, Frame, System, StepChooserRegistrars>::my_PUP_ID =
     0;  // NOLINT
 /// \endcond
 }  // namespace StepChoosers
