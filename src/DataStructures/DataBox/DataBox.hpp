@@ -324,8 +324,9 @@ class DataBox<tmpl::list<Tags...>>
   template <typename... MutateTags, typename TagList, typename Invokable,
             typename... Args>
   // clang-tidy: redundant declaration
-  friend void mutate(gsl::not_null<DataBox<TagList>*> box,             // NOLINT
-                     Invokable&& invokable, Args&&... args) noexcept;  // NOLINT
+  friend decltype(auto) mutate(gsl::not_null<DataBox<TagList>*> box,  // NOLINT
+                               Invokable&& invokable,
+                               Args&&... args) noexcept;  // NOLINT
 
   /*!
    * \requires Type `T` is one of the Tags corresponding to an object stored in
@@ -853,11 +854,21 @@ db::DataBox<tmpl::list<Tags...>>::mutate_subitem_tags_in_box(
  *
  * \example
  * \snippet Test_DataBox.cpp databox_mutate_example
+ *
+ * The `invokable` may have function return values, and any returns are
+ * forwarded as returns to the `db::mutate` call.
+ *
+ * \warning Using `db::mutate` returns to obtain non-const references or
+ * pointers to box items is potentially very dangerous. The \ref DataBoxGroup
+ * "DataBox" cannot track any subsequent changes to quantities that have been
+ * "unsafely" extracted in this manner, so this should be done only when no
+ * alternatives are possible and when it is known that no compute or reference
+ * tags will access the unsafely extracted tag.
  */
 template <typename... MutateTags, typename TagList, typename Invokable,
           typename... Args>
-void mutate(const gsl::not_null<DataBox<TagList>*> box, Invokable&& invokable,
-            Args&&... args) noexcept {
+decltype(auto) mutate(const gsl::not_null<DataBox<TagList>*> box,
+                      Invokable&& invokable, Args&&... args) noexcept {
   static_assert(
       tmpl2::flat_all_v<
           detail::has_unique_matching_tag_v<TagList, MutateTags>...>,
@@ -874,11 +885,7 @@ void mutate(const gsl::not_null<DataBox<TagList>*> box, Invokable&& invokable,
         "passed to the mutate function.");
   }
   box->mutate_locked_box_ = true;
-  invokable(
-      make_not_null(&box->template get_deferred<
-                            detail::first_matching_tag<TagList, MutateTags>>()
-                         .mutate())...,
-      std::forward<Args>(args)...);
+
   using mutate_tags_list =
       tmpl::list<detail::first_matching_tag<TagList, MutateTags>...>;
   // For all the tags in the DataBox, check if one of their subtags is
@@ -904,6 +911,34 @@ void mutate(const gsl::not_null<DataBox<TagList>*> box, Invokable&& invokable,
                                               tmpl::pin<full_mutated_items>,
                                               tmpl::get_source<tmpl::_1>>>,
                       tmpl::get_destination<tmpl::_1>>>;
+  if constexpr (not std::is_same_v<decltype(invokable(
+                                       make_not_null(
+                                           &box->template get_deferred<
+                                                   detail::first_matching_tag<
+                                                       TagList, MutateTags>>()
+                                                .mutate())...,
+                                       std::forward<Args>(args)...)),
+                                   void>) {
+    decltype(auto) return_value = invokable(
+        make_not_null(&box->template get_deferred<
+                              detail::first_matching_tag<TagList, MutateTags>>()
+                           .mutate())...,
+        std::forward<Args>(args)...);
+
+    EXPAND_PACK_LEFT_TO_RIGHT(
+        box->template mutate_subitem_tags_in_box<MutateTags>(
+            typename Subitems<MutateTags>::type{}));
+    box->template reset_compute_items_after_mutate(
+        first_compute_items_to_reset{});
+
+    box->mutate_locked_box_ = false;
+    return return_value;
+  }
+  invokable(
+      make_not_null(&box->template get_deferred<
+                            detail::first_matching_tag<TagList, MutateTags>>()
+                         .mutate())...,
+      std::forward<Args>(args)...);
 
   EXPAND_PACK_LEFT_TO_RIGHT(
       box->template mutate_subitem_tags_in_box<MutateTags>(
@@ -1302,7 +1337,7 @@ SPECTRE_ALWAYS_INLINE constexpr auto apply(const DataBox<BoxTags>& box,
 namespace detail {
 template <typename... ReturnTags, typename... ArgumentTags, typename F,
           typename BoxTags, typename... Args>
-SPECTRE_ALWAYS_INLINE constexpr void mutate_apply(
+SPECTRE_ALWAYS_INLINE constexpr decltype(auto) mutate_apply(
     F&& f, const gsl::not_null<db::DataBox<BoxTags>*> box,
     tmpl::list<ReturnTags...> /*meta*/, tmpl::list<ArgumentTags...> /*meta*/,
     Args&&... args) noexcept {
@@ -1314,12 +1349,12 @@ SPECTRE_ALWAYS_INLINE constexpr void mutate_apply(
   if constexpr (is_apply_callable_v<
                     F, const gsl::not_null<item_type<ReturnTags, BoxTags>*>...,
                     const_item_type<ArgumentTags, BoxTags>..., Args...>) {
-    ::db::mutate<ReturnTags...>(
+    return ::db::mutate<ReturnTags...>(
         box,
-        [
-        ](const gsl::not_null<item_type<ReturnTags, BoxTags>*>... mutated_items,
-          const_item_type<ArgumentTags, BoxTags>... args_items,
-          decltype(std::forward<Args>(args))... l_args) noexcept {
+        [](const gsl::not_null<
+               item_type<ReturnTags, BoxTags>*>... mutated_items,
+           const_item_type<ArgumentTags, BoxTags>... args_items,
+           decltype(std::forward<Args>(args))... l_args) noexcept {
           return std::decay_t<F>::apply(mutated_items..., args_items...,
                                         std::forward<Args>(l_args)...);
         },
@@ -1328,7 +1363,7 @@ SPECTRE_ALWAYS_INLINE constexpr void mutate_apply(
       ::tt::is_callable_v<
           F, const gsl::not_null<item_type<ReturnTags, BoxTags>*>...,
           const_item_type<ArgumentTags, BoxTags>..., Args...>) {
-    ::db::mutate<ReturnTags...>(
+    return ::db::mutate<ReturnTags...>(
         box,
         [&f](const gsl::not_null<
                  item_type<ReturnTags, BoxTags>*>... mutated_items,
@@ -1362,6 +1397,9 @@ SPECTRE_ALWAYS_INLINE constexpr void mutate_apply(
  * `argument_tags` typelists, these are used for the `MutateTags` and
  * `ArgumentTags`, respectively.
  *
+ * Any return values of the invokable `f` are forwarded as returns to the
+ * `mutate_apply` call.
+ *
  * \example
  * An example of using `mutate_apply` with a lambda:
  * \snippet Test_DataBox.cpp mutate_apply_lambda_example
@@ -1384,28 +1422,28 @@ SPECTRE_ALWAYS_INLINE constexpr void mutate_apply(
  */
 template <typename MutateTags, typename ArgumentTags, typename F,
           typename BoxTags, typename... Args>
-SPECTRE_ALWAYS_INLINE constexpr void mutate_apply(
+SPECTRE_ALWAYS_INLINE constexpr decltype(auto) mutate_apply(
     F&& f, const gsl::not_null<DataBox<BoxTags>*> box,
     Args&&... args) noexcept {
   detail::check_tags_are_in_databox(BoxTags{}, MutateTags{});
   detail::check_tags_are_in_databox(BoxTags{}, ArgumentTags{});
-  detail::mutate_apply(std::forward<F>(f), box, MutateTags{}, ArgumentTags{},
-                       std::forward<Args>(args)...);
+  return detail::mutate_apply(std::forward<F>(f), box, MutateTags{},
+                              ArgumentTags{}, std::forward<Args>(args)...);
 }
 
 template <typename F, typename BoxTags, typename... Args>
-SPECTRE_ALWAYS_INLINE constexpr void mutate_apply(
+SPECTRE_ALWAYS_INLINE constexpr decltype(auto) mutate_apply(
     F&& f, const gsl::not_null<DataBox<BoxTags>*> box,
     Args&&... args) noexcept {
-  mutate_apply<typename std::decay_t<F>::return_tags,
-               typename std::decay_t<F>::argument_tags>(
+  return mutate_apply<typename std::decay_t<F>::return_tags,
+                      typename std::decay_t<F>::argument_tags>(
       std::forward<F>(f), box, std::forward<Args>(args)...);
 }
 
 template <typename F, typename BoxTags, typename... Args>
-SPECTRE_ALWAYS_INLINE constexpr void mutate_apply(
+SPECTRE_ALWAYS_INLINE constexpr decltype(auto) mutate_apply(
     const gsl::not_null<DataBox<BoxTags>*> box, Args&&... args) noexcept {
-  mutate_apply(F{}, box, std::forward<Args>(args)...);
+  return mutate_apply(F{}, box, std::forward<Args>(args)...);
 }
 // @}
 }  // namespace db
