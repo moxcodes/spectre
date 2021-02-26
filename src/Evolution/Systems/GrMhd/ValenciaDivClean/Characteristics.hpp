@@ -167,12 +167,20 @@ struct CharacteristicSpeedsCompute : Tags::CharacteristicSpeeds,
         spatial_metric, unit_normal, equation_of_state);
   }
 };
-}  // namespace Tags
 
-struct ComputeLargestCharacteristicSpeed {
-  using argument_tags = tmpl::list<>;
-  static double apply() noexcept { return 1.0; }
+struct LargestCharacteristicSpeed : db::SimpleTag {
+  using type = double;
 };
 
+struct ComputeLargestCharacteristicSpeed : db::ComputeTag,
+                                           LargestCharacteristicSpeed {
+  using argument_tags = tmpl::list<>;
+  using return_type = double;
+  using base = LargestCharacteristicSpeed;
+  static void function(const gsl::not_null<double*> speed) noexcept {
+    *speed = 1.0;
+  }
+};
+}  // namespace Tags
 }  // namespace ValenciaDivClean
 }  // namespace grmhd

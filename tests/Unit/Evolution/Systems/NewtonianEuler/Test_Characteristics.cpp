@@ -106,8 +106,10 @@ void test_largest_characteristic_speed(
       nn_generator, nn_distribution, used_for_size);
   const auto sound_speed = make_with_random_values<Scalar<DataVector>>(
       nn_generator, nn_distribution, used_for_size);
-  CHECK(NewtonianEuler::ComputeLargestCharacteristicSpeed<Dim>::apply(
-            velocity, sound_speed) ==
+  double largest_characteristic_speed;
+  NewtonianEuler::Tags::ComputeLargestCharacteristicSpeed<Dim>::function(
+      make_not_null(&largest_characteristic_speed), velocity, sound_speed);
+  CHECK(largest_characteristic_speed ==
         max(get(sound_speed) + get(magnitude(velocity))));
 }
 
