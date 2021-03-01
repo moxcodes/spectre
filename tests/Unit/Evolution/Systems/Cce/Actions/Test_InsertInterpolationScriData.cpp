@@ -179,7 +179,8 @@ SPECTRE_TEST_CASE(
 
   ActionTesting::MockRuntimeSystem<test_metavariables> runner{
       {start_time, l_max, number_of_radial_points,
-       std::make_unique<::TimeSteppers::RungeKutta3>(), scri_output_density}};
+       std::make_unique<::TimeSteppers::RungeKutta3>(), false,
+       scri_output_density}};
 
   runner.set_phase(test_metavariables::Phase::Initialization);
   ActionTesting::emplace_component<evolution_component>(

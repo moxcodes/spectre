@@ -26,6 +26,7 @@
 #include "Time/Actions/SelfStartActions.hpp"
 #include "Time/Actions/UpdateU.hpp"  // IWYU pragma: keep
 #include "Time/Slab.hpp"
+#include "Time/StepChoosers/ErrorControl.hpp"
 #include "Time/Tags.hpp"
 #include "Time/Time.hpp"
 #include "Time/TimeStepId.hpp"
@@ -131,7 +132,8 @@ struct Component {
       db::add_tag_prefix<Tags::dt,
                          typename metavariables::system::variables_tag>,
       history_tag, Tags::TimeStepId, Tags::Next<Tags::TimeStepId>,
-      Tags::TimeStep, Tags::Next<Tags::TimeStep>, Tags::Time>>;
+      Tags::TimeStep, Tags::Next<Tags::TimeStep>, Tags::Time,
+      Tags::IsUsingTimeSteppingErrorControl<tmpl::list<>>>>;
   using compute_tags = db::AddComputeTags<Tags::SubstepTimeCompute>;
 
   static constexpr bool has_primitives = Metavariables::has_primitives;
@@ -175,7 +177,7 @@ void emplace_component_and_initialize(
        TimeStepId(forward_in_time, 1 - static_cast<int64_t>(order),
                   initial_time),
        initial_time_step, initial_next_time_step,
-       std::numeric_limits<double>::signaling_NaN()});
+       std::numeric_limits<double>::signaling_NaN(), false});
 }
 
 template <>
@@ -192,7 +194,7 @@ void emplace_component_and_initialize<true>(
        TimeStepId(forward_in_time, 1 - static_cast<int64_t>(order),
                   initial_time),
        initial_time_step, initial_next_time_step,
-       std::numeric_limits<double>::signaling_NaN()});
+       std::numeric_limits<double>::signaling_NaN(), false});
 }
 
 using not_self_start_action = std::negation<std::disjunction<

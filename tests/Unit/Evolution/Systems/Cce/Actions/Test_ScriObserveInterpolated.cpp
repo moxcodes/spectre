@@ -241,8 +241,8 @@ SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.Actions.ScriObserveInterpolated",
 
   ActionTesting::MockRuntimeSystem<test_metavariables> runner{
       {start_time, filename, l_max, number_of_radial_points,
-       std::make_unique<::TimeSteppers::RungeKutta3>(), scri_output_density,
-       observation_l_max}};
+       std::make_unique<::TimeSteppers::RungeKutta3>(), false,
+       scri_output_density, observation_l_max}};
 
   runner.set_phase(test_metavariables::Phase::Initialization);
   ActionTesting::emplace_component<evolution_component>(

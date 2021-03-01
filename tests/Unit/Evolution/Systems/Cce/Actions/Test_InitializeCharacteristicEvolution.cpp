@@ -161,7 +161,7 @@ SPECTRE_TEST_CASE(
   const size_t scri_plus_interpolation_order = 3;
   ActionTesting::MockRuntimeSystem<metavariables> runner{
       {start_time, l_max, number_of_radial_points,
-       std::make_unique<::TimeSteppers::RungeKutta3>()}};
+       std::make_unique<::TimeSteppers::RungeKutta3>(), false}};
 
   ActionTesting::set_phase(make_not_null(&runner),
                            metavariables::Phase::Initialization);

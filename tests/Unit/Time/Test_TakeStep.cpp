@@ -14,6 +14,7 @@
 #include "Framework/TestHelpers.hpp"
 #include "Helpers/DataStructures/MakeWithRandomValues.hpp"
 #include "Helpers/Time/TimeSteppers/TimeStepperTestUtils.hpp"
+#include "Time/StepChoosers/ErrorControl.hpp"
 #include "Time/StepChoosers/StepToTimes.hpp"
 #include "Time/StepControllers/BinaryFraction.hpp"
 #include "Time/Tags.hpp"
@@ -29,6 +30,7 @@ struct EvolvedVariable : db::SimpleTag {
 };
 
 struct Metavariables {
+  static constexpr bool local_time_stepping = true;
   struct system {
     using variables_tag = EvolvedVariable;
   };
@@ -71,18 +73,22 @@ SPECTRE_TEST_CASE("Unit.Time.TakeStep", "[Unit][Time]") {
   auto box = db::create<db::AddSimpleTags<
       Tags::TimeStepId, Tags::Next<Tags::TimeStepId>, Tags::TimeStep,
       Tags::Next<Tags::TimeStep>, EvolvedVariable, Tags::dt<EvolvedVariable>,
+      Tags::StepperError<EvolvedVariable>,
       Tags::HistoryEvolvedVariables<EvolvedVariable>,
       Tags::TimeStepper<LtsTimeStepper>, Tags::StepChoosers<step_chooser_list>,
-      Tags::StepController>>(
+      Tags::StepController,
+      ::Tags::IsUsingTimeSteppingErrorControl<step_chooser_list>,
+      Tags::StepperErrorUpdated>>(
       TimeStepId{true, 0_st, slab.start()},
       TimeStepId{true, 0_st, Time{slab, {1, 2}}}, TimeDelta{slab, {1, 2}},
       TimeDelta{slab, {1, 2}}, initial_values, DataVector{5, 0.0},
-      std::move(history),
+      DataVector{5, 0.0}, std::move(history),
       static_cast<std::unique_ptr<LtsTimeStepper>>(
           std::make_unique<TimeSteppers::AdamsBashforthN>(5)),
       std::move(step_choosers),
       static_cast<std::unique_ptr<StepController>>(
-          std::make_unique<StepControllers::BinaryFraction>()));
+          std::make_unique<StepControllers::BinaryFraction>()),
+      true, false);
 
   // update the rhs
   db::mutate<Tags::dt<EvolvedVariable>>(make_not_null(&box), update_rhs,

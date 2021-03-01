@@ -200,7 +200,7 @@ SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.Actions.H5BoundaryCommunication",
       {l_max,
        Tags::EndTimeFromFile::create_from_options(end_time, filename, false),
        start_time, number_of_radial_points,
-       std::make_unique<::TimeSteppers::RungeKutta3>()}};
+       std::make_unique<::TimeSteppers::RungeKutta3>(), false}};
 
   // create the test file, because on initialization the manager will need
   // to get basic data out of the file
