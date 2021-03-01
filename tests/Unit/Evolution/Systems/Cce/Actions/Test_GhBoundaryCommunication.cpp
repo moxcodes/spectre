@@ -188,7 +188,7 @@ SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.Actions.GhBoundaryCommunication",
           l_max, extraction_radius, end_time, start_time,
           InterfaceManagers::InterpolationStrategy::EveryStep,
           number_of_radial_points,
-          std::make_unique<::TimeSteppers::DormandPrince5>()}};
+          std::make_unique<::TimeSteppers::DormandPrince5>(), false}};
 
   // first prepare the input for the modal version
   const double mass = value_dist(gen);

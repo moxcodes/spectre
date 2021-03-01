@@ -175,7 +175,7 @@ SPECTRE_TEST_CASE(
       tuples::tagged_tuple_from_typelist<
           Parallel::get_const_global_cache_tags<test_metavariables>>{
           l_max, end_time, start_time, number_of_radial_points,
-          std::make_unique<::TimeSteppers::DormandPrince5>()}};
+          std::make_unique<::TimeSteppers::DormandPrince5>(), false}};
 
   const AnalyticBoundaryDataManager analytic_manager{
       l_max, extraction_radius,

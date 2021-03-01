@@ -11,6 +11,7 @@
 #include "DataStructures/VariablesTag.hpp"
 #include "Evolution/Systems/Cce/OptionTags.hpp"
 #include "ParallelAlgorithms/Initialization/MutateAssign.hpp"
+#include "Time/StepChoosers/ErrorControl.hpp"
 #include "Time/Tags.hpp"
 #include "Time/TimeSteppers/TimeStepper.hpp"
 #include "Utilities/Rational.hpp"
@@ -60,7 +61,8 @@ template <typename EvolvedCoordinatesVariablesTag, typename EvolvedSwshTag>
 struct InitializeCharacteristicEvolutionTime {
   using initialization_tags = tmpl::list<InitializationTags::TargetStepSize>;
   using const_global_cache_tags =
-      tmpl::list<::Tags::TimeStepper<TimeStepper>>;
+      tmpl::list<::Tags::TimeStepper<TimeStepper>,
+                 ::Tags::IsUsingTimeSteppingErrorControl<tmpl::list<>>>;
 
   using evolved_swsh_variables_tag =
       ::Tags::Variables<tmpl::list<EvolvedSwshTag>>;

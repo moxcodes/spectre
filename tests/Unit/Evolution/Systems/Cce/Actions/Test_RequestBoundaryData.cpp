@@ -185,7 +185,7 @@ SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.Actions.RequestBoundaryData",
       {l_max,
        Tags::EndTimeFromFile::create_from_options(end_time, filename, false),
        start_time, number_of_radial_points,
-       std::make_unique<::TimeSteppers::RungeKutta3>()}};
+       std::make_unique<::TimeSteppers::RungeKutta3>(), false}};
 
   ActionTesting::set_phase(make_not_null(&runner),
                            test_metavariables::Phase::Initialization);
