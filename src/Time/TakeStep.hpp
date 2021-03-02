@@ -22,6 +22,8 @@ void take_step(const gsl::not_null<db::DataBox<DbTags>*> box,
                const Parallel::GlobalCache<Metavariables>& cache,
                const VariablesTag /*meta*/ = VariablesTag{}) noexcept {
   record_time_stepper_data<typename Metavariables::system, VariablesTag>(box);
-  update_u<typename Metavariables::system, VariablesTag>(box);
-  change_step_size<StepChooserRegistrars>(box, cache);
+  do {
+    update_u<typename Metavariables::system, VariablesTag>(box);
+  } while (Metavariables::local_time_stepping and
+           not change_step_size<StepChooserRegistrars>(box, cache));
 }
