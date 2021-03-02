@@ -18,6 +18,7 @@
 #include "Time/Slab.hpp"
 #include "Time/StepChoosers/Constant.hpp"
 #include "Time/StepChoosers/StepChooser.hpp"
+#include "Time/StepChoosers/ErrorControl.hpp"
 #include "Time/StepControllers/BinaryFraction.hpp"
 #include "Time/Tags.hpp"
 #include "Time/Time.hpp"
@@ -52,7 +53,9 @@ struct Component {
   using metavariables = Metavariables;
   using chare_type = ActionTesting::MockArrayChare;
   using array_index = int;
-  using const_global_cache_tags = tmpl::list<Tags::TimeStepper<LtsTimeStepper>>;
+  using const_global_cache_tags =
+      tmpl::list<Tags::TimeStepper<LtsTimeStepper>,
+                 Tags::IsUsingTimeSteppingErrorControl<tmpl::list<>>>;
   using simple_tags = tmpl::list<Tags::TimeStepId, Tags::Next<Tags::TimeStepId>,
                                  Tags::TimeStep, Tags::Next<Tags::TimeStep>,
                                  history_tag, typename System::variables_tag>;
@@ -95,7 +98,7 @@ void check(const bool time_runs_forward,
            std::make_unique<StepChoosers::Constant<step_choosers>>(2. *
                                                                    request)),
        std::make_unique<StepControllers::BinaryFraction>(),
-       std::move(time_stepper)}};
+       std::move(time_stepper), false}};
 
   // Initialize the component
   ActionTesting::emplace_component_and_initialize<component>(

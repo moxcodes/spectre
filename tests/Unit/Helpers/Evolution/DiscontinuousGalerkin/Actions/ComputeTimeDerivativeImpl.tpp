@@ -54,6 +54,7 @@
 #include "ParallelAlgorithms/DiscontinuousGalerkin/InitializeMortars.hpp"
 #include "Time/Slab.hpp"
 #include "Time/StepChoosers/Constant.hpp"
+#include "Time/StepChoosers/ErrorControl.hpp"
 #include "Time/StepChoosers/StepChooser.hpp"
 #include "Time/Tags.hpp"
 #include "Time/Time.hpp"
@@ -827,7 +828,8 @@ struct Metavariables {
   using normal_dot_numerical_flux =
       Tags::NumericalFlux<BoundaryTerms<Dim, HasPrimitiveVariables>>;
   using const_global_cache_tags =
-      tmpl::list<domain::Tags::InitialExtents<Dim>, normal_dot_numerical_flux>;
+      tmpl::list<domain::Tags::InitialExtents<Dim>, normal_dot_numerical_flux,
+                 Tags::IsUsingTimeSteppingErrorControl<tmpl::list<>>>;
   using step_choosers = tmpl::list<StepChoosers::Registrars::Constant>;
 
   using component_list = tmpl::list<component<Metavariables>>;
@@ -938,7 +940,7 @@ void test_impl(const Spectral::Quadrature quadrature,
         return MockRuntimeSystem{
             {std::vector<std::array<size_t, Dim>>{make_array<Dim>(2_st),
                                                   make_array<Dim>(3_st)},
-             typename metavars::normal_dot_numerical_flux::type{},
+             typename metavars::normal_dot_numerical_flux::type{}, false,
              dg_formulation, std::move(step_choosers),
              static_cast<std::unique_ptr<StepController>>(
                  std::make_unique<StepControllers::SplitRemaining>()),
@@ -948,7 +950,7 @@ void test_impl(const Spectral::Quadrature quadrature,
         return MockRuntimeSystem{
             {std::vector<std::array<size_t, Dim>>{make_array<Dim>(2_st),
                                                   make_array<Dim>(3_st)},
-             typename metavars::normal_dot_numerical_flux::type{},
+             typename metavars::normal_dot_numerical_flux::type{}, false,
              dg_formulation}};
       }
     } else {
@@ -962,7 +964,7 @@ void test_impl(const Spectral::Quadrature quadrature,
         return MockRuntimeSystem{
             {std::vector<std::array<size_t, Dim>>{make_array<Dim>(2_st),
                                                   make_array<Dim>(3_st)},
-             typename metavars::normal_dot_numerical_flux::type{},
+             typename metavars::normal_dot_numerical_flux::type{}, false,
              dg_formulation, std::make_unique<BoundaryTerms<Dim, HasPrims>>(),
              std::move(step_choosers),
              static_cast<std::unique_ptr<StepController>>(
@@ -973,7 +975,7 @@ void test_impl(const Spectral::Quadrature quadrature,
         return MockRuntimeSystem{
             {std::vector<std::array<size_t, Dim>>{make_array<Dim>(2_st),
                                                   make_array<Dim>(3_st)},
-             typename metavars::normal_dot_numerical_flux::type{},
+             typename metavars::normal_dot_numerical_flux::type{}, false,
              dg_formulation, std::make_unique<BoundaryTerms<Dim, HasPrims>>()}};
       }
     }
