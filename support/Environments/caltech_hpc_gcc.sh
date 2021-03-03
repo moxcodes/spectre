@@ -8,7 +8,6 @@ spectre_load_sys_modules() {
     module load gcc/9.2.0
     module load mkl/18.1
     module load gsl/2.4
-    module load hdf5/1.10.1
     module load boost/1_68_0-gcc730
     module load cmake/3.18.0
     module load python3/3.8.5
@@ -17,7 +16,6 @@ spectre_load_sys_modules() {
 # Unload system modules
 spectre_unload_sys_modules() {
     module unload boost/1_68_0-gcc730
-    module unload hdf5/1.10.1
     module unload gsl/2.4
     module unload mkl/18.1
     module unload gcc/9.2.0
@@ -67,7 +65,7 @@ EOF
         echo "Installing Blaze..."
         mkdir -p $dep_dir/blaze/
         cd $dep_dir/blaze/
-        wget https://bitbucket.org/blaze-lib/blaze/downloads/blaze-3.7.tar.gz -O blaze.tar.gz
+        wget https://bitbucket.org/blaze-lib/blaze/downloads/blaze-3.8.tar.gz -O blaze.tar.gz
         tar -xzf blaze.tar.gz
         mv blaze-* include
         echo "Installed Blaze into $dep_dir/blaze"
@@ -249,6 +247,7 @@ spectre_unload_modules() {
     module unload catch
     module unload brigand
     module unload blaze
+    module unload hdf5
 
     spectre_unload_sys_modules
 }
@@ -265,6 +264,7 @@ spectre_load_modules() {
     module load spectre_gsl
     module load yaml-cpp
     module load charm
+    module load hdf5
 }
 
 spectre_run_cmake() {
