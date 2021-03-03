@@ -17,6 +17,7 @@
 #include "Evolution/Systems/Cce/GaugeTransformBoundaryData.hpp"
 #include "Evolution/Systems/Cce/Initialize/InitializeJ.hpp"
 #include "Evolution/Systems/Cce/Initialize/InverseCubic.hpp"
+#include "Evolution/Systems/Cce/Initialize/ConformalFactor.hpp"
 #include "Evolution/Systems/Cce/OptionTags.hpp"
 #include "Evolution/Systems/Cce/Tags.hpp"
 #include "Framework/ActionTesting.hpp"
@@ -40,6 +41,7 @@ namespace {
 using swsh_boundary_tags_to_generate =
     tmpl::list<Tags::BoundaryValue<Tags::BondiJ>,
                Tags::BoundaryValue<Tags::Dr<Tags::BondiJ>>,
+               Tags::BoundaryValue<Tags::BondiBeta>,
                Tags::BoundaryValue<Tags::BondiR>>;
 
 using real_boundary_tags_to_compute =
