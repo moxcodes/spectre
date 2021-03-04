@@ -250,6 +250,10 @@ struct StepController : db::SimpleTag {
   }
 };
 
+struct VolumeStep : db::SimpleTag {
+  using type = Scalar<DataVector>;
+};
+
 /// \ingroup TimeGroup
 /// \brief A tag that is true if the `ErrorControl` step chooser is one of the
 /// option-created `Event`s.

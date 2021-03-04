@@ -76,7 +76,7 @@ class ElementSizeCfl : public StepChooser<StepChooserRegistrars> {
       : safety_factor_(safety_factor) {}
 
   using argument_tags =
-      tmpl::list<Tags::TimeStepper<>, domain::Tags::SizeOfElement<Dim>,
+      tmpl::list<::Tags::TimeStepper<>, domain::Tags::SizeOfElement<Dim>,
                  typename System::compute_largest_characteristic_speed>;
   using return_tags = tmpl::list<>;
   using compute_tags =

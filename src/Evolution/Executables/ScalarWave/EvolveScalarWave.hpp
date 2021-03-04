@@ -61,15 +61,17 @@
 #include "PointwiseFunctions/AnalyticSolutions/WaveEquation/PlaneWave.hpp"  // IWYU pragma: keep
 #include "PointwiseFunctions/AnalyticSolutions/WaveEquation/RegularSphericalWave.hpp"  // IWYU pragma: keep
 #include "PointwiseFunctions/MathFunctions/MathFunction.hpp"
-#include "Time/Actions/AdvanceTime.hpp"                // IWYU pragma: keep
-#include "Time/Actions/ChangeSlabSize.hpp"             // IWYU pragma: keep
-#include "Time/Actions/ChangeStepSize.hpp"             // IWYU pragma: keep
-#include "Time/Actions/RecordTimeStepperData.hpp"      // IWYU pragma: keep
-#include "Time/Actions/SelfStartActions.hpp"           // IWYU pragma: keep
-#include "Time/Actions/UpdateU.hpp"                    // IWYU pragma: keep
-#include "Time/StepChoosers/ByBlock.hpp"               // IWYU pragma: keep
-#include "Time/StepChoosers/Cfl.hpp"                   // IWYU pragma: keep
-#include "Time/StepChoosers/Constant.hpp"              // IWYU pragma: keep
+#include "Time/Actions/AdvanceTime.hpp"            // IWYU pragma: keep
+#include "Time/Actions/ChangeSlabSize.hpp"         // IWYU pragma: keep
+#include "Time/Actions/ChangeStepSize.hpp"         // IWYU pragma: keep
+#include "Time/Actions/RecordTimeStepperData.hpp"  // IWYU pragma: keep
+#include "Time/Actions/SelfStartActions.hpp"       // IWYU pragma: keep
+#include "Time/Actions/UpdateU.hpp"                // IWYU pragma: keep
+#include "Time/StepChoosers/ByBlock.hpp"           // IWYU pragma: keep
+#include "Time/StepChoosers/Cfl.hpp"               // IWYU pragma: keep
+#include "Time/StepChoosers/Constant.hpp"          // IWYU pragma: keep
+#include "Time/StepChoosers/ElementSizeCfl.hpp"
+#include "Time/StepChoosers/ErrorControl.hpp"
 #include "Time/StepChoosers/Increase.hpp"              // IWYU pragma: keep
 #include "Time/StepChoosers/PreventRapidIncrease.hpp"  // IWYU pragma: keep
 #include "Time/StepChoosers/StepChooser.hpp"
@@ -111,6 +113,8 @@ struct EvolutionMetavars {
       dg::Formulation::StrongInertial;
   using temporal_id = Tags::TimeStepId;
   static constexpr bool local_time_stepping = true;
+
+  static constexpr bool debug_volume_step_observation = true;
   using boundary_condition_tag = initial_data_tag;
   using normal_dot_numerical_flux =
       Tags::NumericalFlux<ScalarWave::UpwindPenaltyCorrection<Dim>>;
@@ -130,6 +134,7 @@ struct EvolutionMetavars {
   using step_choosers_common = tmpl::list<
       StepChoosers::Registrars::ByBlock<volume_dim>,
       StepChoosers::Registrars::Cfl<volume_dim, Frame::Inertial, system>,
+      StepChoosers::Registrars::ElementSizeCfl<volume_dim, system>,
       StepChoosers::Registrars::Constant, StepChoosers::Registrars::Increase>;
   using step_choosers_for_step_only = tmpl::list<
       StepChoosers::Registrars::PreventRapidIncrease,
@@ -147,8 +152,16 @@ struct EvolutionMetavars {
                    step_choosers_for_slab_only>>;
 
   // public for use by the Charm++ registration code
-  using observe_fields = typename system::variables_tag::tags_list;
-  using analytic_solution_fields = observe_fields;
+  using observe_fields = tmpl::append<
+      typename system::variables_tag::tags_list,
+      tmpl::conditional_t<
+          debug_volume_step_observation,
+          tmpl::push_back<typename db::add_tag_prefix<
+                              Tags::StepperError,
+                              typename system::variables_tag>::tags_list,
+                          Tags::VolumeStep>,
+          tmpl::list<>>>;
+  using analytic_solution_fields = typename system::variables_tag::tags_list;
   using events =
       tmpl::list<dg::Events::Registrars::ObserveFields<
                      Dim, Tags::Time, observe_fields, analytic_solution_fields>,

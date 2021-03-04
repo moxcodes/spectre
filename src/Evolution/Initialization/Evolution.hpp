@@ -226,10 +226,11 @@ struct TimeStepperHistory {
     using type = db::AddComputeTags<>;
   };
 
-  using simple_tags =
-      tmpl::list<dt_variables_tag,
-                 ::Tags::HistoryEvolvedVariables<variables_tag>,
-                 error_variables_tag, ::Tags::StepperErrorUpdated>;
+  using simple_tags = tmpl::flatten<tmpl::list<
+      dt_variables_tag, ::Tags::HistoryEvolvedVariables<variables_tag>,
+      error_variables_tag, ::Tags::StepperErrorUpdated,
+      tmpl::conditional_t<Metavariables::debug_volume_step_observation,
+                          ::Tags::VolumeStep, tmpl::list<>>>>;
 
   using compute_tags =
       typename ComputeTags<typename Metavariables::system>::type;
@@ -265,10 +266,18 @@ struct TimeStepperHistory {
     if (db::get<::Tags::IsUsingTimeSteppingErrorControlBase>(box)) {
       error_vars = ErrorVars{num_grid_points};
     }
-    Initialization::mutate_assign<simple_tags>(
-        make_not_null(&box), std::move(dt_vars), std::move(history),
-        std::move(error_vars), false);
 
+    if constexpr(Metavariables::debug_volume_step_observation) {
+      Initialization::mutate_assign<simple_tags>(
+          make_not_null(&box), std::move(dt_vars), std::move(history),
+          std::move(error_vars), false,
+          Scalar<DataVector>{DataVector{
+              num_grid_points, db::get<::Tags::TimeStep>(box).value()}});
+    } else {
+      Initialization::mutate_assign<simple_tags>(
+          make_not_null(&box), std::move(dt_vars), std::move(history),
+          std::move(error_vars), false);
+    }
     return std::make_tuple(std::move(box));
   }
 

@@ -84,6 +84,15 @@ bool change_step_size(
   // if step accepted, just proceed. Otherwise, change Time::Next and jump
   // back to the first instance of `UpdateU`.
   if (step_accepted) {
+    if constexpr (Metavariables::debug_volume_step_observation) {
+      db::mutate<Tags::VolumeStep>(
+          box,
+          [](const gsl::not_null<Scalar<DataVector>*> volume_time_step,
+             const TimeDelta& time_step) noexcept {
+            get(*volume_time_step) = time_step.value();
+          },
+          db::get<Tags::TimeStep>(*box));
+    }
     return true;
   } else {
     db::mutate<Tags::Next<Tags::TimeStepId>, Tags::TimeStep>(
