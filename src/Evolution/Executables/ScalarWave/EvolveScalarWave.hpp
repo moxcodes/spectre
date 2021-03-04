@@ -131,8 +131,9 @@ struct EvolutionMetavars {
       StepChoosers::Registrars::ByBlock<volume_dim>,
       StepChoosers::Registrars::Cfl<volume_dim, Frame::Inertial, system>,
       StepChoosers::Registrars::Constant, StepChoosers::Registrars::Increase>;
-  using step_choosers_for_step_only =
-      tmpl::list<StepChoosers::Registrars::PreventRapidIncrease>;
+  using step_choosers_for_step_only = tmpl::list<
+      StepChoosers::Registrars::PreventRapidIncrease,
+      StepChoosers::Registrars::ErrorControl<typename system::variables_tag>>;
   using step_choosers_for_slab_only =
       tmpl::list<StepChoosers::Registrars::StepToTimes>;
   using step_choosers = tmpl::conditional_t<
