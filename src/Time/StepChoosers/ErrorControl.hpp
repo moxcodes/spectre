@@ -167,6 +167,8 @@ class ErrorControl : public StepChooser<StepChooserRegistrars> {
 
   using return_tags = tmpl::list<Tags::PreviousStepError>;
 
+  using simple_tags = tmpl::list<Tags::PreviousStepError>;
+
   template <typename Metavariables, typename History, typename TimeStepper>
   std::pair<double, bool> operator()(
       const gsl::not_null<std::optional<double>*> previous_step_error,

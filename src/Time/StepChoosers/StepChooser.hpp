@@ -42,6 +42,9 @@ CREATE_GET_TYPE_ALIAS_OR_DEFAULT(step_choosers)
 CREATE_HAS_TYPE_ALIAS(compute_tags)
 CREATE_HAS_TYPE_ALIAS_V(compute_tags)
 CREATE_GET_TYPE_ALIAS_OR_DEFAULT(compute_tags)
+CREATE_HAS_TYPE_ALIAS(simple_tags)
+CREATE_HAS_TYPE_ALIAS_V(simple_tags)
+CREATE_GET_TYPE_ALIAS_OR_DEFAULT(simple_tags)
 
 template <typename Metavariables>
 using step_chooser_compute_tags =
@@ -51,6 +54,16 @@ using step_chooser_compute_tags =
             get_slab_choosers_or_default_t<Metavariables, tmpl::list<>>>>>::
             creatable_classes,
         tmpl::bind<get_compute_tags_or_default_t, tmpl::_1,
+                   tmpl::pin<tmpl::list<>>>>>>;
+
+template <typename Metavariables>
+using step_chooser_simple_tags =
+    tmpl::remove_duplicates<tmpl::flatten<tmpl::transform<
+        typename StepChooser<tmpl::remove_duplicates<tmpl::append<
+            get_step_choosers_or_default_t<Metavariables, tmpl::list<>>,
+            get_slab_choosers_or_default_t<Metavariables, tmpl::list<>>>>>::
+            creatable_classes,
+        tmpl::bind<get_simple_tags_or_default_t, tmpl::_1,
                    tmpl::pin<tmpl::list<>>>>>>;
 }  // namespace StepChoosers
 
