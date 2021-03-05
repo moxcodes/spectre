@@ -5,6 +5,7 @@
 
 #include <limits>
 #include <pup.h>
+#include <utility>
 
 #include "Options/Options.hpp"
 #include "Parallel/CharmPupable.hpp"
@@ -49,10 +50,10 @@ class Constant : public StepChooser<StepChooserRegistrars> {
   using return_tags = tmpl::list<>;
 
   template <typename Metavariables>
-  double operator()(const double /*last_step_magnitude*/,
-                    const Parallel::GlobalCache<Metavariables>& /*cache*/)
-      const noexcept {
-    return value_;
+  std::pair<double, bool> operator()(
+      const double /*last_step_magnitude*/,
+      const Parallel::GlobalCache<Metavariables>& /*cache*/) const noexcept {
+    return std::make_pair(value_, true);
   }
 
   // NOLINTNEXTLINE(google-runtime-references)

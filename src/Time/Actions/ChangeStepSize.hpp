@@ -16,6 +16,8 @@
 #include "Utilities/TMPL.hpp"
 #include "Utilities/TaggedTuple.hpp"
 
+#include "Parallel/Printf.hpp"
+
 /// \cond
 class TimeDelta;
 class TimeStepId;
@@ -89,6 +91,7 @@ bool change_step_size(
           box,
           [](const gsl::not_null<Scalar<DataVector>*> volume_time_step,
              const TimeDelta& time_step) noexcept {
+            Parallel::printf("Time step... %f\n", time_step.value());
             get(*volume_time_step) = time_step.value();
           },
           db::get<Tags::TimeStep>(*box));

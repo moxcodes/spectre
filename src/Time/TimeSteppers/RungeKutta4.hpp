@@ -74,8 +74,8 @@ class RungeKutta4 : public TimeStepper::Inherit {
                 gsl::not_null<History<Vars, DerivVars>*> history,
                 const TimeDelta& time_step) const noexcept;
 
-  template <typename Vars, typename DerivVars>
-  bool update_u(gsl::not_null<Vars*> u, gsl::not_null<Vars*> u_error,
+  template <typename Vars, typename ErrVars, typename DerivVars>
+  bool update_u(gsl::not_null<Vars*> u, gsl::not_null<ErrVars*> u_error,
                 gsl::not_null<History<Vars, DerivVars>*> history,
                 const TimeDelta& time_step) const noexcept;
 
@@ -83,6 +83,10 @@ class RungeKutta4 : public TimeStepper::Inherit {
   void dense_update_u(gsl::not_null<Vars*> u,
                       const History<Vars, DerivVars>& history,
                       double time) const noexcept;
+
+  size_t order() const noexcept override;
+
+  size_t error_estimate_order() const noexcept override;
 
   uint64_t number_of_substeps() const noexcept override;
 
@@ -132,6 +136,9 @@ void RungeKutta4::update_u(
     const gsl::not_null<Vars*> u,
     const gsl::not_null<History<Vars, DerivVars>*> history,
     const TimeDelta& time_step) const noexcept {
+  ASSERT(history->integration_order() == 4,
+         "Fixed-order stepper cannot run at order "
+         << history->integration_order());
   const size_t substep = history->size() - 1;
   const auto& dt_vars = (history->end() - 1).derivative();
   const auto& u0 = history->begin().value();
@@ -142,7 +149,7 @@ void RungeKutta4::update_u(
       // v^(1) = u^n + dt * \mathcal{L}(u^n,t^n)/2
       // On entry V = u^n, u0 = u^n, rhs0 = \mathcal{L}(u^n, t^n),
       // time = t^n
-      *u += 0.5 * time_step.value() * dt_vars;
+      *u = (history->end() - 1).value() + 0.5 * time_step.value() * dt_vars;
       // On exit v = v^(1), time = t^n + (1/2)*dt
       break;
     }
@@ -191,11 +198,14 @@ void RungeKutta4::update_u(
   }
 }
 
-template <typename Vars, typename DerivVars>
+template <typename Vars, typename ErrVars, typename DerivVars>
 bool RungeKutta4::update_u(
-    const gsl::not_null<Vars*> u, const gsl::not_null<Vars*> u_error,
+    const gsl::not_null<Vars*> u, const gsl::not_null<ErrVars*> u_error,
     const gsl::not_null<History<Vars, DerivVars>*> history,
     const TimeDelta& time_step) const noexcept {
+  ASSERT(history->integration_order() == 4,
+         "Fixed-order stepper cannot run at order "
+         << history->integration_order());
   const size_t substep = history->size() - 1;
   if (substep < 3) {
     update_u(u, history, time_step);

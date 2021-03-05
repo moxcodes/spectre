@@ -115,6 +115,7 @@ struct EvolutionMetavars {
   static constexpr bool local_time_stepping = true;
 
   static constexpr bool debug_volume_step_observation = true;
+  static constexpr bool enable_time_dependence = false;
   using boundary_condition_tag = initial_data_tag;
   using normal_dot_numerical_flux =
       Tags::NumericalFlux<ScalarWave::UpwindPenaltyCorrection<Dim>>;

@@ -260,7 +260,8 @@ struct TimeStepperHistory {
         time_stepper.number_of_past_steps() == 0 ? time_stepper.order() : 1;
     // Will be overwritten before use
     DtVars dt_vars{num_grid_points};
-    typename ::Tags::HistoryEvolvedVariables<variables_tag>::type history;
+    typename ::Tags::HistoryEvolvedVariables<variables_tag>::type history{
+      starting_order};
     ErrorVars error_vars;
     // only bother allocating if the error vars are going to be used
     if (db::get<::Tags::IsUsingTimeSteppingErrorControlBase>(box)) {

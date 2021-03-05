@@ -26,7 +26,6 @@
 #include "Time/TimeStepId.hpp"
 #include "Time/TimeSteppers/TimeStepper.hpp"  // IWYU pragma: keep
 #include "Utilities/CachedFunction.hpp"
-#include "Utilities/ConstantExpressions.hpp"
 #include "Utilities/ErrorHandling/Assert.hpp"
 #include "Utilities/ErrorHandling/Error.hpp"
 #include "Utilities/Gsl.hpp"
@@ -118,8 +117,8 @@ class AdamsBashforthN : public LtsTimeStepper::Inherit {
                 gsl::not_null<History<Vars, DerivVars>*> history,
                 const TimeDelta& time_step) const noexcept;
 
-  template <typename Vars, typename DerivVars>
-  bool update_u(gsl::not_null<Vars*> u, gsl::not_null<Vars*> u_error,
+  template <typename Vars, typename ErrVars, typename DerivVars>
+  bool update_u(gsl::not_null<Vars*> u, gsl::not_null<ErrVars*> u_error,
                 gsl::not_null<History<Vars, DerivVars>*> history,
                 const TimeDelta& time_step) const noexcept;
 
@@ -260,6 +259,10 @@ class AdamsBashforthN : public LtsTimeStepper::Inherit {
       const BoundaryHistoryType<LocalVars, RemoteVars, Coupling>& history,
       double time) const noexcept;
 
+  size_t order() const noexcept override;
+
+  size_t error_estimate_order() const noexcept override;
+
   size_t number_of_past_steps() const noexcept override;
 
   double stable_step() const noexcept override;
@@ -291,8 +294,9 @@ class AdamsBashforthN : public LtsTimeStepper::Inherit {
   // constant-time-step case, while the latter are necessary for dense
   // output.
 
-  template <typename Vars, typename DerivVars, typename Delta>
-  void update_u_impl(gsl::not_null<Vars*> u,
+  template <typename UpdateVars, typename Vars, typename DerivVars,
+            typename Delta>
+  void update_u_impl(gsl::not_null<UpdateVars*> u,
                      const History<Vars, DerivVars>& history,
                      const Delta& time_step, size_t order) const noexcept;
 
@@ -356,12 +360,6 @@ class AdamsBashforthN : public LtsTimeStepper::Inherit {
                           const ApproximateTimeDelta& b) noexcept {
       return a.value() < b.value();
     }
-
-    friend double operator/(
-        const TimeDelta& a,
-        const AdamsBashforthN::ApproximateTimeDelta& b) noexcept {
-      return a.value() / b.value();
-    }
   };
 
   size_t order_ = 3;
@@ -375,25 +373,35 @@ void AdamsBashforthN::update_u(
     const gsl::not_null<Vars*> u,
     const gsl::not_null<History<Vars, DerivVars>*> history,
     const TimeDelta& time_step) const noexcept {
-  update_u_impl(u, *history, time_step, order_);
-  history->mark_unneeded(history->begin() + 1);
+  ASSERT(history->size() >= history->integration_order(),
+         "Insufficient data to take an order-" << history->integration_order()
+         << " step.  Have " << history->size() << " times, need "
+         << history->integration_order());
+  history->mark_unneeded(
+      history->end() -
+      static_cast<typename decltype(history->end())::difference_type>(
+          history->integration_order()));
+  update_u_impl(u, *history, time_step, history->integration_order());
 }
 
-template <typename Vars, typename DerivVars>
+template <typename Vars, typename ErrVars, typename DerivVars>
 bool AdamsBashforthN::update_u(
-    const gsl::not_null<Vars*> u, const gsl::not_null<Vars*> u_error,
+    const gsl::not_null<Vars*> u, const gsl::not_null<ErrVars*> u_error,
     const gsl::not_null<History<Vars, DerivVars>*> history,
     const TimeDelta& time_step) const noexcept {
-  ASSERT(
-      history->size() > 0,
-      "Cannot meaningfully update the evolved variables with an empty history");
-  *u_error = *u;
-  update_u_impl(u, *history, time_step, history->size());
+  ASSERT(history->size() >= history->integration_order(),
+         "Insufficient data to take an order-" << history->integration_order()
+         << " step.  Have " << history->size() << " times, need "
+         << history->integration_order());
+  history->mark_unneeded(
+      history->end() -
+      static_cast<typename decltype(history->end())::difference_type>(
+          history->integration_order()));
+  update_u_impl(u, *history, time_step, history->integration_order());
   // the error estimate is only useful once the history has enough elements to
   // do more than one order of step
-  update_u_impl(u_error, *history, time_step, history->size() - 1);
+  update_u_impl(u_error, *history, time_step, history->integration_order() - 1);
   *u_error = *u - *u_error;
-  history->mark_unneeded(history->begin() + 1);
   return true;
 }
 
@@ -401,73 +409,36 @@ template <typename Vars, typename DerivVars>
 void AdamsBashforthN::dense_update_u(const gsl::not_null<Vars*> u,
                                      const History<Vars, DerivVars>& history,
                                      const double time) const noexcept {
-  const ApproximateTimeDelta time_step{
-      time - history[history.size() - 1].value()};
+  ASSERT(history.integration_order() == order_,
+         "Dense output is only supported at full order");
+  const ApproximateTimeDelta time_step{time - history.back().value()};
   update_u_impl(u, history, time_step, order_);
 }
 
-template <typename Vars, typename DerivVars, typename Delta>
-void AdamsBashforthN::update_u_impl(const gsl::not_null<Vars*> u,
+template <typename UpdateVars, typename Vars, typename DerivVars,
+          typename Delta>
+void AdamsBashforthN::update_u_impl(const gsl::not_null<UpdateVars*> u,
                                     const History<Vars, DerivVars>& history,
                                     const Delta& time_step,
                                     const size_t order) const noexcept {
-  ASSERT(history.size() <= order_,
-         "Length of history (" << history.size() << ") "
-         << "should not exceed target order (" << order_ << ")");
+  ASSERT(
+      history.size() > 0,
+      "Cannot meaningfully update the evolved variables with an empty history");
+  ASSERT(order <= order_,
+         "Requested integration order higher than integrator order");
 
-  const size_t update_order = std::min(history.size(), order);
-  const auto& coefficients = get_coefficients(
+  const auto history_start =
       history.end() -
-          static_cast<typename History<Vars, DerivVars>::difference_type>(
-              update_order),
-      history.end(), time_step);
+      static_cast<typename History<Vars, DerivVars>::difference_type>(order);
+  const auto coefficients =
+      get_coefficients(history_start, history.end(), time_step);
 
-  const auto do_update = [u, &time_step, &coefficients,
-                          &history](auto local_order) noexcept {
-    *u += time_step.value() *
-          constexpr_sum<local_order>([local_order, &coefficients,
-                                      &history](auto i) noexcept {
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wsign-conversion"
-            return coefficients[local_order - 1 - i] *
-                   (history.end() - local_order +
-                    static_cast<
-                        typename History<Vars, DerivVars>::difference_type>(i))
-                       .derivative();
-#pragma GCC diagnostic pop
-          });
-  };
-  switch (update_order) {
-    // note that the order-0 version should only be called when determining
-    // error estimates -- it is not useful for actual integration
-    case 0:
-      break;
-    case 1:
-      do_update(std::integral_constant<size_t, 1>{});
-      break;
-    case 2:
-      do_update(std::integral_constant<size_t, 2>{});
-      break;
-    case 3:
-      do_update(std::integral_constant<size_t, 3>{});
-      break;
-    case 4:
-      do_update(std::integral_constant<size_t, 4>{});
-      break;
-    case 5:
-      do_update(std::integral_constant<size_t, 5>{});
-      break;
-    case 6:
-      do_update(std::integral_constant<size_t, 6>{});
-      break;
-    case 7:
-      do_update(std::integral_constant<size_t, 7>{});
-      break;
-    case 8:
-      do_update(std::integral_constant<size_t, 8>{});
-      break;
-    default:
-      ERROR("Bad amount of history data: " << history.size());
+  *u = (history.end() - 1).value();
+  auto coefficient = coefficients.rbegin();
+  for (auto history_entry = history_start;
+       history_entry != history.end();
+       ++history_entry, ++coefficient) {
+    *u += time_step.value() * *coefficient * history_entry.derivative();
   }
 }
 
@@ -784,16 +755,18 @@ template <typename Iterator, typename Delta>
 std::vector<double> AdamsBashforthN::get_coefficients(
     const Iterator& times_begin, const Iterator& times_end,
     const Delta& step) noexcept {
-  ASSERT(times_begin != times_end, "No history provided");
+  if (times_begin == times_end) {
+    return {};
+  }
   std::vector<double> steps;
   // This may be slightly more space than we need, but we can't get
   // the exact amount without iterating through the iterators, which
   // is not necessarily cheap depending on the iterator type.
   steps.reserve(maximum_order);
   for (auto t = times_begin; std::next(t) != times_end; ++t) {
-    steps.push_back((*std::next(t) - *t) / step);
+    steps.push_back((*std::next(t) - *t).value());
   }
-  steps.push_back(1.);
+  steps.push_back(step.value());
   return get_coefficients_impl(steps);
 }
 }  // namespace TimeSteppers

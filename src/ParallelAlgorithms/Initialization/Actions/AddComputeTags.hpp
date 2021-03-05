@@ -10,6 +10,8 @@
 #include "ParallelAlgorithms/Initialization/MergeIntoDataBox.hpp"
 #include "Utilities/TaggedTuple.hpp"
 
+#include "Utilities/TmplDebugging.hpp"
+
 /// \cond
 namespace Parallel {
 template <typename Metavariables>

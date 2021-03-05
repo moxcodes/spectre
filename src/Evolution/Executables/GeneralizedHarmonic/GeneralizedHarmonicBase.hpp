@@ -91,6 +91,8 @@
 #include "Time/Actions/UpdateU.hpp"
 #include "Time/StepChoosers/Cfl.hpp"
 #include "Time/StepChoosers/Constant.hpp"
+#include "Time/StepChoosers/ElementSizeCfl.hpp"
+#include "Time/StepChoosers/ErrorControl.hpp"
 #include "Time/StepChoosers/Increase.hpp"
 #include "Time/StepChoosers/PreventRapidIncrease.hpp"
 #include "Time/StepChoosers/StepChooser.hpp"
@@ -128,16 +130,19 @@ struct GeneralizedHarmonicDefaults {
   // `read_spec_third_order_piecewise_polynomial()`
   static constexpr bool override_cubic_functions_of_time = true;
   using temporal_id = Tags::TimeStepId;
-  static constexpr bool local_time_stepping = false;
+  static constexpr bool local_time_stepping = true;
+  static constexpr bool debug_volume_step_observation = true;
 
   using normal_dot_numerical_flux = Tags::NumericalFlux<
       GeneralizedHarmonic::UpwindPenaltyCorrection<volume_dim>>;
 
   using step_choosers_common = tmpl::list<
       StepChoosers::Registrars::Cfl<volume_dim, Frame::Inertial, system>,
+      StepChoosers::Registrars::ElementSizeCfl<volume_dim, system>,
       StepChoosers::Registrars::Constant, StepChoosers::Registrars::Increase>;
-  using step_choosers_for_step_only =
-      tmpl::list<StepChoosers::Registrars::PreventRapidIncrease>;
+  using step_choosers_for_step_only = tmpl::list<
+      StepChoosers::Registrars::PreventRapidIncrease,
+      StepChoosers::Registrars::ErrorControl<typename system::variables_tag>>;
   using step_choosers_for_slab_only =
       tmpl::list<StepChoosers::Registrars::StepToTimes>;
   using step_choosers = std::conditional_t<
@@ -215,7 +220,7 @@ struct GeneralizedHarmonicTemplateBase<EvolutionMetavarsDerived<
   using analytic_solution_tag = Tags::AnalyticSolution<analytic_solution>;
   using boundary_condition_tag = analytic_solution_tag;
 
-  using observe_fields = tmpl::append<
+  using observe_fields = tmpl::flatten<tmpl::list<
       tmpl::push_back<
           analytic_solution_fields, gr::Tags::Lapse<DataVector>,
           ::Tags::PointwiseL2Norm<
@@ -226,7 +231,14 @@ struct GeneralizedHarmonicTemplateBase<EvolutionMetavarsDerived<
                          tmpl::list<::Tags::PointwiseL2Norm<
                              GeneralizedHarmonic::Tags::FourIndexConstraint<
                                  volume_dim, frame>>>,
-                         tmpl::list<>>>;
+                         tmpl::list<>>,
+      tmpl::conditional_t<
+          debug_volume_step_observation,
+          tmpl::push_back<typename db::add_tag_prefix<
+                              Tags::StepperError,
+                              typename system::variables_tag>::tags_list,
+                          Tags::VolumeStep>,
+          tmpl::list<>>>>;
 
   using observation_events = tmpl::list<
       dg::Events::Registrars::ObserveTensorNorms<Tags::Time, observe_fields>,
@@ -398,7 +410,8 @@ struct GeneralizedHarmonicTemplateBase<EvolutionMetavarsDerived<
       dg::Actions::InitializeMortars<boundary_scheme, !BjorhusExternalBoundary>,
 
       Initialization::Actions::AddComputeTags<tmpl::push_back<
-          StepChoosers::step_chooser_compute_tags<EvolutionMetavars>,
+          StepChoosers::step_chooser_compute_tags<
+              GeneralizedHarmonicTemplateBase>,
           evolution::Tags::AnalyticCompute<volume_dim, analytic_solution_tag,
                                            analytic_solution_fields>>>,
       Initialization::Actions::DiscontinuousGalerkin<derived_metavars>,

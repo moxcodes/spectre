@@ -76,7 +76,7 @@ class StepToTimes : public StepChooser<StepChooserRegistrars> {
   using return_tags = tmpl::list<>;
 
   template <typename Metavariables>
-  double operator()(
+  std::pair<double, bool> operator()(
       const TimeStepId& time_step_id, const double last_step_magnitude,
       const Parallel::GlobalCache<Metavariables>& /*cache*/) const noexcept {
     const auto& substep_time = time_step_id.substep_time();
@@ -89,7 +89,7 @@ class StepToTimes : public StepChooser<StepChooserRegistrars> {
     const auto goal_times = times_->times_near(now);
     if (not goal_times[1]) {
       // No times requested.
-      return std::numeric_limits<double>::infinity();
+      return std::make_pair(std::numeric_limits<double>::infinity(), true);
     }
 
     double distance_to_next_goal = std::numeric_limits<double>::signaling_NaN();
@@ -98,7 +98,7 @@ class StepToTimes : public StepChooser<StepChooserRegistrars> {
           *goal_times[1] > now + sloppiness ? goal_times[1] : goal_times[2];
       if (not next_time) {
         // We've passed all the times.  No restriction.
-        return std::numeric_limits<double>::infinity();
+        return std::make_pair(std::numeric_limits<double>::infinity(), true);
       }
       distance_to_next_goal = *next_time - now;
     } else {
@@ -106,7 +106,7 @@ class StepToTimes : public StepChooser<StepChooserRegistrars> {
           *goal_times[1] < now - sloppiness ? goal_times[1] : goal_times[0];
       if (not next_time) {
         // We've passed all the times.  No restriction.
-        return std::numeric_limits<double>::infinity();
+        return std::make_pair(std::numeric_limits<double>::infinity(), true);
       }
       distance_to_next_goal = now - *next_time;
     }
@@ -114,14 +114,14 @@ class StepToTimes : public StepChooser<StepChooserRegistrars> {
     if (distance_to_next_goal < 2.0 / 3.0 * last_step_magnitude) {
       // Our goal is well within range of the expected allowed step
       // size.
-      return distance_to_next_goal;
+      return std::make_pair(distance_to_next_goal, true);
     } else {
       // We can't reach our goal in one step, or at least might not be
       // able to if the step adjusts a relatively small amount for
       // other reasons.  Prevent the step from bringing us too close
       // to the goal so that the step following this one will not be
       // too small.
-      return 2.0 / 3.0 * distance_to_next_goal;
+      return std::make_pair(2.0 / 3.0 * distance_to_next_goal, true);
     }
   }
 

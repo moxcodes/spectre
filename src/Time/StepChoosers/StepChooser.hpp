@@ -97,6 +97,15 @@ class StepChooser : public PUP::able {
   /// The `last_step_magnitude` parameter describes the step size to be
   /// adjusted.  It may be the step size or the slab size, or may be
   /// infinite if the appropriate size cannot be determined.
+  ///
+  /// The return value of this function contains the desired step size
+  /// and a `bool` indicating whether the step should be accepted. If the `bool`
+  /// is `false`, the current time step will be recomputed with a step size
+  /// informed by the desired step value returned by this function. The
+  /// implementations of the call operator in derived classes should always
+  /// return a strictly smaller step than the `last_step_magnitude` when they
+  /// return `false` for the second member of the pair (indicating step
+  /// rejection).
   template <typename Metavariables, typename DbTags>
   std::pair<double, bool> desired_step(
       const gsl::not_null<db::DataBox<DbTags>*> box,
@@ -114,7 +123,7 @@ class StepChooser : public PUP::able {
                   *chooser, box, last_step_magnitude, cache);
             });
     ASSERT(
-        result > 0.,
+        result.first > 0.,
         "StepChoosers should always return positive values.  Got " << result);
     return result;
   }
