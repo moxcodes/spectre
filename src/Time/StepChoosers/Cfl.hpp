@@ -82,12 +82,20 @@ class Cfl : public StepChooser<StepChooserRegistrars> {
       const double minimum_grid_spacing,
       const typename Metavariables::time_stepper_tag::type::element_type&
           time_stepper,
-      const double speed, const double /*last_step_magnitude*/,
+      const double speed, const double last_step_magnitude,
       const Parallel::GlobalCache<Metavariables>& /*cache*/) const noexcept {
     const double time_stepper_stability_factor = time_stepper.stable_step();
-    return std::make_pair(safety_factor_ * time_stepper_stability_factor *
-                              minimum_grid_spacing / speed,
-                          true);
+    const double step_size = safety_factor_ * time_stepper_stability_factor *
+                             minimum_grid_spacing / speed;
+    // reject the step if the CFL condition is violated. In the case of CFL
+    // violation, ensure that the step diminishes slightly, to avoid the
+    // possibility of roundoff-scale fluctuations causing a retry with the same
+    // rejected step-size.
+    return std::make_pair(
+        step_size * (last_step_magnitude <= step_size
+                         ? 1.0
+                         : 1.0 - std::numeric_limits<double>::epsilon()),
+        last_step_magnitude <= step_size);
   }
 
   // NOLINTNEXTLINE(google-runtime-references)
