@@ -204,7 +204,11 @@ class ErrorControl : public StepChooser<StepChooserRegistrars> {
                       beta_factor),
               min_factor_, max_factor_);
     }
-    *previous_step_error = l_inf_error;
+    if (l_inf_error <= 1.0) {
+      *previous_step_error = l_inf_error;
+    } else {
+      new_step = std::min(new_step, previous_step * 0.99);
+    }
     return std::make_pair(new_step, l_inf_error <= 1.0);
   }
 

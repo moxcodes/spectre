@@ -98,13 +98,17 @@ bool change_step_size(
     return true;
   } else {
     db::mutate<Tags::Next<Tags::TimeStepId>, Tags::TimeStep>(
-        box, [&time_stepper, &time_id, &new_step](
-                 const gsl::not_null<TimeStepId*> next_time_id,
-                 const gsl::not_null<TimeDelta*> time_step) noexcept {
+        box,
+        [&time_stepper, &step_controller, &desired_step](
+            const gsl::not_null<TimeStepId*> next_time_id,
+            const gsl::not_null<TimeDelta*> time_step,
+            const TimeStepId& time_id) noexcept {
+          *time_step = step_controller.choose_step(
+              time_id.step_time(), desired_step);
           *next_time_id = time_stepper.next_time_id(
-              time_id, new_step.with_slab(time_id.step_time().slab()));
-          *time_step = new_step.with_slab(time_id.step_time().slab());
-        });
+              time_id, *time_step);
+        },
+        db::get<Tags::TimeStepId>(*box));
     return false;
   }
 }
