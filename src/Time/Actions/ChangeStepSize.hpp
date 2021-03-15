@@ -17,6 +17,7 @@
 #include "Utilities/TaggedTuple.hpp"
 
 #include "Parallel/Printf.hpp"
+#include "Utilities/MakeString.hpp"
 
 /// \cond
 class TimeDelta;
@@ -103,6 +104,8 @@ bool change_step_size(
             const gsl::not_null<TimeStepId*> next_time_id,
             const gsl::not_null<TimeDelta*> time_step,
             const TimeStepId& time_id) noexcept {
+          Parallel::printf(MakeString{} << "Time step rejected -- "
+                                        << time_step_id << "\n");
           *time_step = step_controller.choose_step(
               time_id.step_time(), desired_step);
           *next_time_id = time_stepper.next_time_id(

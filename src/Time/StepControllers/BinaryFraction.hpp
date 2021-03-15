@@ -20,6 +20,9 @@
 #include "Utilities/ErrorHandling/Assert.hpp"
 #include "Utilities/TMPL.hpp"
 
+#include "Parallel/Printf.hpp"
+#include "Utilities/MakeString.hpp"
+
 // IWYU pragma: no_include "Utilities/Rational.hpp"
 
 namespace StepControllers {
@@ -47,10 +50,14 @@ class BinaryFraction : public StepController {
     const TimeDelta full_slab =
         desired_step > 0 ? time.slab().duration() : -time.slab().duration();
     const double desired_step_count = full_slab.value() / desired_step;
+    Parallel::printf(MakeString{}
+                     << "Deseired step count: " << desired_step_count << "\n");
     const size_t desired_step_power =
         desired_step_count <= 1
             ? 0
             : static_cast<size_t>(std::ceil(std::log2(desired_step_count)));
+    Parallel::printf(MakeString{}
+                     << "Deseired step power: " << desired_step_power << "\n");
 
     // Ensure we will hit the slab boundary if we continue taking
     // constant-sized steps.
@@ -58,6 +65,7 @@ class BinaryFraction : public StepController {
         std::max(static_cast<decltype(time.fraction().denominator())>(
                      two_to_the(desired_step_power)),
                  time.fraction().denominator());
+    Parallel::printf(MakeString{} << "Step count: " << step_count << "\n");
 
     return full_slab / step_count;
   }
