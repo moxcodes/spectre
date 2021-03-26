@@ -7,6 +7,8 @@
 
 #include "DataStructures/Tensor/EagerMath/Magnitude.hpp"
 #include "DataStructures/VariablesTag.hpp"
+#include "Evolution/Systems/NewtonianEuler/BoundaryConditions/BoundaryCondition.hpp"
+#include "Evolution/Systems/NewtonianEuler/BoundaryCorrections/BoundaryCorrection.hpp"
 #include "Evolution/Systems/NewtonianEuler/Characteristics.hpp"
 #include "Evolution/Systems/NewtonianEuler/ConservativeFromPrimitive.hpp"
 #include "Evolution/Systems/NewtonianEuler/Fluxes.hpp"
@@ -28,6 +30,9 @@ struct System {
   static constexpr size_t volume_dim = Dim;
   static constexpr size_t thermodynamic_dim =
       EquationOfStateType::thermodynamic_dim;
+
+  using boundary_conditions_base = BoundaryConditions::BoundaryCondition<Dim>;
+  using boundary_correction = BoundaryCorrections::BoundaryCorrection<Dim>;
 
   using variables_tag = ::Tags::Variables<tmpl::list<
       Tags::MassDensityCons, Tags::MomentumDensity<Dim>, Tags::EnergyDensity>>;
