@@ -41,10 +41,10 @@ namespace Actions {
 ///
 /// For requirements on Metavariables, see `InterpolationTarget`.
 struct RegisterElement {
-  template <
-      typename ParallelComponent, typename DbTags, typename Metavariables,
-      typename ArrayIndex,
-      Requires<tmpl::list_contains_v<DbTags, Tags::NumberOfElements>> = nullptr>
+  template <typename ParallelComponent, typename DbTags, typename Metavariables,
+            typename ArrayIndex,
+            Requires<db::tag_is_retrievable_v<DbTags, Tags::NumberOfElements>> =
+                nullptr>
   static void apply(db::DataBox<DbTags>& box,
                     const Parallel::GlobalCache<Metavariables>& /*cache*/,
                     const ArrayIndex& /*array_index*/) noexcept {
@@ -52,6 +52,37 @@ struct RegisterElement {
         make_not_null(&box),
         [](const gsl::not_null<size_t*> num_elements) noexcept {
           ++(*num_elements);
+        });
+  }
+};
+
+/// \ingroup ActionsGroup
+/// \brief Invoked on the `Interpolator` ParallelComponent to deregister an
+/// element with the `Interpolator`.
+///
+/// This is called by `RegisterElementWithInterpolator` below.
+///
+/// Uses: nothing
+///
+/// DataBox changes:
+/// - Adds: nothing
+/// - Removes: nothing
+/// - Modifies:
+///   - `Tags::NumberOfElements`
+///
+/// For requirements on Metavariables, see `InterpolationTarget`.
+struct DeregisterElement {
+  template <typename ParallelComponent, typename DbTags, typename Metavariables,
+            typename ArrayIndex,
+            Requires<db::tag_is_retrievable_v<DbTags, Tags::NumberOfElements>> =
+                nullptr>
+  static void apply(db::DataBox<DbTags>& box,
+                    const Parallel::GlobalCache<Metavariables>& /*cache*/,
+                    const ArrayIndex& /*array_index*/) noexcept {
+    db::mutate<Tags::NumberOfElements>(
+        make_not_null(&box),
+        [](const gsl::not_null<size_t*> num_elements) noexcept {
+          --(*num_elements);
         });
   }
 };
@@ -67,7 +98,49 @@ struct RegisterElement {
 /// - Removes: nothing
 /// - Modifies: nothing
 ///
+/// When this struct is used as an action, the `apply` function will perform the
+/// registration with the interpolator. However, this struct also offers the
+/// static member functions `perform_registration` and `perform_deregistration`
+/// that are needed for either registering when an element is added to a core
+/// outside of initialization or deregistering when an element is being
+/// eliminated from a core. The use of separate functions is necessary to
+/// provide an interface usable outside of iterable actions, e.g. in specialized
+/// `pup` functions.
 struct RegisterElementWithInterpolator {
+ private:
+  template <typename ParallelComponent, typename RegisterOrDeregisterAction,
+            typename DbTagList, typename Metavariables, typename ArrayIndex>
+  static void register_or_deregister_impl(
+      const db::DataBox<DbTagList>& /*box*/,
+      Parallel::GlobalCache<Metavariables>& cache,
+      const ArrayIndex& /*array_index*/) noexcept {
+    auto& interpolator =
+        *Parallel::get_parallel_component<::intrp::Interpolator<Metavariables>>(
+             cache)
+             .ckLocalBranch();
+    Parallel::simple_action<RegisterOrDeregisterAction>(interpolator);
+  }
+
+ public:
+  template <typename ParallelComponent, typename DbTagList,
+            typename Metavariables, typename ArrayIndex>
+  static void perform_registration(const db::DataBox<DbTagList>& box,
+                                   Parallel::GlobalCache<Metavariables>& cache,
+                                   const ArrayIndex& array_index) noexcept {
+    register_or_deregister_impl<ParallelComponent, RegisterElement>(
+        box, cache, array_index);
+  }
+
+  template <typename ParallelComponent, typename DbTagList,
+            typename Metavariables, typename ArrayIndex>
+  static void perform_deregistration(
+      const db::DataBox<DbTagList>& box,
+      Parallel::GlobalCache<Metavariables>& cache,
+      const ArrayIndex& array_index) noexcept {
+    register_or_deregister_impl<ParallelComponent, DeregisterElement>(
+        box, cache, array_index);
+  }
+
   template <typename DbTagList, typename... InboxTags, typename Metavariables,
             typename ArrayIndex, typename ActionList,
             typename ParallelComponent>
@@ -75,13 +148,9 @@ struct RegisterElementWithInterpolator {
       db::DataBox<DbTagList>& box,
       const tuples::TaggedTuple<InboxTags...>& /*inboxes*/,
       Parallel::GlobalCache<Metavariables>& cache,
-      const ArrayIndex& /*array_index*/, const ActionList /*meta*/,
+      const ArrayIndex& array_index, const ActionList /*meta*/,
       const ParallelComponent* const /*meta*/) noexcept {
-    auto& interpolator =
-        *Parallel::get_parallel_component<::intrp::Interpolator<Metavariables>>(
-             cache)
-             .ckLocalBranch();
-    Parallel::simple_action<RegisterElement>(interpolator);
+    perform_registration<ParallelComponent>(box, cache, array_index);
     return {std::move(box)};
   }
 };
