@@ -30,7 +30,12 @@
 namespace Cce::InitializeJ {
 namespace detail {
 double adjust_angular_coordinates_for_omega(
-    const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*> volume_j,
+    const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*>
+        j_to_transform,
+    const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 2>>*>
+        dr_j_to_transform,
+    const gsl::not_null<Scalar<SpinWeighted<ComplexDataVector, 0>>*>
+        r_to_transform,
     const gsl::not_null<tnsr::i<DataVector, 3>*> cartesian_cauchy_coordinates,
     const gsl::not_null<
         tnsr::i<DataVector, 2, ::Frame::Spherical<::Frame::Inertial>>*>
@@ -287,7 +292,21 @@ double adjust_angular_coordinates_for_omega(
         0.5 * sqrt(get(gauge_d).data() * conj(get(gauge_d).data()) -
                    get(gauge_c).data() * conj(get(gauge_c).data()));
 
-    GaugeAdjustInitialJ::apply(volume_j, gauge_c, gauge_d, gauge_omega,
+    Spectral::Swsh::SwshInterpolator interpolator{
+        get<0>(*angular_cauchy_coordinates),
+        get<1>(*angular_cauchy_coordinates), l_max};
+    // re-use the `next_gauge_c` buffer because it isn't needed anymore
+    auto& gauge_transformed_dr_j = next_gauge_c;
+    GaugeAdjustedBoundaryValue<Tags::Dr<Tags::BondiJ>>::apply(
+        make_not_null(&gauge_transformed_dr_j), *dr_j_to_transform,
+        *j_to_transform, gauge_c, gauge_d, gauge_omega, interpolator, l_max);
+    *dr_j_to_transform = gauge_transformed_dr_j;
+    auto& gauge_transformed_r = next_gauge_d;
+    GaugeAdjustedBoundaryValue<Tags::BondiR>::apply(
+        make_not_null(&gauge_transformed_r), *r_to_transform, gauge_omega,
+        interpolator);
+    *r_to_transform = gauge_transformed_r;
+    GaugeAdjustInitialJ::apply(j_to_transform, gauge_c, gauge_d, gauge_omega,
                                *angular_cauchy_coordinates, l_max);
   }
   return max_error;
@@ -307,20 +326,25 @@ void ConformalFactor::operator()(
         tnsr::i<DataVector, 2, ::Frame::Spherical<::Frame::Inertial>>*>
         angular_cauchy_coordinates,
     const Scalar<SpinWeighted<ComplexDataVector, 2>>& boundary_j,
-    const Scalar<SpinWeighted<ComplexDataVector, 2>>& /*boundary_dr_j*/,
-    const Scalar<SpinWeighted<ComplexDataVector, 0>>& /*r*/,
+    const Scalar<SpinWeighted<ComplexDataVector, 2>>& boundary_dr_j,
+    const Scalar<SpinWeighted<ComplexDataVector, 0>>& r,
     const Scalar<SpinWeighted<ComplexDataVector, 0>>& beta, const size_t l_max,
     const size_t number_of_radial_points) const noexcept {
   const DataVector one_minus_y_collocation =
       1.0 - Spectral::collocation_points<Spectral::Basis::Legendre,
                                          Spectral::Quadrature::GaussLobatto>(
                 number_of_radial_points);
-  Scalar<SpinWeighted<ComplexDataVector, 2>> first_angular_view_j{};
-  get(first_angular_view_j).data().set_data_ref(get(*j).data().data(),
-                                           get(boundary_j).size());
+  // allocations can be aggregated or omitted by optimization
+  Scalar<SpinWeighted<ComplexDataVector, 2>> first_angular_view_j{
+      get(boundary_j).size()};
+  Scalar<SpinWeighted<ComplexDataVector, 2>> first_angular_view_dr_j =
+      boundary_dr_j;
+  Scalar<SpinWeighted<ComplexDataVector, 0>> gauge_transformed_r = r;
   get(first_angular_view_j) = get(boundary_j);
   detail::adjust_angular_coordinates_for_omega(
-      make_not_null(&first_angular_view_j), cartesian_cauchy_coordinates,
+      make_not_null(&first_angular_view_j),
+      make_not_null(&first_angular_view_dr_j),
+      make_not_null(&gauge_transformed_r), cartesian_cauchy_coordinates,
       angular_cauchy_coordinates, exp(2.0 * get(beta)), l_max, 1.0e-10, 100_st,
       true);
   for (size_t i = 0; i < number_of_radial_points; i++) {
@@ -330,8 +354,17 @@ void ConformalFactor::operator()(
     // auto is acceptable here as these two values are only used once in the
     // below computation. `auto` causes an expression template to be
     // generated, rather than allocating.
-    const auto one_minus_y_coefficient = 0.5 * get(first_angular_view_j).data();
-    angular_view_j = one_minus_y_collocation[i] * one_minus_y_coefficient;
+    const auto one_minus_y_coefficient =
+        0.25 *
+        (3.0 * get(first_angular_view_j).data() +
+         get(gauge_transformed_r).data() * get(first_angular_view_dr_j).data());
+    const auto one_minus_y_cubed_coefficient =
+        -0.0625 *
+        (get(first_angular_view_j).data() +
+         get(gauge_transformed_r).data() * get(first_angular_view_dr_j).data());
+    angular_view_j =
+        one_minus_y_collocation[i] * one_minus_y_coefficient +
+        pow<3>(one_minus_y_collocation[i]) * one_minus_y_cubed_coefficient;
   }
 }
 
