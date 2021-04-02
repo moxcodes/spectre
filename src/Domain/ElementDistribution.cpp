@@ -16,6 +16,7 @@
 
 namespace domain {
 
+namespace {
 // This interleaves the bits of the element index.
 // A sketch of a 4x2 2D element, with bit indices and resulting z-curve
 //
@@ -26,17 +27,24 @@ namespace domain {
 // v  1 |  1   3   5   7
 template <size_t Dim>
 size_t z_curve_index(const ElementId<Dim>& element_id) noexcept {
-  std::array<std::pair<size_t, size_t>, Dim> element_refinement_order;
+  // for the bit manipulation of the element index, we need to interleave the
+  // indices in each dimension in order according to how many bits are in the
+  // index representation. This variable stores the refinement level and
+  // dimension index in ascending order of refinement level, representing a
+  // permutation of the dimensions
+  std::array<std::pair<size_t, size_t>, Dim>
+      dimension_by_highest_refinement_level;
   for (size_t i = 0; i < Dim; ++i) {
-    element_refinement_order.at(i) = std::make_pair(
+    dimension_by_highest_refinement_level.at(i) = std::make_pair(
         gsl::at(element_id.segment_ids(), i).refinement_level(), i);
   }
-  alg::sort(element_refinement_order, [](const std::pair<size_t, size_t>& lhs,
-                                         const std::pair<size_t, size_t>& rhs) {
-    return lhs.first < rhs.first;
-  });
+  alg::sort(dimension_by_highest_refinement_level,
+            [](const std::pair<size_t, size_t>& lhs,
+               const std::pair<size_t, size_t>& rhs) {
+              return lhs.first < rhs.first;
+            });
 
-  size_t aggregated_id = 0;
+  size_t element_order_index = 0;
 
   // 'gap' the lowest refinement direction bits as:
   // ... x1 x0 -> ... x1 0 0 x0,
@@ -52,26 +60,29 @@ size_t z_curve_index(const ElementId<Dim>& element_id) noexcept {
   for (size_t i = 0; i < Dim; ++i) {
     const size_t id_to_gap_and_shift =
         gsl::at(element_id.segment_ids(),
-                gsl::at(element_refinement_order, i).second)
+                gsl::at(dimension_by_highest_refinement_level, i).second)
             .index();
     size_t total_gap = leading_gap;
-    if (gsl::at(element_refinement_order, i).first > 0) {
+    if (gsl::at(dimension_by_highest_refinement_level, i).first > 0) {
       ++leading_gap;
     }
     for (size_t bit_index = 0;
-         bit_index < gsl::at(element_refinement_order, i).first; ++bit_index) {
-      aggregated_id |=
+         bit_index < gsl::at(dimension_by_highest_refinement_level, i).first;
+         ++bit_index) {
+      element_order_index |=
           ((id_to_gap_and_shift & two_to_the(bit_index)) << total_gap);
       for (size_t j = 0; j < Dim; ++j) {
         if (i != j and
-            bit_index + 1 < gsl::at(element_refinement_order, j).first) {
+            bit_index + 1 <
+                gsl::at(dimension_by_highest_refinement_level, j).first) {
           ++total_gap;
         }
       }
     }
   }
-  return aggregated_id;
+  return element_order_index;
 }
+}  // namespace
 
 template <size_t Dim>
 BlockZCurveProcDistribution<Dim>::BlockZCurveProcDistribution(
@@ -140,7 +151,7 @@ size_t BlockZCurveProcDistribution<Dim>::get_proc_for_element(
   }
   ERROR(
       "Processor not successfully chosen. This indicates a flaw in the logic "
-      "BlockZCurveProcDistribution.");
+      "of BlockZCurveProcDistribution.");
 }
 #define GET_DIM(data) BOOST_PP_TUPLE_ELEM(0, data)
 
