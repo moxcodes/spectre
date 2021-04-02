@@ -527,14 +527,11 @@ class BinaryCompactObject : public DomainCreator<3> {
     using group = SizeMap;
   };
 
-  using time_independent_options = tmpl::list<
-      InnerRadiusObjectA, OuterRadiusObjectA, XCoordObjectA, ExciseInteriorA,
-      InnerRadiusObjectB, OuterRadiusObjectB, XCoordObjectB, ExciseInteriorB,
-      RadiusOuterCube, RadiusOuterSphere, InitialRefinement, InitialGridPoints,
-      UseEquiangularMap, UseProjectiveMap, UseLogarithmicMapOuterSphericalShell,
-      AdditionToOuterLayerRadialRefinementLevel, UseLogarithmicMapObjectA,
-      AdditionToObjectARadialRefinementLevel, UseLogarithmicMapObjectB,
-      AdditionToObjectBRadialRefinementLevel>;
+  using time_independent_options =
+      tmpl::list<ObjectA, ObjectB, RadiusEnvelopingCube, RadiusOuterSphere,
+                 InitialRefinement, InitialGridPoints, UseProjectiveMap,
+                 UseLogarithmicMapOuterSphericalShell,
+                 AdditionToOuterLayerRadialRefinementLevel>;
   using time_dependent_options =
       tmpl::list<InitialTime, InitialExpirationDeltaT,
                  ExpansionMapOuterBoundary, InitialExpansion,
@@ -578,32 +575,16 @@ class BinaryCompactObject : public DomainCreator<3> {
       "(InitialRefinement + OuterSphere.AdditionToRadialRefinementLevel)."};
 
   BinaryCompactObject(
-      typename InnerRadiusObjectA::type inner_radius_object_A,
-      typename OuterRadiusObjectA::type outer_radius_object_A,
-      typename XCoordObjectA::type xcoord_object_A,
-      typename ExciseInteriorA::type excise_interior_A,
-      typename InnerRadiusObjectB::type inner_radius_object_B,
-      typename OuterRadiusObjectB::type outer_radius_object_B,
-      typename XCoordObjectB::type xcoord_object_B,
-      typename ExciseInteriorB::type excise_interior_B,
-      typename RadiusOuterCube::type radius_enveloping_cube,
+      Object object_A, Object object_B,
+      typename RadiusEnvelopingCube::type radius_enveloping_cube,
       typename RadiusOuterSphere::type radius_enveloping_sphere,
       typename InitialRefinement::type initial_refinement,
       typename InitialGridPoints::type initial_grid_points_per_dim,
-      typename UseEquiangularMap::type use_equiangular_map,
       typename UseProjectiveMap::type use_projective_map = true,
       typename UseLogarithmicMapOuterSphericalShell::type
           use_logarithmic_map_outer_spherical_shell = false,
       typename AdditionToOuterLayerRadialRefinementLevel::type
           addition_to_outer_layer_radial_refinement_level = 0,
-      typename UseLogarithmicMapObjectA::type use_logarithmic_map_object_A =
-          false,
-      typename AdditionToObjectARadialRefinementLevel::type
-          addition_to_object_A_radial_refinement_level = 0,
-      typename UseLogarithmicMapObjectB::type use_logarithmic_map_object_B =
-          false,
-      typename AdditionToObjectBRadialRefinementLevel::type
-          addition_to_object_B_radial_refinement_level = 0,
       const Options::Context& context = {});
 
   BinaryCompactObject(
@@ -622,32 +603,16 @@ class BinaryCompactObject : public DomainCreator<3> {
       typename InitialSizeMapVelocities::type initial_size_map_velocities,
       typename InitialSizeMapAccelerations::type initial_size_map_accelerations,
       typename SizeMapFunctionOfTimeNames::type size_map_function_of_time_names,
-      typename InnerRadiusObjectA::type inner_radius_object_A,
-      typename OuterRadiusObjectA::type outer_radius_object_A,
-      typename XCoordObjectA::type xcoord_object_A,
-      typename ExciseInteriorA::type excise_interior_A,
-      typename InnerRadiusObjectB::type inner_radius_object_B,
-      typename OuterRadiusObjectB::type outer_radius_object_B,
-      typename XCoordObjectB::type xcoord_object_B,
-      typename ExciseInteriorB::type excise_interior_B,
-      typename RadiusOuterCube::type radius_enveloping_cube,
+      Object object_A, Object object_B,
+      typename RadiusEnvelopingCube::type radius_enveloping_cube,
       typename RadiusOuterSphere::type radius_enveloping_sphere,
       typename InitialRefinement::type initial_refinement,
       typename InitialGridPoints::type initial_grid_points_per_dim,
-      typename UseEquiangularMap::type use_equiangular_map,
       typename UseProjectiveMap::type use_projective_map = true,
       typename UseLogarithmicMapOuterSphericalShell::type
           use_logarithmic_map_outer_spherical_shell = false,
       typename AdditionToOuterLayerRadialRefinementLevel::type
           addition_to_outer_layer_radial_refinement_level = 0,
-      typename UseLogarithmicMapObjectA::type use_logarithmic_map_object_A =
-          false,
-      typename AdditionToObjectARadialRefinementLevel::type
-          addition_to_object_A_radial_refinement_level = 0,
-      typename UseLogarithmicMapObjectB::type use_logarithmic_map_object_B =
-          false,
-      typename AdditionToObjectBRadialRefinementLevel::type
-          addition_to_object_B_radial_refinement_level = 0,
       const Options::Context& context = {});
 
   BinaryCompactObject() = default;
