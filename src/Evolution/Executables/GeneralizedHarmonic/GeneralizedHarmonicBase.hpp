@@ -220,23 +220,27 @@ struct GeneralizedHarmonicTemplateBase<EvolutionMetavarsDerived<
   using analytic_solution_tag = Tags::AnalyticSolution<analytic_solution>;
   using boundary_condition_tag = analytic_solution_tag;
 
-  using observe_fields = tmpl::append<
-      tmpl::push_back<
-          analytic_solution_fields, gr::Tags::Lapse<DataVector>,
-          ::Tags::PointwiseL2Norm<
-              GeneralizedHarmonic::Tags::GaugeConstraint<volume_dim, frame>>,
-          ::Tags::PointwiseL2Norm<GeneralizedHarmonic::Tags::
-                                      ThreeIndexConstraint<volume_dim, frame>>>,
+  using observe_fields = tmpl::flatten<tmpl::list<
+      analytic_solution_fields, gr::Tags::Lapse<DataVector>,
+      ::Tags::PointwiseL2Norm<
+          GeneralizedHarmonic::Tags::GaugeConstraint<volume_dim, frame>>,
+      ::Tags::PointwiseL2Norm<
+          GeneralizedHarmonic::Tags::ThreeIndexConstraint<volume_dim, frame>>,
       std::conditional_t<volume_dim == 3,
                          tmpl::list<::Tags::PointwiseL2Norm<
                              GeneralizedHarmonic::Tags::FourIndexConstraint<
                                  volume_dim, frame>>>,
-                         tmpl::list<>>>;
+                         tmpl::list<>>>>;
 
   using observation_events = tmpl::list<
       dg::Events::Registrars::ObserveTensorNorms<Tags::Time, observe_fields>,
       dg::Events::Registrars::ObserveFields<
-          volume_dim, Tags::Time, observe_fields, analytic_solution_fields>,
+          volume_dim, Tags::Time,
+          tmpl::append<observe_fields,
+                       typename db::add_tag_prefix<
+                           Tags::StepperError,
+                           typename system::variables_tag>::tags_list>,
+          analytic_solution_fields>,
       Events::Registrars::ObserveTimeStep<system>,
       Events::Registrars::ChangeSlabSize<slab_choosers>>;
 

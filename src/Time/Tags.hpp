@@ -250,8 +250,26 @@ struct StepController : db::SimpleTag {
   }
 };
 
+
+struct UsingStepperError {
+  using type = bool;
+  static constexpr Options::String help =
+      "Whether to compute the stepper error";
+};
+
+
 /// \ingroup TimeGroup
 /// \brief A tag that is true if the `ErrorControl` step chooser is one of the
 /// option-created `Event`s.
 struct IsUsingTimeSteppingErrorControlBase : db::BaseTag {};
+
+struct ManuallyChosenUsingStepperError : db::SimpleTag,
+                                         IsUsingTimeSteppingErrorControlBase {
+  using type = bool;
+  using option_tags = tmpl::list<UsingStepperError>;
+  static constexpr bool pass_metavariables = false;
+  static bool create_from_options(const bool using_stepper_error) noexcept {
+    return using_stepper_error;
+  }
+};
 }  // namespace Tags
