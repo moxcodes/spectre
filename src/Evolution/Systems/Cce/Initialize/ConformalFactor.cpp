@@ -197,6 +197,8 @@ double adjust_angular_coordinates_for_omega(
 
   double max_error = 1.0;
   size_t number_of_steps = 0;
+  SpinWeighted<ComplexDataVector, 1> jacobian_supplement_f{
+      number_of_angular_points};
   while (true) {
     GaugeUpdateAngularFromCartesian<
         Tags::CauchyAngularCoords,
@@ -219,8 +221,21 @@ double adjust_angular_coordinates_for_omega(
         0.5 * sqrt(get(gauge_d).data() * conj(get(gauge_d).data()) -
                    get(gauge_c).data() * conj(get(gauge_c).data()));
 
+    double gauge_omega_avg = 0.0;
+    for (auto& val : get(gauge_omega).data()) {
+      gauge_omega_avg += real(val);
+    }
+    gauge_omega_avg /= static_cast<double>(number_of_angular_points);
+
+    double target_omega_avg = 0.0;
+    for (auto& val : target_omega.data()) {
+      target_omega_avg += real(val);
+    }
+    target_omega_avg /= static_cast<double>(number_of_angular_points);
+
     // check completion conditions
-    max_error = max(abs(get(gauge_omega).data() - target_omega.data()));
+    max_error = max(abs(get(gauge_omega).data() - gauge_omega_avg -
+                        target_omega.data() + target_omega_avg));
     Parallel::printf("Debug iterative solve: %e\n", max_error);
     ++number_of_steps;
     if (max_error > 5.0e-3) {
@@ -236,11 +251,15 @@ double adjust_angular_coordinates_for_omega(
     }
     // The alteration in each of the spin-weighted Jacobian factors determined
     // by linearizing the system in small J
-    get(next_gauge_c).data() =
-        -(target_omega.data() - get(gauge_omega).data()) * get(gauge_c).data();
     get(next_gauge_d).data() = get(gauge_omega).data() *
-                               (target_omega.data() - get(gauge_omega).data()) /
+                               (target_omega.data() - target_omega_avg -
+                                get(gauge_omega).data() + gauge_omega_avg) /
                                get(gauge_d).data();
+    Spectral::Swsh::angular_derivatives<
+        tmpl::list<Spectral::Swsh::Tags::InverseEthbar>>(
+        l_max, 1, make_not_null(&jacobian_supplement_f), get(next_gauge_d));
+    Spectral::Swsh::angular_derivatives<tmpl::list<Spectral::Swsh::Tags::Eth>>(
+        l_max, 1, make_not_null(&get(next_gauge_c)), jacobian_supplement_f);
 
     iteration_interpolator.interpolate(make_not_null(&evolution_gauge_eth_x),
                                        eth_x);
@@ -345,8 +364,8 @@ void ConformalFactor::operator()(
       make_not_null(&first_angular_view_j),
       make_not_null(&first_angular_view_dr_j),
       make_not_null(&gauge_transformed_r), cartesian_cauchy_coordinates,
-      angular_cauchy_coordinates, exp(2.0 * get(beta)), l_max, 1.0e-10, 100_st,
-      true);
+      angular_cauchy_coordinates, exp(2.0 * get(beta)), l_max, 1.0e-14,
+      1000_st, true);
   for (size_t i = 0; i < number_of_radial_points; i++) {
     ComplexDataVector angular_view_j{
         get(*j).data().data() + get(boundary_j).size() * i,
