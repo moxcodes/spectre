@@ -43,8 +43,8 @@ namespace Actions {
 struct RegisterElement {
   template <typename ParallelComponent, typename DbTags, typename Metavariables,
             typename ArrayIndex,
-            Requires<db::tag_is_retrievable_v<DbTags, Tags::NumberOfElements>> =
-                nullptr>
+            Requires<db::tag_is_retrievable_v<Tags::NumberOfElements,
+                                              db::DataBox<DbTags>>> = nullptr>
   static void apply(db::DataBox<DbTags>& box,
                     const Parallel::GlobalCache<Metavariables>& /*cache*/,
                     const ArrayIndex& /*array_index*/) noexcept {
@@ -74,8 +74,8 @@ struct RegisterElement {
 struct DeregisterElement {
   template <typename ParallelComponent, typename DbTags, typename Metavariables,
             typename ArrayIndex,
-            Requires<db::tag_is_retrievable_v<DbTags, Tags::NumberOfElements>> =
-                nullptr>
+            Requires<db::tag_is_retrievable_v<Tags::NumberOfElements,
+                                              db::DataBox<DbTags>>> = nullptr>
   static void apply(db::DataBox<DbTags>& box,
                     const Parallel::GlobalCache<Metavariables>& /*cache*/,
                     const ArrayIndex& /*array_index*/) noexcept {
@@ -109,9 +109,8 @@ struct DeregisterElement {
 struct RegisterElementWithInterpolator {
  private:
   template <typename ParallelComponent, typename RegisterOrDeregisterAction,
-            typename DbTagList, typename Metavariables, typename ArrayIndex>
+            typename Metavariables, typename ArrayIndex>
   static void register_or_deregister_impl(
-      const db::DataBox<DbTagList>& /*box*/,
       Parallel::GlobalCache<Metavariables>& cache,
       const ArrayIndex& /*array_index*/) noexcept {
     auto& interpolator =
@@ -122,23 +121,27 @@ struct RegisterElementWithInterpolator {
   }
 
  public:
+  // the registration functions do not use the DataBox argument, but need to
+  // keep it to conform to the interface used in the registration and
+  // deregistration procedure in Algorithm.hpp, which also supports registration
+  // and deregistration that does use the box.
   template <typename ParallelComponent, typename DbTagList,
             typename Metavariables, typename ArrayIndex>
-  static void perform_registration(const db::DataBox<DbTagList>& box,
+  static void perform_registration(const db::DataBox<DbTagList>& /*box*/,
                                    Parallel::GlobalCache<Metavariables>& cache,
                                    const ArrayIndex& array_index) noexcept {
     register_or_deregister_impl<ParallelComponent, RegisterElement>(
-        box, cache, array_index);
+        cache, array_index);
   }
 
   template <typename ParallelComponent, typename DbTagList,
             typename Metavariables, typename ArrayIndex>
   static void perform_deregistration(
-      const db::DataBox<DbTagList>& box,
+      const db::DataBox<DbTagList>& /*box*/,
       Parallel::GlobalCache<Metavariables>& cache,
       const ArrayIndex& array_index) noexcept {
     register_or_deregister_impl<ParallelComponent, DeregisterElement>(
-        box, cache, array_index);
+        cache, array_index);
   }
 
   template <typename DbTagList, typename... InboxTags, typename Metavariables,
