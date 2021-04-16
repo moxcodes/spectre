@@ -354,13 +354,13 @@ Main<Metavariables>::Main(CkArgMsg* msg) noexcept {
       mutable_global_cache_proxy_, this->thisProxy,
       &mutable_global_cache_dependency);
 
-  if constexpr (Algorithm_detail::has_LoadBalancing_v<
-                    typename Metavariables::Phase>) {
-    at_sync_indicator_proxy_ =
-        detail::CProxy_AtSyncIndicator<Metavariables>::ckNew();
-    at_sync_indicator_proxy_[0].insert(this->thisProxy, sys::my_proc());
-    at_sync_indicator_proxy_.doneInserting();
-  }
+  // if constexpr (Algorithm_detail::has_LoadBalancing_v<
+                    // typename Metavariables::Phase>) {
+    // at_sync_indicator_proxy_ =
+        // detail::CProxy_AtSyncIndicator<Metavariables>::ckNew();
+    // at_sync_indicator_proxy_[0].insert(this->thisProxy, sys::my_proc());
+    // at_sync_indicator_proxy_.doneInserting();
+  // }
 
   tuples::tagged_tuple_from_typelist<parallel_component_tag_list>
       the_parallel_components;
@@ -503,13 +503,13 @@ void Main<Metavariables>::execute_next_phase() noexcept {
     Informer::print_exit_info();
     sys::exit();
   }
-  if constexpr (Algorithm_detail::has_LoadBalancing_v<
-                    typename Metavariables::Phase>) {
-    if(current_phase_ == Metavariables::Phase::LoadBalancing) {
-      at_sync_indicator_proxy_.IndicateAtSync();
-      return;
-    }
-  }
+  // if constexpr (Algorithm_detail::has_LoadBalancing_v<
+                    // typename Metavariables::Phase>) {
+    // if(current_phase_ == Metavariables::Phase::LoadBalancing) {
+      // at_sync_indicator_proxy_.IndicateAtSync();
+      // return;
+    // }
+  // }
   tmpl::for_each<component_list>([this](auto parallel_component) noexcept {
     tmpl::type_from<decltype(parallel_component)>::execute_next_phase(
         current_phase_, global_cache_proxy_);

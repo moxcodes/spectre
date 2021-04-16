@@ -51,6 +51,60 @@
 // IWYU pragma: no_include "Parallel/Algorithm.hpp"  // Include... ourself?
 
 namespace Parallel {
+
+namespace detail {
+
+template <typename CBaseInherit>
+class CBaseWithResume : public CBaseInherit {
+ public:
+  CBaseWithResume() = default;
+  explicit CBaseWithResume(CkMigrateMessage* msg) noexcept
+      : CBaseInherit(msg) {}
+
+  virtual void ResumeFromSync() = 0;
+};
+
+// obtains the Chare type for the component associated with a template
+// instantiation of the `AlgorithmImpl`, for choosing the appropriate type from
+// which to inherit.
+template <typename Component, typename ChareType>
+struct get_charm_base_class;
+
+template <typename Component>
+struct get_charm_base_class<Component, Parallel::Algorithms::Array> {
+  using type = CBase_AlgorithmArray<
+      Component, typename get_array_index<
+                     Parallel::Algorithms::Array>::template f<Component>>;
+};
+
+template <typename Component>
+struct get_charm_base_class<Component, Parallel::Algorithms::Group> {
+  using type = CBaseWithResume<CBase_AlgorithmGroup<
+      Component, typename get_array_index<
+                     Parallel::Algorithms::Group>::template f<Component>>>;
+};
+
+template <typename Component>
+struct get_charm_base_class<Component, Parallel::Algorithms::Nodegroup> {
+  using type = CBaseWithResume<CBase_AlgorithmNodegroup<
+      Component, typename get_array_index<
+                     Parallel::Algorithms::Nodegroup>::template f<Component>>>;
+};
+
+template <typename Component>
+struct get_charm_base_class<Component, Parallel::Algorithms::Singleton> {
+  using type = CBaseWithResume<CBase_AlgorithmSingleton<
+      Component, typename get_array_index<
+                     Parallel::Algorithms::Singleton>::template f<Component>>>;
+};
+
+template <typename Component>
+using get_charm_base_class_t =
+    typename get_charm_base_class<Component,
+                                  typename Component::chare_type>::type;
+
+}  // namespace detail
+
 /// \cond
 template <typename ParallelComponent, typename PhaseDepActionList>
 class AlgorithmImpl;
@@ -139,10 +193,7 @@ constexpr bool has_registration_list_v =
  */
 template <typename ParallelComponent, typename... PhaseDepActionListsPack>
 class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
-    : public ParallelComponent::chare_type::template cbase<
-          ParallelComponent,
-          typename get_array_index<typename ParallelComponent::chare_type>::
-              template f<ParallelComponent>> {
+    : public detail::get_charm_base_class_t<ParallelComponent> {
   static_assert(
       sizeof...(PhaseDepActionListsPack) > 0,
       "Must have at least one phase dependent action list "
@@ -171,12 +222,18 @@ class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
       typename chare_type::template cproxy<parallel_component, array_index>;
   /// The Charm++ base object type
   using cbase_type =
-      typename chare_type::template cbase<parallel_component, array_index>;
+      detail::get_charm_base_class_t<ParallelComponent>;
   /// The type of the phases
   using PhaseType =
       typename tmpl::front<tmpl::list<PhaseDepActionListsPack...>>::phase_type;
 
   using phase_dependent_action_lists = tmpl::list<PhaseDepActionListsPack...>;
+
+  void ResumeFromSync() override {
+    halt_algorithm_until_next_phase_ = false;
+    terminate_ = false;
+    this->perform_algorithm();
+  }
 
   /// \cond
   // Needed for serialization
@@ -550,6 +607,7 @@ class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
         switch(get<1>(action_return)) {
           case AlgorithmExecution::Halt:
             halt_algorithm_until_next_phase_ = true;
+            this->AtSync();
             terminate_ = true;
             break;
           case AlgorithmExecution::Pause:
@@ -637,7 +695,7 @@ AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>::
                                Parallel::Algorithms::Array> and
                 Algorithm_detail::has_LoadBalancing_v<
                     typename metavariables::Phase>) {
-    this->usesAtSync = false;
+    this->usesAtSync = true;
     this->setMigratable(true);
   }
   global_cache_ = global_cache_proxy.ckLocalBranch();

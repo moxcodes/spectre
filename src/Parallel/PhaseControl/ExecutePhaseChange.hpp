@@ -66,8 +66,8 @@ struct ExecutePhaseChange {
     for (const auto& [trigger, phase_changes] : phase_change_and_triggers) {
       if (trigger->is_triggered(box)) {
         for (const auto& phase_change : phase_changes) {
-          phase_change->template contribute_phase_data<ParallelComponent>(
-              make_not_null(&box), cache, array_index);
+          // phase_change->template contribute_phase_data<ParallelComponent>(
+              // make_not_null(&box), cache, array_index);
         }
         should_halt = true;
       }
@@ -78,15 +78,15 @@ struct ExecutePhaseChange {
     if (should_halt) {
       if constexpr (std::is_same_v<typename ParallelComponent::chare_type,
                     Parallel::Algorithms::Array>) {
-        Parallel::contribute_to_phase_change_reduction<ParallelComponent>(
-            tuples::TaggedTuple<TagsAndCombines::UsePhaseChangeArbitration>{
-                true},
-            cache, array_index);
+        // Parallel::contribute_to_phase_change_reduction<ParallelComponent>(
+            // tuples::TaggedTuple<TagsAndCombines::UsePhaseChangeArbitration>{
+                // true},
+            // cache, array_index);
       } else {
-        Parallel::contribute_to_phase_change_reduction<ParallelComponent>(
-            tuples::TaggedTuple<TagsAndCombines::UsePhaseChangeArbitration>{
-                true},
-            cache);
+        // Parallel::contribute_to_phase_change_reduction<ParallelComponent>(
+            // tuples::TaggedTuple<TagsAndCombines::UsePhaseChangeArbitration>{
+                // true},
+            // cache);
       }
     }
     return {std::move(box), should_halt
