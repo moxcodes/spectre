@@ -155,6 +155,9 @@ struct EvolutionMetavars
                  ::Tags::dt<GeneralizedHarmonic::Tags::Pi<volume_dim, frame>>,
                  ::Tags::dt<GeneralizedHarmonic::Tags::Phi<volume_dim, frame>>>;
 
+  using phase_changes = typename GeneralizedHarmonicTemplateBase<
+      EvolutionMetavars<InitialData, BoundaryConditions>>::phase_changes;
+
   using observation_events = typename GeneralizedHarmonicTemplateBase<
       EvolutionMetavars<InitialData, BoundaryConditions>>::observation_events;
   using events = tmpl::push_back<observation_events,
@@ -164,9 +167,16 @@ struct EvolutionMetavars
   using analytic_solution_tag =
       typename GeneralizedHarmonicTemplateBase<EvolutionMetavars<
           InitialData, BoundaryConditions>>::analytic_solution_tag;
-  using const_global_cache_tags =
-      tmpl::list<analytic_solution_tag, normal_dot_numerical_flux,
-                 time_stepper_tag, Tags::EventsAndTriggers<events, triggers>>;
+  using const_global_cache_tags = tmpl::list<
+      analytic_solution_tag, normal_dot_numerical_flux, time_stepper_tag,
+      Tags::EventsAndTriggers<events, triggers>,
+      GeneralizedHarmonic::ConstraintDamping::Tags::DampingFunctionGamma0<
+          volume_dim, frame>,
+      GeneralizedHarmonic::ConstraintDamping::Tags::DampingFunctionGamma1<
+          volume_dim, frame>,
+      GeneralizedHarmonic::ConstraintDamping::Tags::DampingFunctionGamma2<
+          volume_dim, frame>,
+      PhaseControl::Tags::PhaseChangeAndTriggers<phase_changes, triggers>>;
 
   using initial_data = typename GeneralizedHarmonicTemplateBase<
       EvolutionMetavars<InitialData, BoundaryConditions>>::initial_data;
@@ -241,14 +251,19 @@ struct EvolutionMetavars
               GeneralizedHarmonic::CharacteristicFieldsCompute<volume_dim,
                                                                frame>>,
           true, true>,
-      Initialization::Actions::AddComputeTags<
-          tmpl::list<evolution::Tags::AnalyticCompute<
-              volume_dim, analytic_solution_tag, analytic_solution_fields>>>,
+      Initialization::Actions::AddComputeTags<tmpl::push_back<
+          StepChoosers::step_chooser_compute_tags<EvolutionMetavars>,
+          evolution::Tags::AnalyticCompute<volume_dim, analytic_solution_tag,
+                                           analytic_solution_fields>>>,
       dg::Actions::InitializeMortars<boundary_scheme, true>,
       Initialization::Actions::DiscontinuousGalerkin<EvolutionMetavars>,
       intrp::Actions::ElementInitInterpPoints<
           intrp::Tags::InterpPointInfo<EvolutionMetavars>>,
       Initialization::Actions::RemoveOptionsAndTerminatePhase>;
+
+  using dg_registration_list =
+      tmpl::list<intrp::Actions::RegisterElementWithInterpolator,
+                 observers::Actions::RegisterEventsWithObservers>;
 
   using gh_dg_element_array = DgElementArray<
       EvolutionMetavars,
@@ -281,13 +296,14 @@ struct EvolutionMetavars
               SelfStart::self_start_procedure<step_actions<false>, system>>,
           Parallel::PhaseActions<
               Phase, Phase::Register,
-              tmpl::list<intrp::Actions::RegisterElementWithInterpolator,
-                         observers::Actions::RegisterEventsWithObservers,
-                         Parallel::Actions::TerminatePhase>>,
+                                 tmpl::list<dg_registration_list,
+                                            Parallel::Actions::TerminatePhase>>,
           Parallel::PhaseActions<
               Phase, Phase::Evolve,
               tmpl::list<Actions::RunEventsAndTriggers, Actions::ChangeSlabSize,
-                         step_actions<true>, Actions::AdvanceTime>>>>>;
+                         step_actions<true>, Actions::AdvanceTime,
+                         PhaseControl::Actions::ExecutePhaseChange<
+                             phase_changes, triggers>>>>>>;
 
   struct Horizon {
     using tags_to_observe =
@@ -341,6 +357,13 @@ struct EvolutionMetavars
       tmpl::push_back<typename Event<observation_events>::creatable_classes,
                       typename Horizon::post_horizon_find_callback>>;
 
+  template <typename ParallelComponent>
+  struct registration_list {
+    using type = std::conditional_t<
+        std::is_same_v<ParallelComponent, gh_dg_element_array>,
+      dg_registration_list, tmpl::list<>>;
+  };
+
   using component_list = tmpl::flatten<tmpl::list<
       observers::Observer<EvolutionMetavars>,
       observers::ObserverWriter<EvolutionMetavars>,
@@ -378,10 +401,12 @@ static const std::vector<void (*)()> charm_init_node_funcs{
         StepChooser<metavariables::slab_choosers>>,
     &Parallel::register_derived_classes_with_charm<
         StepChooser<metavariables::step_choosers>>,
-    &Parallel::register_derived_classes_with_charm<StepController>,
     &Parallel::register_derived_classes_with_charm<TimeStepper>,
     &Parallel::register_derived_classes_with_charm<
-        Trigger<metavariables::triggers>>};
+        Trigger<metavariables::triggers>>,
+    &Parallel::register_derived_classes_with_charm<
+        PhaseChange<metavariables::phase_changes>>,
+    &Parallel::register_factory_classes_with_charm<metavariables>};
 
 static const std::vector<void (*)()> charm_init_proc_funcs{
     &enable_floating_point_exceptions};

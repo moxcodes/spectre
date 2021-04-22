@@ -69,6 +69,9 @@
 #include "Parallel/Actions/TerminatePhase.hpp"
 #include "Parallel/Algorithms/AlgorithmSingleton.hpp"
 #include "Parallel/InitializationFunctions.hpp"
+#include "Parallel/PhaseControl/ExecutePhaseChange.hpp"
+#include "Parallel/PhaseControl/PhaseControlTags.hpp"
+#include "Parallel/PhaseControl/VisitAndReturn.hpp"
 #include "Parallel/PhaseDependentActionList.hpp"
 #include "Parallel/Reduction.hpp"
 #include "Parallel/RegisterDerivedClassesWithCharm.hpp"
@@ -301,6 +304,15 @@ struct GeneralizedHarmonicTemplateBase<
                                  intrp::Events::Registrars::Interpolate<
                                    3, AhA, interpolator_source_vars>>;
 
+  using phase_changes = tmpl::list<PhaseControl::Registrars::VisitAndReturn<
+      GeneralizedHarmonicTemplateBase, Phase::LoadBalancing>>;
+
+  using initialize_phase_change_decision_data =
+      PhaseControl::InitializePhaseChangeDecisionData<phase_changes, triggers>;
+
+  using phase_change_tags_and_combines_list =
+      PhaseControl::get_phase_change_tags<phase_changes>;
+
   // A tmpl::list of tags to be added to the GlobalCache by the
   // metavariables
   using const_global_cache_tags = tmpl::list<
@@ -327,7 +339,7 @@ struct GeneralizedHarmonicTemplateBase<
       const gsl::not_null<tuples::TaggedTuple<Tags...>*>
           phase_change_decision_data,
       const Phase& current_phase,
-      const Parallel::CProxy_GlobalCache<EvolutionMetavars>&
+      const Parallel::CProxy_GlobalCache<derived_metavars>&
           cache_proxy) noexcept {
     const auto next_phase =
         PhaseControl::arbitrate_phase_change<phase_changes, triggers>(
@@ -364,16 +376,6 @@ struct GeneralizedHarmonicTemplateBase<
     }
   }
 
-  using phase_changes = tmpl::list<PhaseControl::Registrars::VisitAndReturn<
-      derived_metavars, Phase::LoadBalancing>>;
-
-  using initialize_phase_change_decision_data =
-      PhaseControl::InitializePhaseChangeDecisionData<phase_changes, triggers>;
-
-  using phase_change_tags_and_combines_list =
-      PhaseControl::get_phase_change_tags<phase_changes>;
-
-  
   using step_actions = tmpl::list<
       evolution::dg::Actions::ComputeTimeDerivative<derived_metavars>,
       dg::Actions::ComputeNonconservativeBoundaryFluxes<
@@ -429,10 +431,11 @@ struct GeneralizedHarmonicTemplateBase<
               GeneralizedHarmonic::CharacteristicFieldsCompute<volume_dim,
                                                                frame>>,
           true, true>,
-      Initialization::Actions::AddComputeTags<
-          PhaseControl::Tags::PhaseChangeAndTriggers<phase_changes, triggers>,
-          tmpl::list<evolution::Tags::AnalyticCompute<
-              volume_dim, analytic_solution_tag, analytic_solution_fields>>>,
+      Initialization::Actions::AddComputeTags<tmpl::push_back<
+          StepChoosers::step_chooser_compute_tags<
+              GeneralizedHarmonicTemplateBase>,
+          evolution::Tags::AnalyticCompute<volume_dim, analytic_solution_tag,
+                                           analytic_solution_fields>>>,
       dg::Actions::InitializeMortars<boundary_scheme, true>,
       Initialization::Actions::DiscontinuousGalerkin<derived_metavars>,
       Initialization::Actions::RemoveOptionsAndTerminatePhase>;
@@ -478,9 +481,9 @@ struct GeneralizedHarmonicTemplateBase<
 
   template <typename ParallelComponent>
   struct registration_list {
-    using type =
-        std::conditional_t<std::is_same_v<ParallelComponent, dg_element_array>,
-                           dg_registration_list, tmpl::list<>>;
+    using type = std::conditional_t<
+        std::is_same_v<ParallelComponent, gh_dg_element_array>,
+        dg_registration_list, tmpl::list<>>;
   };
 
   using component_list = tmpl::flatten<tmpl::list<
