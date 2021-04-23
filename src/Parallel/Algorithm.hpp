@@ -46,6 +46,7 @@
 #include "Utilities/TMPL.hpp"
 #include "Utilities/TaggedTuple.hpp"
 #include "Utilities/TypeTraits.hpp"
+#include "Parallel/Printf.hpp"
 
 // IWYU pragma: no_include <array>  // for tuple_size
 
@@ -327,19 +328,34 @@ class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
   void start_phase(const PhaseType next_phase) noexcept {
     // terminate should be true since we exited a phase previously.
     if (not get_terminate() and not halt_algorithm_until_next_phase_) {
-      ERROR(
-          "An algorithm must always be set to terminate at the beginning of a "
-          "phase. Since this is not the case the previous phase did not end "
-          "correctly. The integer corresponding to the previous phase is: "
-          << static_cast<int>(phase_)
-          << " and the next phase is: " << static_cast<int>(next_phase)
-          << ", The termination flag is: " << get_terminate()
-          << ", and the halt flag is: " << halt_algorithm_until_next_phase_);
+      // Note: we are disabling this safety error on this branch because it
+      // causes erroneous failures when we attempt to load-balance when the CCE
+      // component has paused to receive data.
+
+      // We also are not resetting the algorithm step in this case.
+      // I must note that this is a dangerous hack and should not be trusted
+      // outside the limited context of a CCE-GH evolution
+
+      Parallel::printf(
+          "Warning! element is resuming with its previously recorded algorithm "
+          "step. Outside of specific limited contexts (CCE-GH evolution with "
+          "balancing), this is likely to cause subtle problems in the "
+          "evolution. This will be improved in future features.");
+
+      // ERROR(
+      // "An algorithm must always be set to terminate at the beginning of a "
+      // "phase. Since this is not the case the previous phase did not end "
+      // "correctly. The integer corresponding to the previous phase is: "
+      // << static_cast<int>(phase_)
+      // << " and the next phase is: " << static_cast<int>(next_phase)
+      // << ", The termination flag is: " << get_terminate()
+      // << ", and the halt flag is: " << halt_algorithm_until_next_phase_);
+    } else {
+      algorithm_step_ = 0;
     }
     // set terminate to true if there are no actions in this PDAL
     set_terminate(number_of_actions_in_phase(next_phase) == 0);
     phase_ = next_phase;
-    algorithm_step_ = 0;
     halt_algorithm_until_next_phase_ = false;
     perform_algorithm();
   }
