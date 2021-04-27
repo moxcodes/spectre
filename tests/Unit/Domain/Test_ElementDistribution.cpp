@@ -22,15 +22,13 @@ std::array<SegmentId, Dim> element_index_to_segment_id(
     const std::array<size_t, Dim>& refinement_levels,
     const size_t element_index) noexcept {
   std::array<SegmentId, Dim> segment_ids{};
+  size_t stride = 1;
   for (size_t i = 0; i < Dim; ++i) {
-    size_t stride = 1;
-    for (size_t j = 0; j < i; ++j) {
-      stride *= two_to_the(gsl::at(refinement_levels, j));
-    }
     const size_t element_index_in_dim =
         (element_index / stride) % two_to_the(gsl::at(refinement_levels, i));
     segment_ids.at(i) =
         SegmentId{gsl::at(refinement_levels, i), element_index_in_dim};
+    stride *= two_to_the(gsl::at(refinement_levels, i));
   }
   return segment_ids;
 }
@@ -66,13 +64,10 @@ std::vector<std::vector<size_t>> make_proc_map_for_domain(
   const domain::BlockZCurveProcDistribution distribution{
       number_of_procs, refinement_levels_by_block};
   for (size_t block = 0; block < number_of_blocks; ++block) {
-    size_t number_of_elements_in_block = 1;
-    for (size_t i = 0; i < Dim; ++i) {
-      number_of_elements_in_block *=
-          two_to_the(gsl::at(gsl::at(refinement_levels_by_block, block), i));
-    }
-    proc_map.at(block) = std::vector<size_t>(number_of_elements_in_block);
-    for (size_t element_index = 0; element_index < number_of_elements_in_block;
+    const size_t number_of_elements =
+        number_of_elements_in_block(gsl::at(refinement_levels_by_block, block));
+    proc_map.at(block) = std::vector<size_t>(number_of_elements);
+    for (size_t element_index = 0; element_index < number_of_elements;
          ++element_index) {
       const ElementId<Dim> element_id{
           block,
@@ -127,17 +122,8 @@ void check_element_distribution_cohesion(
                       two_to_the(gsl::at(
                           gsl::at(refinement_levels_by_block, block), i - 1));
     }
-    std::vector<size_t> number_of_clusters_per_proc(number_of_procs);
-    for (size_t& val : number_of_clusters_per_proc) {
-      val = 0;
-    }
-    std::vector<bool> seen(gsl::at(proc_map, block).size());
-    // clang-tidy thinks this should be range-based, but that works weirdly with
-    // vectors of bools
-    /// NOLINTNEXTLINE(modernize-loop-convert)
-    for (size_t i = 0; i < seen.size(); ++i) {
-      seen.at(i) = false;
-    }
+    std::vector<size_t> number_of_clusters_per_proc(number_of_procs, 0_st);
+    std::vector<bool> seen(gsl::at(proc_map, block).size(), false);
     for (size_t start_element = 0;
          start_element < gsl::at(proc_map, block).size(); ++start_element) {
       if (not seen.at(start_element)) {
@@ -250,7 +236,7 @@ void test_single_block_domain() noexcept {
         stride *= 4_st;
       }
       // check that each element in the large cubes have the same processor as
-      // the corneer elements.
+      // the corner elements.
       size_t global_element_id = segment_id_to_element_index(segment_id);
       CHECK(gsl::at(gsl::at(proc_map, 0), global_element_id) ==
             gsl::at(gsl::at(proc_map, 0), global_reference_id));

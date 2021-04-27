@@ -18,7 +18,8 @@ namespace domain {
 
 namespace {
 // This interleaves the bits of the element index.
-// A sketch of a 4x2 2D element, with bit indices and resulting z-curve
+// A sketch of a 2D block with 4x2 elements, with bit indices and resulting
+// z-curve
 //
 //        x-->
 //        00  01  10  11
@@ -69,6 +70,11 @@ size_t z_curve_index(const ElementId<Dim>& element_id) noexcept {
     for (size_t bit_index = 0;
          bit_index < gsl::at(dimension_by_highest_refinement_level, i).first;
          ++bit_index) {
+      // This operation will not overflow for our present use of `ElementId`s.
+      // This technique densely assigns an ElementID a unique size_t identifier
+      // determining the Morton curve order, and `ElementId` supports refinement
+      // levels such that a global index within a block will fit in a 64-bit
+      // unsigned integer.
       element_order_index |=
           ((id_to_gap_and_shift & two_to_the(bit_index)) << total_gap);
       for (size_t j = 0; j < Dim; ++j) {
@@ -88,8 +94,9 @@ template <size_t Dim>
 BlockZCurveProcDistribution<Dim>::BlockZCurveProcDistribution(
     size_t number_of_procs,
     const std::vector<std::array<size_t, Dim>>& refinements_by_block) noexcept {
-  elements_per_proc_.reserve(number_of_procs);
-  block_element_distribution_.reserve(refinements_by_block.size());
+  block_element_distribution_ =
+      std::vector<std::vector<std::pair<size_t, size_t>>>(
+          refinements_by_block.size());
   auto add_number_of_elements_for_refinement =
       [](size_t lhs, const std::array<size_t, Dim>& rhs) {
         size_t value = 1;
@@ -109,12 +116,10 @@ BlockZCurveProcDistribution<Dim>::BlockZCurveProcDistribution(
   size_t remaining_elements_in_block =
       add_number_of_elements_for_refinement(0_st, refinements_by_block[0]);
   size_t current_block = 0;
-  block_element_distribution_.emplace_back();
   for (size_t i = 0; i < number_of_procs; ++i) {
     size_t remaining_elements_on_proc =
         (number_of_elements / number_of_procs) +
         (i < (number_of_elements % number_of_procs) ? 1 : 0);
-    elements_per_proc_.push_back(remaining_elements_on_proc);
     while (remaining_elements_on_proc > 0) {
       block_element_distribution_.at(current_block)
           .emplace_back(
@@ -124,7 +129,6 @@ BlockZCurveProcDistribution<Dim>::BlockZCurveProcDistribution(
         remaining_elements_on_proc -= remaining_elements_in_block;
         ++current_block;
         if (current_block < refinements_by_block.size()) {
-          block_element_distribution_.emplace_back();
           remaining_elements_in_block = add_number_of_elements_for_refinement(
               0_st, gsl::at(refinements_by_block, current_block));
         }
