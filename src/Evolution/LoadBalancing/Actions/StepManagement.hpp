@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "AlgorithmArray.hpp"
+#include "Parallel/Algorithms/AlgorithmArray.hpp"
 #include "DataStructures/DataBox/DataBox.hpp"
 #include "Evolution/LoadBalancing/Tags.hpp"
 #include "Parallel/GlobalCache.hpp"

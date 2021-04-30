@@ -6,23 +6,26 @@
 #include "Domain/Creators/RegisterDerivedWithCharm.hpp"
 #include "Domain/Creators/TimeDependence/RegisterDerivedWithCharm.hpp"
 #include "Domain/FunctionsOfTime/RegisterDerivedWithCharm.hpp"
-#include "Evolution/LoadBalancing/DistributionStrategies.hpp"
+#include "Domain/Domain.hpp"
 #include "Evolution/LoadBalancing/LoadBalancingTestArray.hpp"
 #include "Evolution/LoadBalancing/StepTriggers.hpp"
 #include "Evolution/LoadBalancing/Tags.hpp"
-#include "Parallel/Actions/ManagePhaseControl.hpp"
 #include "Parallel/InitializationFunctions.hpp"
+#include "Parallel/PhaseControl/PhaseControlTags.hpp"
+#include "Parallel/PhaseControl/VisitAndReturn.hpp"
 #include "Parallel/RegisterDerivedClassesWithCharm.hpp"
 
 template <size_t Dim, bool UseAtSync>
 struct EvolutionMetavars {
   static constexpr size_t volume_dim = Dim;
   using temporal_id = Lb::Tags::StepNumber;
+  struct system {};
   static constexpr bool use_at_sync = UseAtSync;
 
   using triggers = tmpl::list<Triggers::Registrars::SpecifiedStepTrigger,
                               Triggers::Registrars::EveryNStepsTrigger>;
 
+  static constexpr bool use_z_order_distribution = false;
   using graph_dump_triggers =
       tmpl::list<Triggers::Registrars::SpecifiedStepTrigger,
                  Triggers::Registrars::EveryNStepsTrigger,
@@ -50,17 +53,29 @@ struct EvolutionMetavars {
     }
   }
 
-  using global_sync_phases =
-      tmpl::list<std::integral_constant<Phase, Phase::LoadBalancing>>;
+  using phase_changes = tmpl::list<PhaseControl::Registrars::VisitAndReturn<
+      EvolutionMetavars, Phase::LoadBalancing>>;
 
-  static void global_startup_routines() noexcept { return; }
+  using phase_change_tags_and_combines_list =
+      PhaseControl::get_phase_change_tags<phase_changes>;
 
+  using const_global_cache_tags = tmpl::list<
+      PhaseControl::Tags::PhaseChangeAndTriggers<phase_changes, triggers>>;
 
-
+  template <typename... Tags>
   static Phase determine_next_phase(
+      const gsl::not_null<tuples::TaggedTuple<Tags...>*>
+          phase_change_decision_data,
       const Phase& current_phase,
-      const Parallel::CProxy_GlobalCache<
-          EvolutionMetavars>& /*cache_proxy*/) noexcept {
+      const Parallel::CProxy_GlobalCache<EvolutionMetavars>&
+          cache_proxy) noexcept {
+    const auto next_phase =
+        PhaseControl::arbitrate_phase_change<phase_changes, triggers>(
+            phase_change_decision_data, current_phase,
+            *(cache_proxy.ckLocalBranch()));
+    if (next_phase.has_value()) {
+      return next_phase.value();
+    }
     switch (current_phase) {
       case Phase::Initialization:
         return Phase::Evolve;
@@ -97,13 +112,13 @@ static const std::vector<void (*)()> charm_init_node_funcs{
     &domain::FunctionsOfTime::register_derived_with_charm,
     &domain::creators::register_derived_with_charm,
     &Parallel::register_derived_classes_with_charm<
-        Lb::Distribution::DistributionStrategy>,
-    &Parallel::register_derived_classes_with_charm<
         Trigger<metavariables::triggers>>,
     &Parallel::register_derived_classes_with_charm<
         Trigger<metavariables::graph_dump_triggers>>,
     &Parallel::register_derived_classes_with_charm<
-        Trigger<metavariables::global_sync_triggers>>};
+        Trigger<metavariables::global_sync_triggers>>,
+    &Parallel::register_derived_classes_with_charm<
+        PhaseChange<metavariables::phase_changes>>};
 
 static const std::vector<void (*)()> charm_init_proc_funcs{
   &enable_floating_point_exceptions};

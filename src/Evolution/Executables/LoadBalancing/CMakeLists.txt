@@ -3,7 +3,6 @@
 
 set(LIBS_TO_LINK
   Domain
-  LoadBalancing
   Parallel
   )
 

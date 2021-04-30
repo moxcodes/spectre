@@ -8,8 +8,9 @@
 #include <vector>
 
 #include "DataStructures/DataBox/Tag.hpp"
+#include "DataStructures/FixedHashMap.hpp"
+#include "Domain/Domain.hpp"
 #include "Domain/Structure/MaxNumberOfNeighbors.hpp"
-#include "Evolution/LoadBalancing/DistributionStrategies.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/MortarHelpers.hpp"
 #include "Options/Options.hpp"
 #include "Parallel/InboxInserters.hpp"
@@ -47,13 +48,6 @@ struct CommunicationSize {
 struct NumberOfSteps {
   using type = size_t;
   static constexpr Options::String help{"number of steps to run"};
-  using group = TestLoadBalancing;
-};
-
-struct DistributionStrategy {
-  using type = std::unique_ptr<Distribution::DistributionStrategy>;
-  static constexpr Options::String help{
-      "Strategy for initial element distribution"};
   using group = TestLoadBalancing;
 };
 
@@ -126,19 +120,6 @@ struct NeighborData : db::SimpleTag {
 
 struct InternalStorage : db::SimpleTag {
   using type = std::vector<DataVector>;
-};
-
-struct DistributionStrategy : db::SimpleTag {
-  using type =
-      std::unique_ptr<Distribution::DistributionStrategy>;
-  using option_tags = tmpl::list<OptionTags::DistributionStrategy>;
-
-  static constexpr bool pass_metavariables = false;
-  static std::unique_ptr<Distribution::DistributionStrategy>
-  create_from_options(const std::unique_ptr<Distribution::DistributionStrategy>&
-                          distribution_strategy) {
-    return distribution_strategy->get_clone();
-  }
 };
 
 template <typename TriggerRegistrars>

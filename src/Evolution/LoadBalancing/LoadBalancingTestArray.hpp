@@ -7,9 +7,10 @@
 #include <unordered_map>
 #include <vector>
 
-#include "AlgorithmArray.hpp"
 #include "DataStructures/DataBox/DataBox.hpp"
 #include "DataStructures/DataVector.hpp"
+#include "Domain/Domain.hpp"
+#include "Domain/ElementDistribution.hpp"
 #include "Domain/Structure/InitialElementIds.hpp"
 #include "Evolution/LoadBalancing/Actions/EmulateLoad.hpp"
 #include "Evolution/LoadBalancing/Actions/InitializeGraphDumpLabel.hpp"
@@ -17,16 +18,20 @@
 #include "Evolution/LoadBalancing/Actions/LoadBalancingTestCommunication.hpp"
 #include "Evolution/LoadBalancing/Actions/StepManagement.hpp"
 #include "Evolution/LoadBalancing/Tags.hpp"
-#include "Parallel/Actions/ManagePhaseControl.hpp"
+#include "Parallel/Algorithms/AlgorithmArray.hpp"
 #include "Parallel/GlobalCache.hpp"
 #include "Parallel/Info.hpp"
 #include "Parallel/ParallelComponentHelpers.hpp"
+#include "Parallel/PhaseControl/ExecutePhaseChange.hpp"
 #include "ParallelAlgorithms/Initialization/Actions/RemoveOptionsAndTerminatePhase.hpp"
 #include "Utilities/Gsl.hpp"
 
 namespace Lb {
+namespace detail {
+CREATE_HAS_STATIC_MEMBER_VARIABLE(use_z_order_distribution)
+CREATE_HAS_STATIC_MEMBER_VARIABLE_V(use_z_order_distribution)
+}  // namespace detail
 
-// TODO PUP
 
 template <typename Metavariables>
 struct LoadBalancingTestArray {
@@ -41,13 +46,14 @@ struct LoadBalancingTestArray {
       tmpl::list<Actions::InitializeLoadBalancingTestArray<volume_dim>,
                  Actions::InitializeGraphDumpLabel<Metavariables>,
                  Initialization::Actions::RemoveOptionsAndTerminatePhase>;
-  using evolution_action_list = tmpl::list<
-      Actions::ExitIfComplete, Actions::SendDataToNeighbors<volume_dim>,
-      Actions::ReceiveDataFromNeighbors<volume_dim>, Actions::EmulateLoad<>,
-      tmpl::conditional_t<use_at_sync,
-                          Parallel::Actions::ManagePhaseControl<Metavariables>,
-                          tmpl::list<>>,
-      Actions::IncrementTime>;
+  using evolution_action_list =
+      tmpl::list<Actions::ExitIfComplete,
+                 Actions::SendDataToNeighbors<volume_dim>,
+                 Actions::ReceiveDataFromNeighbors<volume_dim>,
+                 Actions::EmulateLoad<>, Actions::IncrementTime,
+                 PhaseControl::Actions::ExecutePhaseChange<
+                     typename Metavariables::phase_changes,
+                     typename Metavariables::triggers>>;
 
   using phase_dependent_action_list =
       tmpl::list<Parallel::PhaseActions<typename Metavariables::Phase,
@@ -66,12 +72,7 @@ struct LoadBalancingTestArray {
 
   using const_global_cache_tags =
       tmpl::push_back<Parallel::get_const_global_cache_tags_from_actions<
-                          phase_dependent_action_list>,
-                      Tags::DistributionStrategy>;
-
-  static void pup(const Parallel::GlobalCache<Metavariables>& /*cache*/,
-                  const ElementId<volume_dim>& /*array_index*/,
-                  PUP::er& /*p*/) noexcept {}
+                          phase_dependent_action_list>>;
 
   static void execute_next_phase(
       const typename Metavariables::Phase next_phase,
@@ -115,32 +116,33 @@ void LoadBalancingTestArray<Metavariables>::allocate_array(
   const auto& initial_refinement_levels =
       get<domain::Tags::InitialRefinementLevels<volume_dim>>(
           initialization_items);
-  auto distribution =
-      Parallel::get<Tags::DistributionStrategy>(local_cache).get_clone();
+  bool use_z_order_distribution = true;
+  if constexpr (detail::has_use_z_order_distribution_v<Metavariables>) {
+    use_z_order_distribution = Metavariables::use_z_order_distribution;
+  }
+  int which_proc = 0;
+  const domain::BlockZCurveProcDistribution<volume_dim> element_distribution{
+      static_cast<size_t>(sys::number_of_procs()), initial_refinement_levels};
   for (const auto& block : domain.blocks()) {
+    const auto initial_ref_levs = initial_refinement_levels[block.id()];
     const std::vector<ElementId<volume_dim>> element_ids =
-        initial_element_ids(block.id(), initial_refinement_levels[block.id()]);
-    for (size_t i = 0; i < element_ids.size(); ++i) {
-      lb_element_array(ElementId<volume_dim>{element_ids[i]})
-          .insert(global_cache, initialization_items,
-                  distribution->which_proc(
-                      domain, initial_refinement_levels,
-                      static_cast<size_t>(Parallel::number_of_procs()),
-                      domain::Initialization::create_initial_element(
-                          element_ids[i], block, initial_refinement_levels),
-                      ElementId<volume_dim>{element_ids[i]},
-                      ElementMap<volume_dim, Frame::Inertial>{
-                          element_ids[i], block.stationary_map().get_clone()}));
+        initial_element_ids(block.id(), initial_ref_levs);
+    if (use_z_order_distribution) {
+      for (const auto& element_id : element_ids) {
+        const size_t target_proc = element_distribution.get_proc_for_element(
+            block.id(), ElementId<volume_dim>(element_id));
+        lb_element_array(ElementId<volume_dim>(element_id))
+            .insert(global_cache, initialization_items, target_proc);
+      }
+    } else {
+      const int number_of_procs = sys::number_of_procs();
+      for (size_t i = 0; i < element_ids.size(); ++i) {
+        lb_element_array(ElementId<volume_dim>(element_ids[i]))
+            .insert(global_cache, initialization_items, which_proc);
+        which_proc = which_proc + 1 == number_of_procs ? 0 : which_proc + 1;
+      }
     }
   }
   lb_element_array.doneInserting();
-  for (const auto& block : domain.blocks()) {
-    const std::vector<ElementId<volume_dim>> element_ids =
-        initial_element_ids(block.id(), initial_refinement_levels[block.id()]);
-    for (size_t i = 0; i < element_ids.size(); ++i) {
-      Parallel::simple_action<SetMigratable>(
-          lb_element_array(ElementId<volume_dim>{element_ids[i]}));
-    }
-  }
 }
 }  // namespace Lb

@@ -1,22 +1,16 @@
 # Distributed under the MIT License.
 # See LICENSE.txt for details.
 
-set(LIBRARY LoadBalancing)
-
-set(LIBRARY_SOURCES
-  DistributionStrategies.cpp
-  )
-
-add_spectre_library(${LIBRARY} ${LIBRARY_SOURCES})
-
-target_link_libraries(
+spectre_target_headers(
   ${LIBRARY}
-  PUBLIC
-  DataStructures
+  INCLUDE_DIRECTORY ${CMAKE_SOURCE_DIR}/src
+  HEADERS
+  Actions/EmulateLoad.hpp
+  Actions/InitializeGraphDumpLabel.hpp
+  Actions/InitializeLoadBalancingTestArray.hpp
+  Actions/LoadBalancingCommunication.hpp
+  Actions/StepManagement.hpp
+  LoadBalancingTestArray.hpp
+  StepTriggers.hpp
+  Tags.hpp
   )
-
-add_dependencies(
-  ${LIBRARY}
-  module_GlobalCache
-  )
-

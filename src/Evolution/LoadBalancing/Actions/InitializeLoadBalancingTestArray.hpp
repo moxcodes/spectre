@@ -8,21 +8,21 @@
 #include <utility>
 #include <vector>
 
-#include "AlgorithmArray.hpp"
 #include "DataStructures/DataBox/DataBox.hpp"
 #include "DataStructures/DataBox/Tag.hpp"
 #include "DataStructures/DataVector.hpp"
 #include "Domain/CreateInitialElement.hpp"
+#include "Domain/Creators/DomainCreator.hpp"
+#include "Domain/Domain.hpp"
 #include "Domain/ElementMap.hpp"
 #include "Domain/Structure/Element.hpp"
 #include "Domain/Structure/ElementId.hpp"
 #include "Domain/Structure/MaxNumberOfNeighbors.hpp"
 #include "Domain/Tags.hpp"
-#include "Evolution/LoadBalancing/LoadBalancingTestArray.hpp"
 #include "Evolution/LoadBalancing/Tags.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/MortarHelpers.hpp"
+#include "Parallel/Algorithms/AlgorithmArray.hpp"
 #include "Parallel/GlobalCache.hpp"
-#include "Parallel/Tags.hpp"
 #include "ParallelAlgorithms/Initialization/MergeIntoDataBox.hpp"
 #include "Utilities/TaggedTuple.hpp"
 
