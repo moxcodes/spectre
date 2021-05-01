@@ -19,31 +19,59 @@ namespace Actions {
 struct DefaultLoadFunction {
   static void apply(
       const gsl::not_null<std::vector<DataVector>*> internal_storage,
-      const std::vector<DataVector>& neighbor_data) noexcept {
-    for (size_t i = 0; i < internal_storage->size(); ++i) {
-      (*internal_storage)[i] =
-          (*internal_storage)[i * 3 % internal_storage->size()] +
-          0.01 *
-              (square((*internal_storage)[i * 5 % internal_storage->size()]) +
-               (*internal_storage)[i * 7 % internal_storage->size()] *
-                   neighbor_data[i % neighbor_data.size()] +
-               neighbor_data[i * 3 % neighbor_data.size()] -
-               neighbor_data[i * 5 % neighbor_data.size()]);
-      // keep things below 1:
-      for (auto& val : (*internal_storage)[i]) {
-        if (val > 1.0 or val < -1.0) {
-          val = 1.0 / val;
+      const std::vector<DataVector>& neighbor_data,
+      const bool use_blaze_math = true) noexcept {
+      for (size_t i = 0; i < internal_storage->size(); ++i) {
+        if (use_blaze_math) {
+          (*internal_storage)[i] =
+              (*internal_storage)[i * 3 % internal_storage->size()] +
+              0.01 *
+                  (square(
+                       (*internal_storage)[i * 5 % internal_storage->size()]) +
+                   (*internal_storage)[i * 7 % internal_storage->size()] *
+                       neighbor_data[i % neighbor_data.size()] +
+                   neighbor_data[i * 3 % neighbor_data.size()] -
+                   neighbor_data[i * 5 % neighbor_data.size()]);
+        } else {
+          for(size_t j =0; j < (*internal_storage)[i].size(); ++j) {
+            (*internal_storage)[i][j] =
+                (*internal_storage)[i * 3 % internal_storage->size()][j] +
+                0.01 *
+                    (square((*internal_storage)[i * 5 %
+                                                internal_storage->size()][j]) +
+                     (*internal_storage)[i * 7 % internal_storage->size()][j] *
+                         neighbor_data[i % neighbor_data.size()][j] +
+                     neighbor_data[i * 3 % neighbor_data.size()][j] -
+                     neighbor_data[i * 5 % neighbor_data.size()][j]);
+          }
+        }
+        // keep things below 1:
+        for (auto& val : (*internal_storage)[i]) {
+          if (val > 1.0 or val < -1.0) {
+            val = 1.0 / val;
+          }
         }
       }
-    }
   }
   static void apply(
-      const gsl::not_null<std::vector<DataVector>*> internal_storage) noexcept {
+      const gsl::not_null<std::vector<DataVector>*> internal_storage,
+      const bool use_blaze_math = true) noexcept {
     for (size_t i = 0; i < internal_storage->size(); ++i) {
-      (*internal_storage)[i] =
-          (*internal_storage)[i * 3 % internal_storage->size()] +
-          0.1 * (square((*internal_storage)[i * 5 % internal_storage->size()]) /
+      if (use_blaze_math) {
+        (*internal_storage)[i] =
+            (*internal_storage)[i * 3 % internal_storage->size()] +
+            0.1 *
+                (square((*internal_storage)[i * 5 % internal_storage->size()]) /
                  max((*internal_storage)[i * 5 % internal_storage->size()]));
+      } else {
+        for (size_t j = 0; j < (*internal_storage)[i].size(); ++j) {
+          (*internal_storage)[i][j] =
+              (*internal_storage)[i * 3 % internal_storage->size()][j] +
+              0.1 * (square((*internal_storage)[i * 5 %
+                                                internal_storage->size()][j]) /
+                     (*internal_storage)[i * 5 % internal_storage->size()][j]);
+        }
+      }
       // keep things below 1:
       for (auto& val : (*internal_storage)[i]) {
         if (val > 1.0 or val < -1.0) {
@@ -80,11 +108,12 @@ struct EmulateLoad {
                        .number_of_neighbors() == 0)) {
         db::mutate<Tags::InternalStorage>(
             make_not_null(&box),
-            [&i](const gsl::not_null<std::vector<DataVector>*>
-                     internal_storage) noexcept {
-              LoadFunction::apply(internal_storage);
+            [&i](const gsl::not_null<std::vector<DataVector>*> internal_storage,
+                 const bool& use_blaze_math) noexcept {
+              LoadFunction::apply(internal_storage, use_blaze_math);
               i += LoadFunction::load_weight(internal_storage);
-            });
+            },
+            db::get<Tags::UseBlazeMath>(box));
         if (i > db::get<Tags::ExecutionLoad>(box)) {
           break;
         }
@@ -95,11 +124,13 @@ struct EmulateLoad {
               make_not_null(&box),
               [&i](const gsl::not_null<std::vector<DataVector>*>
                        internal_storage,
-                   const std::vector<DataVector>& neighbor_data) noexcept {
-                LoadFunction::apply(internal_storage, neighbor_data);
+                   const std::vector<DataVector>& neighbor_data,
+                   const bool& use_blaze_math) noexcept {
+                LoadFunction::apply(internal_storage, neighbor_data,
+                                    use_blaze_math);
                 i += LoadFunction::load_weight(internal_storage, neighbor_data);
               },
-              neighbor_data.second);
+              neighbor_data.second, db::get<Tags::UseBlazeMath>(box));
           if (i > db::get<Tags::ExecutionLoad>(box)) {
             break;
           }

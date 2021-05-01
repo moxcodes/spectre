@@ -40,11 +40,10 @@ struct InitializeLoadBalancingTestArray {
       tmpl::list<domain::Tags::InitialExtents<Dim>,
                  domain::Tags::InitialRefinementLevels<Dim>,
                  Tags::ExecutionLoad, Tags::InternalStorageSize,
-                 Tags::CommunicationSize>;
-  using initialization_tags_to_keep =
-      tmpl::list<Tags::ExecutionLoad, Tags::InternalStorageSize,
-                 Tags::CommunicationSize,
-                 domain::Tags::InitialRefinementLevels<Dim>>;
+                 Tags::CommunicationSize, Tags::UseBlazeMath>;
+  using initialization_tags_to_keep = tmpl::list<
+      Tags::ExecutionLoad, Tags::InternalStorageSize, Tags::CommunicationSize,
+      domain::Tags::InitialRefinementLevels<Dim>, Tags::UseBlazeMath>;
 
   using const_global_cache_tags = tmpl::list<domain::Tags::Domain<Dim>>;
   template <typename DataBox, typename... InboxTags, typename Metavariables,

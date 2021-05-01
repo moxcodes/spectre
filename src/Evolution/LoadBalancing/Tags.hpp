@@ -51,6 +51,13 @@ struct NumberOfSteps {
   using group = TestLoadBalancing;
 };
 
+struct UseBlazeMath {
+  using type = bool;
+  static constexpr Options::String help{
+      "Whether to use blaze vectorization for the load emulation"};
+  using group = TestLoadBalancing;
+};
+
 template <typename TriggerRegistrars>
 struct GraphDumpTrigger {
   using type = std::unique_ptr<Trigger<TriggerRegistrars>>;
@@ -100,6 +107,16 @@ struct NumberOfSteps : db::SimpleTag {
   static constexpr bool pass_metavariables = false;
   static size_t create_from_options(const size_t number_of_steps) noexcept {
     return number_of_steps;
+  }
+};
+
+struct UseBlazeMath : db::SimpleTag {
+  using type = bool;
+  using option_tags = tmpl::list<OptionTags::UseBlazeMath>;
+
+  static constexpr bool pass_metavariables = false;
+  static bool create_from_options(const bool use_blaze_math) noexcept {
+    return use_blaze_math;
   }
 };
 
