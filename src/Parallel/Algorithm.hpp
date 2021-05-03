@@ -340,6 +340,15 @@ class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
     phase_ = next_phase;
     algorithm_step_ = 0;
     halt_algorithm_until_next_phase_ = false;
+    if constexpr (std::is_same_v<typename ParallelComponent::chare_type,
+                                 Parallel::Algorithms::Array> and
+                  Algorithm_detail::has_LoadBalancing_v<
+                      typename metavariables::Phase>) {
+      if (next_phase == metavariables::Phase::LoadBalancing) {
+        this->AtSync();
+        return;
+      }
+    }
     perform_algorithm();
   }
 
@@ -637,7 +646,7 @@ AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>::
                                Parallel::Algorithms::Array> and
                 Algorithm_detail::has_LoadBalancing_v<
                     typename metavariables::Phase>) {
-    this->usesAtSync = false;
+    this->usesAtSync = true;
     this->setMigratable(true);
   }
   global_cache_ = global_cache_proxy.ckLocalBranch();
