@@ -50,6 +50,17 @@ class AlgorithmArray
   using Parallel::AlgorithmImpl<
       ParallelComponent,
       typename ParallelComponent::phase_dependent_action_list>::AlgorithmImpl;
+
+  explicit AlgorithmArray(CkMigrateMessage* msg) noexcept
+      : Parallel::AlgorithmImpl<
+            ParallelComponent,
+            typename ParallelComponent::phase_dependent_action_list>{msg} {}
+
+  void pup(PUP::er& p) noexcept override {  // NOLINT
+    Parallel::AlgorithmImpl<
+        ParallelComponent,
+        typename ParallelComponent::phase_dependent_action_list>::pup(p);
+  }
 };
 
 #define CK_TEMPLATES_ONLY
