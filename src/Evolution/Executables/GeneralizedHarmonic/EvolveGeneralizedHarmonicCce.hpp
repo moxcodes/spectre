@@ -183,7 +183,8 @@ struct EvolutionMetavars
               volume_dim, frame>,
           GeneralizedHarmonic::ConstraintDamping::Tags::DampingFunctionGamma2<
               volume_dim, frame>,
-          PhaseControl::Tags::PhaseChangeAndTriggers<phase_changes, triggers>>,
+          PhaseControl::Tags::PhaseChangeAndTriggers<phase_changes, triggers>,
+          Parallel::Tags::WallClockHoursForCheckpointAndExit>,
       tmpl::list<
           normal_dot_numerical_flux, time_stepper_tag,
           Tags::EventsAndTriggers<events, triggers>,
@@ -193,7 +194,8 @@ struct EvolutionMetavars
               volume_dim, frame>,
           GeneralizedHarmonic::ConstraintDamping::Tags::DampingFunctionGamma2<
               volume_dim, frame>,
-          PhaseControl::Tags::PhaseChangeAndTriggers<phase_changes, triggers>>>;
+          PhaseControl::Tags::PhaseChangeAndTriggers<phase_changes, triggers>,
+          Parallel::Tags::WallClockHoursForCheckpointAndExit>>;
 
   using initial_data = typename GeneralizedHarmonicTemplateBase<
       EvolutionMetavars<InitialData, BoundaryConditions,
