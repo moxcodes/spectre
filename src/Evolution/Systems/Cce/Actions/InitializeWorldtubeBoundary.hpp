@@ -15,6 +15,7 @@
 #include "Evolution/Systems/Cce/InterfaceManagers/GhLocalTimeStepping.hpp"
 #include "Evolution/Systems/Cce/InterfaceManagers/GhLockstep.hpp"
 #include "Evolution/Systems/Cce/OptionTags.hpp"
+#include "Evolution/Initialization/Tags.hpp"
 #include "Evolution/Systems/Cce/Tags.hpp"
 #include "NumericalAlgorithms/Interpolation/SpanInterpolator.hpp"
 #include "NumericalAlgorithms/Spectral/SwshCollocation.hpp"
@@ -41,7 +42,12 @@ namespace detail {
 template <typename Initializer, typename ManagerTag,
           typename BoundaryCommunicationTagsList>
 struct InitializeWorldtubeBoundaryBase {
-  using initialization_tags = tmpl::list<ManagerTag>;
+  using initialization_tags = tmpl::flatten<tmpl::list<
+      ManagerTag,
+      tmpl::conditional_t<std::is_same_v<ManagerTag, Tags::GhInterfaceManager>,
+                          tmpl::list<InitializationTags::TargetStepSize,
+                                     Initialization::Tags::InitialTimeDelta>,
+                          tmpl::list<>>>>;
   using initialization_tags_to_keep = tmpl::list<ManagerTag>;
   using const_global_cache_tags = tmpl::list<Tags::LMax>;
 
@@ -64,6 +70,36 @@ struct InitializeWorldtubeBoundaryBase {
 
       Initialization::mutate_assign<simple_tags>(make_not_null(&box),
                                                  std::move(boundary_variables));
+      if constexpr (std::is_same_v<ManagerTag, Tags::GhInterfaceManager>) {
+        // TODO this should use dynamic casting instead, because the check being
+        // performed actually has to do with the interpolation manager not the
+        // strategy.
+        if (db::get<ManagerTag>(box).get_interpolation_strategy() ==
+            Cce::InterfaceManagers::InterpolationStrategy::EverySubstep) {
+          if (db::get<InitializationTags::TargetStepSize>(box) !=
+              db::get<Initialization::Tags::InitialTimeDelta>(box)) {
+            ERROR(
+                "You are using the GhLockstep interpolation manager and the "
+                "CCE timestep is mismatched with the GH time step. Use a "
+                "different interpolation manager or make the time steps of the "
+                "two systems identical.");
+          }
+        } else {
+          if (db::get<InitializationTags::TargetStepSize>(box) <
+              2.0 * db::get<Initialization::Tags::InitialTimeDelta>(box)) {
+            ERROR(
+                "You are using the GhLocalTimeStepping interpolation manager "
+                "and the CCE time step is less than twice the GH timestep -- "
+                "this will tend to cause slowdowns on the CCE side of the "
+                "evolution due to an overfull inbox. You should probably "
+                "either increase the CCE timestep or decrease the GH timestep. "
+                "In the unlikely event that these steps are both correct for "
+                "your current setup, consider using a different "
+                "InterfaceManager.");
+          }
+        }
+        // check time step details
+      }
       return std::make_tuple(std::move(box));
     } else {
       ERROR(MakeString{} << "Missing required boundary manager tag : "

@@ -171,7 +171,8 @@ void test_gh_initialization() noexcept {
   ActionTesting::emplace_component<component>(
       &runner, 0,
       Tags::GhInterfaceManager::create_from_options(
-          std::make_unique<InterfaceManagers::GhLockstep>()));
+          std::make_unique<InterfaceManagers::GhLockstep>()),
+      0.01, 0.01);
 
   // this should run the initialization
   for (size_t i = 0; i < 3; ++i) {

@@ -27,7 +27,7 @@ Cce:
     InverseCubic
 
   StartTime: 0.0
-  TargetStepSize: 0.17
+  TargetStepSize: 0.02
 
   Filtering:
     RadialFilterHalfPower: 24
@@ -35,6 +35,7 @@ Cce:
     FilterLMax: 14
 
   GhInterfaceManager:
+    # GhLockstep:
     GhLocalTimeStepping:
       AdamsBashforthOrder: 3
 

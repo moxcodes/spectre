@@ -208,7 +208,8 @@ SPECTRE_TEST_CASE("Unit.Evolution.Systems.Cce.Actions.GhBoundaryCommunication",
   ActionTesting::emplace_component<worldtube_component>(
       &runner, 0,
       Tags::GhInterfaceManager::create_from_options(
-          std::make_unique<InterfaceManagers::GhLockstep>()));
+          std::make_unique<InterfaceManagers::GhLockstep>()),
+      target_step_size, target_step_size);
 
   // this should run the initializations
   for (size_t i = 0; i < 4; ++i) {
