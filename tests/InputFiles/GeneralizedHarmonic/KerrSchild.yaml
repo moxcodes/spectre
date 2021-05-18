@@ -22,6 +22,10 @@ PhaseChangeAndTriggers:
          Offset: 0
     - - CheckpointAndExitAfterWallclock:
           WallclockHours: 0.0166  # 1 minute
+  - - Slabs:
+        Specified:
+          Values: [4]
+    - - VisitAndReturn(LoadBalancing)
 
 DomainCreator:
     Shell:
