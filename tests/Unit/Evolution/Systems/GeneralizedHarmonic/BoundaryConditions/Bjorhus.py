@@ -241,13 +241,13 @@ def compute_intermediate_vars(face_mesh_velocity, normal_covector, pi, phi,
                               spacetime_deriv_gauge_source, dt_pi, dt_phi,
                               dt_spacetime_metric, d_pi, d_phi,
                               d_spacetime_metric):
-    inverse_spacetime_metric = np.linalg.inv(spacetime_metric)
     spatial_metric = spacetime_metric[1:, 1:]
     inverse_spatial_metric = np.linalg.inv(spatial_metric)
     unit_interface_normal_vector = np.einsum('i,ij->j', normal_covector,
                                              inverse_spatial_metric)
     shift = gr.shift(spacetime_metric, inverse_spatial_metric)
-    # lapse = gr.lapse(shift, spacetime_metric)
+    inverse_spacetime_metric = gr.inverse_spacetime_metric(
+        lapse, shift, inverse_spatial_metric)
     spacetime_unit_normal_vector = gr.spacetime_normal_vector(lapse, shift)
     spacetime_unit_normal_one_form = spacetime_unit_normal_vector * 0
     spacetime_unit_normal_one_form[0] = -lapse
@@ -348,12 +348,14 @@ def dt_corrs_ConstraintPreserving(face_mesh_velocity, normal_covector,
          d_pi, d_phi, d_spacetime_metric)
     if face_mesh_velocity is not None:
         char_speeds = char_speeds - np.dot(normal_covector, face_mesh_velocity)
-    dt_v_psi = add_constraint_preserving_terms_to_dt_v_psi(
+    if np.amin(char_speeds) >= 0.:
+        return (pi * 0, phi * 0, pi * 0, pi * 0)
+    dt_v_psi = constraint_preserving_bjorhus_corrections_dt_v_psi(
         unit_interface_normal_vector, three_index_constraint, char_speeds)
-    dt_v_zero = add_constraint_preserving_terms_to_dt_v_zero(
+    dt_v_zero = constraint_preserving_bjorhus_corrections_dt_v_zero(
         unit_interface_normal_vector, four_index_constraint, char_speeds)
     dt_v_plus = dt_v_psi * 0
-    dt_v_minus = add_constraint_preserving_terms_to_dt_v_minus(
+    dt_v_minus = constraint_preserving_bjorhus_corrections_dt_v_minus(
         gamma2, coords, incoming_null_one_form, outgoing_null_one_form,
         incoming_null_vector, outgoing_null_vector, projection_ab,
         projection_Ab, projection_AB, char_projected_rhs_dt_v_psi,
@@ -387,12 +389,14 @@ def dt_corrs_ConstraintPreservingPhysical(
          d_pi, d_phi, d_spacetime_metric)
     if face_mesh_velocity is not None:
         char_speeds = char_speeds - np.dot(normal_covector, face_mesh_velocity)
-    dt_v_psi = add_constraint_preserving_terms_to_dt_v_psi(
+    if np.amin(char_speeds) >= 0.:
+        return (pi * 0, phi * 0, pi * 0, pi * 0)
+    dt_v_psi = constraint_preserving_bjorhus_corrections_dt_v_psi(
         unit_interface_normal_vector, three_index_constraint, char_speeds)
-    dt_v_zero = add_constraint_preserving_terms_to_dt_v_zero(
+    dt_v_zero = constraint_preserving_bjorhus_corrections_dt_v_zero(
         unit_interface_normal_vector, four_index_constraint, char_speeds)
     dt_v_plus = dt_v_psi * 0
-    dt_v_minus = add_constraint_preserving_physical_terms_to_dt_v_minus(
+    dt_v_minus = constraint_preserving_physical_bjorhus_corrections_dt_v_minus(
         gamma2, coords, normal_covector, unit_interface_normal_vector,
         spacetime_unit_normal_vector, incoming_null_one_form,
         outgoing_null_one_form, incoming_null_vector, outgoing_null_vector,

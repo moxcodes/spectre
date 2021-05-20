@@ -16,6 +16,7 @@
 #include "PointwiseFunctions/GeneralRelativity/GeneralizedHarmonic/ExtrinsicCurvature.hpp"
 #include "PointwiseFunctions/GeneralRelativity/IndexManipulation.hpp"
 #include "PointwiseFunctions/GeneralRelativity/InterfaceNullNormal.hpp"
+#include "PointwiseFunctions/GeneralRelativity/InverseSpacetimeMetric.hpp"
 #include "PointwiseFunctions/GeneralRelativity/Lapse.hpp"
 #include "PointwiseFunctions/GeneralRelativity/ProjectionOperators.hpp"
 #include "PointwiseFunctions/GeneralRelativity/Shift.hpp"
@@ -30,17 +31,15 @@ namespace GeneralizedHarmonic::BoundaryConditions {
 namespace helpers {
 double min_characteristic_speed(
     const std::array<DataVector, 4>& char_speeds) noexcept {
-  std::array<double, 4> min_speeds{
-      {min(char_speeds.at(0)), min(char_speeds.at(1)), min(char_speeds.at(2)),
-       min(char_speeds.at(3))}};
+  std::array<double, 4> min_speeds{{min(char_speeds[0]), min(char_speeds[1]),
+                                    min(char_speeds[2]), min(char_speeds[3])}};
   return *std::min_element(min_speeds.begin(), min_speeds.end());
 }
 template <typename T>
 void set_bc_corr_zero_when_char_speed_is_positive(
     const gsl::not_null<T*> dt_v_corr,
     const DataVector& char_speed_u) noexcept {
-  auto it = dt_v_corr->begin();
-  for (; it != dt_v_corr->end(); ++it) {
+  for (auto it = dt_v_corr->begin(); it != dt_v_corr->end(); ++it) {
     for (size_t i = 0; i < it->size(); ++i) {
       if (char_speed_u[i] > 0.) {
         (*it)[i] = 0.;
@@ -227,17 +226,25 @@ std::optional<std::string> ConstraintPreservingBjorhus<Dim>::dg_time_derivative(
       char_speeds.at(a) -= negative_lambda0;
     }
   }
+  // If the chosen boundary lies inside the apparent horizon, return here
+  if (helpers::min_characteristic_speed(char_speeds) >= 0.) {
+    std::fill(dt_spacetime_metric_correction->begin(),
+              dt_spacetime_metric_correction->end(), 0.);
+    std::fill(dt_pi_correction->begin(), dt_pi_correction->end(), 0.);
+    std::fill(dt_phi_correction->begin(), dt_phi_correction->end(), 0.);
+    return {};
+  }
 
-  Bjorhus::add_constraint_preserving_terms_to_dt_v_psi(
+  Bjorhus::constraint_preserving_bjorhus_corrections_dt_v_psi(
       make_not_null(&bc_dt_v_psi), unit_interface_normal_vector,
       three_index_constraint, char_speeds);
 
-  Bjorhus::add_constraint_preserving_terms_to_dt_v_zero(
+  Bjorhus::constraint_preserving_bjorhus_corrections_dt_v_zero(
       make_not_null(&bc_dt_v_zero), unit_interface_normal_vector,
       four_index_constraint, char_speeds);
 
   if (type_ == detail::ConstraintPreservingBjorhusType::ConstraintPreserving) {
-    Bjorhus::add_constraint_preserving_terms_to_dt_v_minus(
+    Bjorhus::constraint_preserving_bjorhus_corrections_dt_v_minus(
         make_not_null(&bc_dt_v_minus), gamma2, coords, incoming_null_one_form,
         outgoing_null_one_form, incoming_null_vector, outgoing_null_vector,
         projection_ab, projection_Ab, projection_AB,
@@ -245,7 +252,7 @@ std::optional<std::string> ConstraintPreservingBjorhus<Dim>::dg_time_derivative(
         constraint_char_zero_plus, constraint_char_zero_minus, char_speeds);
   } else if (type_ == detail::ConstraintPreservingBjorhusType::
                           ConstraintPreservingPhysical) {
-    Bjorhus::add_constraint_preserving_physical_terms_to_dt_v_minus(
+    Bjorhus::constraint_preserving_physical_bjorhus_corrections_dt_v_minus(
         make_not_null(&bc_dt_v_minus), gamma2, coords, normal_covector,
         unit_interface_normal_vector, spacetime_unit_normal_vector,
         incoming_null_one_form, outgoing_null_one_form, incoming_null_vector,
@@ -263,11 +270,11 @@ std::optional<std::string> ConstraintPreservingBjorhus<Dim>::dg_time_derivative(
 
   // Only add corrections at grid points where the char speeds are negative
   helpers::set_bc_corr_zero_when_char_speed_is_positive(
-      make_not_null(&bc_dt_v_psi), char_speeds.at(0));
+      make_not_null(&bc_dt_v_psi), char_speeds[0]);
   helpers::set_bc_corr_zero_when_char_speed_is_positive(
-      make_not_null(&bc_dt_v_zero), char_speeds.at(1));
+      make_not_null(&bc_dt_v_zero), char_speeds[1]);
   helpers::set_bc_corr_zero_when_char_speed_is_positive(
-      make_not_null(&bc_dt_v_minus), char_speeds.at(3));
+      make_not_null(&bc_dt_v_minus), char_speeds[3]);
 
   // Convert corrections to dt<evolved variables>
   auto dt_evolved_vars = evolved_fields_from_characteristic_fields(
@@ -279,18 +286,6 @@ std::optional<std::string> ConstraintPreservingBjorhus<Dim>::dg_time_derivative(
   *dt_spacetime_metric_correction =
       get<gr::Tags::SpacetimeMetric<Dim, Frame::Inertial, DataVector>>(
           dt_evolved_vars);
-
-  // Subtract out original dt<vars>
-  //   for (size_t a = 0; a <= Dim; ++a) {
-  //     for (size_t b = a; b <= Dim; ++b) {
-  //       dt_pi_correction->get(a, b) -= dt_pi.get(a, b);
-  //       dt_spacetime_metric_correction->get(a, b) -=
-  //           dt_spacetime_metric.get(a, b);
-  //       for (size_t i = 0; i < Dim; ++i) {
-  //         dt_phi_correction->get(i, a, b) -= dt_phi.get(i, a, b);
-  //       }
-  //     }
-  //   }
 
   if (face_mesh_velocity.has_value()) {
     const auto negative_lambda0 =
@@ -374,7 +369,6 @@ void ConstraintPreservingBjorhus<Dim>::compute_intermediate_vars(
                         ::Tags::Tempia<0, Dim, Frame::Inertial, DataVector>>>
       local_buffer(get_size(get<0>(normal_covector)));
 
-  //   auto& lapse = get<::Tags::TempScalar<0, DataVector>>(local_buffer);
   auto& shift =
       get<::Tags::TempI<0, Dim, Frame::Inertial, DataVector>>(local_buffer);
   auto& spatial_metric =
@@ -384,14 +378,14 @@ void ConstraintPreservingBjorhus<Dim>::compute_intermediate_vars(
   auto& two_index_constraint =
       get<::Tags::Tempia<0, Dim, Frame::Inertial, DataVector>>(local_buffer);
 
-  *inverse_spacetime_metric = determinant_and_inverse(spacetime_metric).second;
   gr::spatial_metric(make_not_null(&spatial_metric), spacetime_metric);
   *inverse_spatial_metric = determinant_and_inverse(spatial_metric).second;
   raise_or_lower_index(unit_interface_normal_vector, normal_covector,
                        *inverse_spatial_metric);
-
   gr::shift(make_not_null(&shift), spacetime_metric, *inverse_spatial_metric);
-  //   gr::lapse(make_not_null(&lapse), shift, spacetime_metric);
+  gr::inverse_spacetime_metric(inverse_spacetime_metric, lapse, shift,
+                               *inverse_spatial_metric);
+
   gr::spacetime_normal_vector(spacetime_unit_normal_vector, lapse, shift);
   gr::spacetime_normal_one_form(make_not_null(&spacetime_unit_normal_one_form),
                                 lapse);
