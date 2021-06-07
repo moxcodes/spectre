@@ -423,7 +423,7 @@ void add_received_variables(
     const TemporalId& temporal_id) noexcept {
   db::mutate<Tags::IndicesOfFilledInterpPoints<TemporalId>,
              Tags::InterpolatedVars<InterpolationTargetTag, TemporalId>>(
-      box, [&temporal_id, &vars_src, &global_offsets ](
+      box, [&temporal_id, &vars_src, &global_offsets](
                const gsl::not_null<
                    std::unordered_map<TemporalId, std::unordered_set<size_t>>*>
                    indices_of_filled,
@@ -431,6 +431,10 @@ void add_received_variables(
                    TemporalId, Variables<typename InterpolationTargetTag::
                                              vars_to_interpolate_to_target>>*>
                    vars_dest_all_times) noexcept {
+        if (vars_dest_all_times->count(temporal_id) == 0_st) {
+          ERROR("Temporal id " << temporal_id
+                               << " missing from variables map!\n");
+        }
         auto& vars_dest = vars_dest_all_times->at(temporal_id);
         // Here we assume that vars_dest has been allocated to the correct
         // size (but could contain garbage, since below we are filling it).
