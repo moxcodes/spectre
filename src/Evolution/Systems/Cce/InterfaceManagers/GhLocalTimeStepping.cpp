@@ -155,8 +155,9 @@ void GhLocalTimeStepping::update_history() noexcept {
   while (not pre_history_.empty() and
          static_cast<bool>(get<1>(pre_history_.at(0))) and
          static_cast<bool>(get<2>(pre_history_.at(0))) and
-         requests_.front().substep_time().value() >=
-             get<0>(pre_history_.front()).substep_time().value()) {
+         (requests_.front().substep_time().value() >=
+              get<0>(pre_history_.front()).substep_time().value() or
+          boundary_history_.size() < boundary_history_.integration_order())) {
     boundary_history_.insert(get<0>(pre_history_.front()),
                              *get<3>(pre_history_.front()));
     boundary_history_.most_recent_value() = *get<1>(pre_history_.front());
@@ -177,8 +178,8 @@ auto GhLocalTimeStepping::retrieve_and_remove_first_ready_gh_data() noexcept
     return std::nullopt;
   }
   const double first_request = requests_.front().substep_time().value();
-  if (boundary_history_.size() > 0 and
-      (boundary_history_.end() - 1)->value() <= first_request and
+  if (boundary_history_.size() >= boundary_history_.integration_order() and
+      boundary_history_.begin()->value() <= first_request and
       latest_next_.substep_time().value() >= first_request) {
     gh_variables latest_values{};
     time_stepper_.dense_update_u(make_not_null(&latest_values),
