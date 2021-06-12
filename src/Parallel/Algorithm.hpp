@@ -204,6 +204,7 @@ class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
     }
     p | performing_action_;
     p | phase_;
+    p | phase_bookmarks_;
     p | algorithm_step_;
     if constexpr (Parallel::is_node_group_proxy<cproxy_type>::value) {
       p | node_lock_;
@@ -341,6 +342,9 @@ class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
   }
   // @}
 
+  /// Start execution of the phase-dependent action list in `next_phase`. If
+  /// `next_phase` has already been visited, execution will resume at the point
+  /// where the previous execution of the same phase left off.
   void start_phase(const PhaseType next_phase) noexcept {
     // terminate should be true since we exited a phase previously.
     if (not get_terminate() and not halt_algorithm_until_next_phase_) {
@@ -354,9 +358,15 @@ class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
           << ", and the halt flag is: " << halt_algorithm_until_next_phase_);
     }
     // set terminate to true if there are no actions in this PDAL
+
     set_terminate(number_of_actions_in_phase(next_phase) == 0);
+    phase_bookmarks_[phase_] = algorithm_step_;
     phase_ = next_phase;
-    algorithm_step_ = 0;
+    if(phase_bookmarks_.count(phase_) != 0) {
+      algorithm_step_ = phase_bookmarks_.at(phase_);
+    } else {
+      algorithm_step_ = 0;
+    }
     halt_algorithm_until_next_phase_ = false;
     perform_algorithm();
   }
@@ -642,6 +652,7 @@ class AlgorithmImpl<ParallelComponent, tmpl::list<PhaseDepActionListsPack...>>
   Parallel::CProxy_GlobalCache<metavariables> global_cache_proxy_;
   bool performing_action_ = false;
   PhaseType phase_{};
+  std::unordered_map<PhaseType, size_t> phase_bookmarks_{};
   std::size_t algorithm_step_ = 0;
   tmpl::conditional_t<Parallel::is_node_group_proxy<cproxy_type>::value,
                       Parallel::NodeLock, NoSuchType>
