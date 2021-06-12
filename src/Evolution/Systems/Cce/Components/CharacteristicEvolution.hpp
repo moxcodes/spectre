@@ -164,9 +164,9 @@ struct CharacteristicEvolution {
       Actions::RequestBoundaryData<
           typename Metavariables::cce_boundary_component,
           CharacteristicEvolution<Metavariables>>,
+      ::Actions::Label<CceEvolutionLabelTag>,
       Actions::ReceiveWorldtubeData<Metavariables>,
       Actions::InitializeFirstHypersurface,
-      ::Actions::Label<CceEvolutionLabelTag>,
       Actions::RequestNextBoundaryData<
           typename Metavariables::cce_boundary_component,
           CharacteristicEvolution<Metavariables>>,
@@ -175,9 +175,7 @@ struct CharacteristicEvolution {
                       tmpl::bind<hypersurface_computation, tmpl::_1>>,
       Actions::FilterSwshVolumeQuantity<Tags::BondiH>,
       compute_scri_quantities_and_observe, record_time_stepper_data_and_step,
-      Actions::ExitIfEndTimeReached,
-      Actions::ReceiveWorldtubeData<Metavariables>,
-      ::Actions::Goto<CceEvolutionLabelTag>>;
+      Actions::ExitIfEndTimeReached, ::Actions::Goto<CceEvolutionLabelTag>>;
 
   using phase_dependent_action_list =
       tmpl::list<Parallel::PhaseActions<typename Metavariables::Phase,
