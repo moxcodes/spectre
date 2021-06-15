@@ -56,15 +56,22 @@ struct UnionOfBcTypes<evolution::BoundaryConditions::Type::TimeDerivative,
 
 template <evolution::BoundaryConditions::Type GhBcType>
 struct UnionOfBcTypes<GhBcType, evolution::BoundaryConditions::Type::Outflow> {
-  static_assert(GhBcType == evolution::BoundaryConditions::Type::Outflow);
-  static constexpr evolution::BoundaryConditions::Type bc_type =
-      evolution::BoundaryConditions::Type::Outflow;
+  static_assert(GhBcType == evolution::BoundaryConditions::Type::Outflow,
+                "If either boundary condition in `ProductOfConditions` has "
+                "`Type::Outflow`, both must have `Type::Outflow`");
 };
 
 template <evolution::BoundaryConditions::Type ValenciaBcType>
 struct UnionOfBcTypes<evolution::BoundaryConditions::Type::Outflow,
                       ValenciaBcType> {
-  static_assert(ValenciaBcType == evolution::BoundaryConditions::Type::Outflow);
+  static_assert(ValenciaBcType == evolution::BoundaryConditions::Type::Outflow,
+                "If either boundary condition in `ProductOfConditions` has "
+                "`Type::Outflow`, both must have `Type::Outflow`");
+};
+
+template <>
+struct UnionOfBcTypes<evolution::BoundaryConditions::Type::Outflow,
+                      evolution::BoundaryConditions::Type::Outflow> {
   static constexpr evolution::BoundaryConditions::Type bc_type =
       evolution::BoundaryConditions::Type::Outflow;
 };

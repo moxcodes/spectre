@@ -15,6 +15,8 @@ template <size_t Dim>
 class ConstraintPreservingBjorhus;
 template <size_t Dim>
 class DirichletAnalytic;
+template <size_t Dim>
+class Outflow;
 }  // namespace GeneralizedHarmonic::BoundaryConditions
 /// \endcond
 
@@ -26,6 +28,7 @@ class BoundaryCondition : public domain::BoundaryConditions::BoundaryCondition {
  public:
   using creatable_classes =
       tmpl::list<ConstraintPreservingBjorhus<Dim>, DirichletAnalytic<Dim>,
+                 Outflow<Dim>,
                  domain::BoundaryConditions::Periodic<BoundaryCondition<Dim>>>;
 
   BoundaryCondition() = default;
