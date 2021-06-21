@@ -53,6 +53,7 @@
 #include "Evolution/Systems/GrMhd/ValenciaDivClean/BoundaryCorrections/Factory.hpp"
 #include "Evolution/Systems/GrMhd/ValenciaDivClean/BoundaryCorrections/RegisterDerived.hpp"
 #include "Evolution/Systems/GrMhd/ValenciaDivClean/FixConservatives.hpp"
+#include "Evolution/Systems/GrMhd/ValenciaDivClean/KastaunEtAl.hpp"
 #include "Evolution/Systems/GrMhd/ValenciaDivClean/NewmanHamlin.hpp"
 #include "Evolution/Systems/GrMhd/ValenciaDivClean/PalenzuelaEtAl.hpp"
 #include "Evolution/Systems/GrMhd/ValenciaDivClean/System.hpp"
@@ -91,6 +92,8 @@
 #include "NumericalAlgorithms/Interpolation/InterpolatorRegisterElement.hpp"
 #include "NumericalAlgorithms/Interpolation/Tags.hpp"
 #include "NumericalAlgorithms/Interpolation/TryToInterpolate.hpp"
+#include "NumericalAlgorithms/LinearOperators/ExponentialFilter.hpp"
+#include "NumericalAlgorithms/LinearOperators/FilterAction.hpp"
 #include "Options/Options.hpp"
 #include "Options/Protocols/FactoryCreation.hpp"
 #include "Parallel/Actions/SetupDataBox.hpp"
@@ -204,6 +207,7 @@ struct GhValenciaDivCleanDefaults {
       tmpl::append<typename system::primitive_variables_tag::tags_list,
                    typename system::gh_system::variables_tag::tags_list>;
   using ordered_list_of_primitive_recovery_schemes = tmpl::list<
+      grmhd::ValenciaDivClean::PrimitiveRecoverySchemes::KastaunEtAl,
       grmhd::ValenciaDivClean::PrimitiveRecoverySchemes::NewmanHamlin,
       grmhd::ValenciaDivClean::PrimitiveRecoverySchemes::PalenzuelaEtAl>;
 
@@ -402,7 +406,8 @@ struct GhValenciaDivCleanTemplateBase<
       Limiters::Actions::Limit<derived_metavars>,
       VariableFixing::Actions::FixVariables<
           grmhd::ValenciaDivClean::FixConservatives>,
-      Actions::UpdatePrimitives>>;
+      Actions::UpdatePrimitives,
+      dg::Actions::Filter<Filters::Exponential<0>, analytic_solution_fields>>>;
 
   using initialization_actions = tmpl::list<
       Actions::SetupDataBox,
