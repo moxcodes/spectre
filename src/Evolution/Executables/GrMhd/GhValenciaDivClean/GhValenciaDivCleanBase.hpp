@@ -147,6 +147,7 @@
 #include "PointwiseFunctions/GeneralRelativity/Christoffel.hpp"
 #include "PointwiseFunctions/GeneralRelativity/DetAndInverseSpatialMetric.hpp"
 #include "PointwiseFunctions/GeneralRelativity/GeneralizedHarmonic/ConstraintGammas.hpp"
+#include "PointwiseFunctions/GeneralRelativity/GeneralizedHarmonic/GaugeSource.hpp"
 #include "PointwiseFunctions/GeneralRelativity/IndexManipulation.hpp"
 #include "PointwiseFunctions/GeneralRelativity/Ricci.hpp"
 #include "PointwiseFunctions/GeneralRelativity/Tags.hpp"
@@ -249,7 +250,14 @@ struct GhValenciaDivCleanDefaults {
       GeneralizedHarmonic::Actions::InitializeConstraints<volume_dim>,
       VariableFixing::Actions::FixVariables<
           VariableFixing::FixToAtmosphere<volume_dim>>,
-      Actions::UpdateConservatives, Parallel::Actions::TerminatePhase>;
+      Actions::UpdateConservatives,
+      Initialization::Actions::AddComputeTags<
+          tmpl::list<GeneralizedHarmonic::Tags::TwoIndexConstraintCompute<
+                         volume_dim, domain_frame>,
+                     ::Tags::PointwiseL2NormCompute<
+                         GeneralizedHarmonic::Tags::TwoIndexConstraint<
+                             volume_dim, domain_frame>>>>,
+      Parallel::Actions::TerminatePhase>;
 
   // NOLINTNEXTLINE(google-runtime-references)
   void pup(PUP::er& /*p*/) noexcept {}
@@ -290,12 +298,16 @@ struct GhValenciaDivCleanTemplateBase<
   using observe_fields = tmpl::append<
       typename system::variables_tag::tags_list,
       typename system::primitive_variables_tag::tags_list,
+      db::wrap_tags_in<Tags::dt, typename system::variables_tag::tags_list>,
       tmpl::list<
+          grmhd::GhValenciaDivClean::Tags::TraceReversedStressEnergy,
           ::Tags::PointwiseL2Norm<GeneralizedHarmonic::Tags::GaugeConstraint<
               volume_dim, domain_frame>>,
           ::Tags::PointwiseL2Norm<
               GeneralizedHarmonic::Tags::ThreeIndexConstraint<volume_dim,
                                                               domain_frame>>,
+          ::Tags::PointwiseL2Norm<GeneralizedHarmonic::Tags::TwoIndexConstraint<
+              volume_dim, domain_frame>>,
           ::Tags::PointwiseL2Norm<
               GeneralizedHarmonic::Tags::FourIndexConstraint<volume_dim,
                                                              domain_frame>>>>;

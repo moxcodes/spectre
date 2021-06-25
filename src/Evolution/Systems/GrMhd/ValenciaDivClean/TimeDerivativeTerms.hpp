@@ -76,6 +76,9 @@ struct TimeDerivativeTerms {
       // Need lapse, shift, and inverse spatial metric to be projected to the
       // boundary for Riemann solvers.
       gr::Tags::Lapse<>, gr::Tags::Shift<3>, gr::Tags::InverseSpatialMetric<3>>;
+
+  using temporary_tags_to_save = tmpl::list<>;
+
   using argument_tags = tmpl::list<
       grmhd::ValenciaDivClean::Tags::TildeD,
       grmhd::ValenciaDivClean::Tags::TildeTau,

@@ -111,6 +111,9 @@ struct TimeDerivative {
       gr::Tags::SpacetimeNormalVector<Dim, Frame::Inertial, DataVector>,
       gr::Tags::SpacetimeNormalOneForm<Dim, Frame::Inertial, DataVector>,
       gr::Tags::DerivativesOfSpacetimeMetric<Dim, Frame::Inertial, DataVector>>;
+
+  using temporary_tags_to_save = tmpl::list<>;
+
   using argument_tags = tmpl::list<
       gr::Tags::SpacetimeMetric<Dim>, Tags::Pi<Dim>, Tags::Phi<Dim>,
       ::GeneralizedHarmonic::ConstraintDamping::Tags::ConstraintGamma0,

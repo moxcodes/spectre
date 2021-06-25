@@ -207,6 +207,13 @@ struct TimeDerivativeTerms {
   using temporary_tags = tmpl::flatten<tmpl::list<
       gh_temp_tags, valencia_temp_tags, Tags::TraceReversedStressEnergy,
       Tags::FourVelocityOneForm, Tags::ComovingMagneticFieldOneForm>>;
+  using temporary_tags_to_save =
+      tmpl::append<typename GeneralizedHarmonic::TimeDerivative<
+                       3_st>::temporary_tags_to_save,
+                   typename grmhd::ValenciaDivClean::TimeDerivativeTerms::
+                       temporary_tags_to_save,
+                   tmpl::list<Tags::TraceReversedStressEnergy>>;
+
   using argument_tags = tmpl::append<gh_arg_tags, valencia_arg_tags>;
 
   template <typename... Args>

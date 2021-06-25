@@ -194,7 +194,10 @@ struct EvolutionMetavars {
                     volume_dim, Tags::Time,
                     tmpl::append<
                         typename system::variables_tag::tags_list,
-                        typename system::primitive_variables_tag::tags_list>,
+                        +typename system::primitive_variables_tag::tags_list,
+                        +db::wrap_tags_in<
+                            Tags::dt,
+                            typename system::variables_tag::tags_list>>,
                     tmpl::conditional_t<
                         evolution::is_analytic_solution_v<initial_data>,
                         analytic_variables_tags, tmpl::list<>>>,
@@ -203,9 +206,9 @@ struct EvolutionMetavars {
                                            interpolator_source_vars>...>>>,
         tmpl::pair<StepChooser<StepChooserUse::LtsStep>,
                    StepChoosers::standard_step_choosers<system>>,
-        tmpl::pair<StepChooser<StepChooserUse::Slab>,
-                   StepChoosers::standard_slab_choosers<system,
-                                                        local_time_stepping>>,
+        tmpl::pair<
+            StepChooser<StepChooserUse::Slab>,
+            StepChoosers::standard_slab_choosers<system, local_time_stepping>>,
         tmpl::pair<StepController, StepControllers::standard_step_controllers>,
         tmpl::pair<Trigger, tmpl::append<Triggers::logical_triggers,
                                          Triggers::time_triggers>>>;
