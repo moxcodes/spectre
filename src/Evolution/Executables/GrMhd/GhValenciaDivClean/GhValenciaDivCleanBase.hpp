@@ -47,6 +47,7 @@
 #include "Evolution/Systems/GeneralizedHarmonic/UpwindPenaltyCorrection.hpp"
 #include "Evolution/Systems/GrMhd/GhValenciaDivClean/BoundaryConditions/ProductOfConditions.hpp"
 #include "Evolution/Systems/GrMhd/GhValenciaDivClean/BoundaryCorrections/ProductOfCorrections.hpp"
+#include "Evolution/Systems/GrMhd/GhValenciaDivClean/Constraints.hpp"
 #include "Evolution/Systems/GrMhd/GhValenciaDivClean/System.hpp"
 #include "Evolution/Systems/GrMhd/ValenciaDivClean/BoundaryConditions/Factory.hpp"
 #include "Evolution/Systems/GrMhd/ValenciaDivClean/BoundaryConditions/RegisterDerivedWithCharm.hpp"
@@ -251,12 +252,16 @@ struct GhValenciaDivCleanDefaults {
       VariableFixing::Actions::FixVariables<
           VariableFixing::FixToAtmosphere<volume_dim>>,
       Actions::UpdateConservatives,
-      Initialization::Actions::AddComputeTags<
-          tmpl::list<GeneralizedHarmonic::Tags::TwoIndexConstraintCompute<
-                         volume_dim, domain_frame>,
-                     ::Tags::PointwiseL2NormCompute<
-                         GeneralizedHarmonic::Tags::TwoIndexConstraint<
-                             volume_dim, domain_frame>>>>,
+      Initialization::Actions::AddComputeTags<tmpl::list<
+          GeneralizedHarmonic::Tags::TwoIndexConstraintCompute<volume_dim,
+                                                               domain_frame>,
+          grmhd::GhValenciaDivClean::Tags::FConstraintCompute<volume_dim,
+                                                              domain_frame>,
+          ::Tags::PointwiseL2NormCompute<
+              GeneralizedHarmonic::Tags::TwoIndexConstraint<volume_dim,
+                                                            domain_frame>>,
+          ::Tags::PointwiseL2NormCompute<GeneralizedHarmonic::Tags::FConstraint<
+              volume_dim, domain_frame>>>>,
       Parallel::Actions::TerminatePhase>;
 
   // NOLINTNEXTLINE(google-runtime-references)
@@ -308,6 +313,8 @@ struct GhValenciaDivCleanTemplateBase<
                                                               domain_frame>>,
           ::Tags::PointwiseL2Norm<GeneralizedHarmonic::Tags::TwoIndexConstraint<
               volume_dim, domain_frame>>,
+          ::Tags::PointwiseL2Norm<
+              GeneralizedHarmonic::Tags::FConstraint<volume_dim, domain_frame>>,
           ::Tags::PointwiseL2Norm<
               GeneralizedHarmonic::Tags::FourIndexConstraint<volume_dim,
                                                              domain_frame>>>>;
